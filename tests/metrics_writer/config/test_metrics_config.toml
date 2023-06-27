@@ -1,0 +1,16 @@
+[aggregations]
+level1 = 'Census_Bg'
+    
+[queries]
+
+    [queries.query1]
+    name = "Total Damage Sum"
+    description = "Total of the damage event"
+    select = "SUM(`Total Damage Event`) AS `Total Damage Sum`"
+    filter = ""
+
+    [queries.query2]
+    name = "Max Damage"
+    description = "Max of the damage event"
+    select = "MAX(`Total Damage Event`) AS `Total Damage Sum`"
+    filter = ""
