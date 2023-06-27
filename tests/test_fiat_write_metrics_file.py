@@ -6,7 +6,10 @@ from unittest.mock import patch
 import pandas as pd
 import pandasql as pdsql
 
-from fiat_toolbox.metrics_writer.fiat_write_metrics_file import WriteMetricsFile, sql_struct
+from fiat_toolbox.metrics_writer.fiat_write_metrics_file import (
+    WriteMetricsFile,
+    sql_struct,
+)
 
 
 class TestReadMetricsConfigFile(unittest.TestCase):
@@ -20,6 +23,59 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         config_file = Path("config_file.json")
         mock_path_exists.return_value = True
         mock_json_load.return_value = {
+            "queries": [
+                {
+                    "name": "Total Damage Sum",
+                    "description": "Total of the damage event",
+                    "select": "SUM(`Total Damage Event`)",
+                    "filter": "`Object ID` > 2",
+                    "groupby": "",
+                },
+                {
+                    "name": "Single Family Damage Sum",
+                    "description": "Total of the damage event for only single families",
+                    "select": "SUM(`Total Damage Event`)",
+                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "groupby": "",
+                },
+            ]
+        }
+
+        # Act
+        write_class = WriteMetricsFile(config_file)
+        sql_prompts_without_aggregates = write_class._read_metrics_file(
+            include_aggregates=False
+        )
+
+        # Assert
+        sql_prompts_expected = {
+            "Total Damage Sum": sql_struct(
+                name="Total Damage Sum",
+                description="Total of the damage event",
+                select="SUM(`Total Damage Event`)",
+                filter="`Object ID` > 2",
+                groupby="",
+            ),
+            "Single Family Damage Sum": sql_struct(
+                name="Single Family Damage Sum",
+                description="Total of the damage event for only single families",
+                select="SUM(`Total Damage Event`)",
+                filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                groupby="",
+            ),
+        }
+        self.assertEqual(sql_prompts_without_aggregates, sql_prompts_expected)
+
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.toml.load")
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.open")
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.os.path.exists")
+    def test_read_metrics_file_without_aggregates_toml(
+        self, mock_path_exists, mock_open, mock_toml_load
+    ):
+        # Arrange
+        config_file = Path("config_file.toml")
+        mock_path_exists.return_value = True
+        mock_toml_load.return_value = {
             "queries": [
                 {
                     "name": "Total Damage Sum",
@@ -154,6 +210,30 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             write_class._read_metrics_file(include_aggregates=True)
             self.assertTrue(
                 "Config file config_file.json not found" in str(context.exception)
+            )
+
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.open")
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.os.path.exists")
+    def test_read_metrics_unsupported_file_extension(self, mock_path_exists, mock_open):
+        # Arrange
+        config_file = Path("config_file.txt")
+
+        # Act
+        write_class = WriteMetricsFile(config_file)
+
+        # Assert
+        with self.assertRaises(ValueError) as context:
+            write_class._read_metrics_file(include_aggregates=False)
+            self.assertTrue(
+                "Config file 'config_file.txt' has an invalid extension. Only .json and .toml are supported."
+                in str(context.exception)
+            )
+
+        with self.assertRaises(ValueError) as context:
+            write_class._read_metrics_file(include_aggregates=True)
+            self.assertTrue(
+                "Config file 'config_file.txt' has an invalid extension. Only .json and .toml are supported."
+                in str(context.exception)
             )
 
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.json.load")
@@ -661,7 +741,9 @@ class TestCreateMetricsDict(unittest.TestCase):
 
 
 class TestParseMetrics(unittest.TestCase):
-    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.WriteMetricsFile._read_metrics_file")
+    @patch(
+        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.WriteMetricsFile._read_metrics_file"
+    )
     def test_parse_metrics_config_file_without_aggregates(self, mock_read_metrics_file):
         # Arrange
         config_file = Path("config_file.json")
@@ -711,7 +793,9 @@ class TestParseMetrics(unittest.TestCase):
 
         self.assertEqual(metrics, metrics_expected)
 
-    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.WriteMetricsFile._read_metrics_file")
+    @patch(
+        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.WriteMetricsFile._read_metrics_file"
+    )
     def test_parse_metrics_config_file_with_aggregates(self, mock_read_metrics_file):
         # Arrange
         config_file = Path("config_file.json")
@@ -913,9 +997,7 @@ class TestWriteMetricsFile(unittest.TestCase):
         df_metrics_subbasin = pd.read_csv(
             "tests/metrics_writer/data/metrics_subbasin.csv"
         )
-        df_metrics_taxuse = pd.read_csv(
-            "tests/metrics_writer/data/metrics_taxuse.csv"
-        )
+        df_metrics_taxuse = pd.read_csv("tests/metrics_writer/data/metrics_taxuse.csv")
 
         self.assertTrue(df_metrics_subbasin.equals(df_metrics_subbasin_expected))
         self.assertTrue(df_metrics_taxuse.equals(df_metrics_taxuse_expected))
@@ -965,4 +1047,3 @@ class TestWriteMetricsFile(unittest.TestCase):
             )
 
         os.remove(temporary_file_name)
-        

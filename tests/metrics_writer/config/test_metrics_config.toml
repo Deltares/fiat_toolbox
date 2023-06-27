@@ -1,16 +1,25 @@
-[aggregations]
-level1 = 'Census_Bg'
-    
-[queries]
+aggregateBy = ["Subbasin", "Land Use"]
 
-    [queries.query1]
-    name = "Total Damage Sum"
-    description = "Total of the damage event"
-    select = "SUM(`Total Damage Event`) AS `Total Damage Sum`"
-    filter = ""
+[[queries]]
+name = "Total Damage Sum"
+description = "Total of the damage event"
+select = "SUM(`Total Damage Event`)"
+filter = ""
 
-    [queries.query2]
-    name = "Max Damage"
-    description = "Max of the damage event"
-    select = "MAX(`Total Damage Event`) AS `Total Damage Sum`"
-    filter = ""
+[[queries]]
+name = "Elevation Damage Sum"
+description = "Total of the damage event"
+select = "SUM(`Total Damage Event`)"
+filter = "`Ground Elevation` < 6"
+
+[[queries]]
+name = "Content potential damage portion"
+description = "Content potential damage portion"
+select = "AVG(`Max Potential Damage: Content` / (`Max Potential Damage: Content` + `Max Potential Damage: Structure`))"
+filter = ""
+
+[[queries]]
+name = "Max Damage"
+description = "Max of the damage event"
+select = "MAX(`Total Damage Event`)"
+filter = ""
