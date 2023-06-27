@@ -1,0 +1,16 @@
+name: fiat_toolbox-dev
+
+channels:
+  - conda-forge
+
+dependencies:
+  - black
+  - ipykernel
+  - numpy
+  - pandas
+  - pandasql
+  - pip
+  - pytest # tests
+  - pytest-cov # tests
+  - pytest-benchmark # tests
+  - python>=3.7
