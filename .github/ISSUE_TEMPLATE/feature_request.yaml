@@ -1,7 +1,7 @@
 ---
 name: Feature Request
-description: Suggest an idea/enhancement for HydroMT
-labels: [Enhancement, Needs refinement]
+description: Suggest an idea/enhancement for this project
+labels: [Freature]
 
 body:
   - type: dropdown
