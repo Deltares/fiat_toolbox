@@ -4,88 +4,127 @@ from urllib.request import urlopen
 from io import BytesIO
 from zipfile import ZipFile
 from pathlib import Path
+from typing import Union
 
+def check_datatype(
+        variable: Union[str, pd.DataFrame],
+)->pd.DataFrame:
+    """Check that inputs for equity are rather .csv files or pd.Dataframes
 
-def get_equity_input(block_groups_census, damages):
+    Parameters
+    ----------
+    variable : Union[str, pd.DataFrame]
+        _description_
 
-    def check_datatype(variable):
-        if isinstance(variable, pd.DataFrame):
-            variable = variable
-        elif isinstance(variable, str) and variable.endswith('.csv'):
-            variable = pd.read_csv(variable)
-        else:
-            raise ValueError("Input variable is neither a pandas DataFrame nor a path to a CSV file.")
-        return variable 
+    Returns
+    -------
+    pd.DataFrame
+        _description_
 
-    block_groups_census = check_datatype(block_groups_census)
-    damages  = check_datatype(damages)
+    Raises
+    ------
+    ValueError
+        _description_
+    """
+    if isinstance(variable, pd.DataFrame):
+        variable = variable
+    elif isinstance(variable, str) and variable.endswith('.csv'):
+        variable = pd.read_csv(variable)
+    else:
+        raise ValueError("Input variable is neither a pandas DataFrame nor a path to a CSV file.")
+    return variable 
 
-    # Merge census block groups with fiat output
-    gdf_all = pd.merge(block_groups_census, damages, on="Census_Bg", how="left")
-    gdf_all = gdf_all.dropna().reset_index(drop=True)
+def get_equity_input(
+        census_table: Union[str, pd.DataFrame], 
+        damages_table: Union[str, pd.DataFrame],
+)->pd.DataFrame:
+    """Create dataframe with damage and social data used to calculate the equity weights
 
-    return gdf_all
+    Parameters
+    ----------
+    census_table : Union[str, pd.DataFrame]
+        _description_
+    damages_table : Union[str, pd.DataFrame]
+        _description_
 
-def calculate_equity_weights(gdf_all, gamma):
+    Returns
+    -------
+    pd.DataFrame
+        _description_
+    """
+    # Check if data inputs are wether .csv files or pd.DataFrame
+    census_table = check_datatype(census_table)
+    damages_table  = check_datatype(damages_table)
 
-    gamma = 1.2 # elasticity
+    # Merge census block groups with fiat output (damages estimations per return period)
+    df = pd.merge(census_table, damages_table, on="Census_Bg", how="left")
+    df = df.dropna().reset_index(drop=True)
+    return df
 
-    I_PC = gdf_all["PerCapitaIncomeBG"] # mean per capita income
-    Pop = gdf_all["TotalPopulationBG"] # population
+def calculate_equity_weights(
+        df: pd.DataFrame, 
+        gamma: float,
+)->pd.DataFrame:
+    # Get elasticity parameter
+    # gamma = 1.2 
+
+    # Get population and income per capital data
+    I_PC = df["PerCapitaIncomeBG"] # mean per capita income
+    Pop  = df["TotalPopulationBG"] # population
 
     # Calculate aggregated annual income
     I_AA = I_PC * Pop
+
     # Calculate weighted average income per capita
     I_WA = np.average(I_PC, weights=Pop)
 
+    # Calculate equity weights
     EW = (I_PC / I_WA) ** -gamma # Equity Weight
-
-    gdf_all["I_AA"] = I_AA 
-    gdf_all["EW"] = EW 
-
-    return gdf_all
-
-def calculate_ewced_per_rp(gdf_all, gamma):
     
-    I_AA = gdf_all["I_AA"] 
-    EW   = gdf_all["EW"]
+    # Add annual income to the dataframe
+    df["I_AA"] = I_AA
+    # Add equity weight calculations into the dataframe
+    df["EW"] = EW 
+    return df
 
-    RP_cols = [name for name in gdf_all.columns if "Total Damage" in name]
+def calculate_ewced_per_rp(
+        df_ew: pd.DataFrame, 
+        gamma: float,
+)->pd.DataFrame:
+    
+    # Get equity weight data
+    I_AA = df_ew["I_AA"] 
+    EW   = df_ew["EW"]
 
+    # Retrieve columns with damage per return period data of fiat output
+    RP_cols = [name for name in df_ew.columns if "Total Damage" in name]
+
+    # Get weighted expected annual damage per return period
     for col in RP_cols:
-        D = gdf_all[col] # Damage for return period
-        # EAD = gdf_all["EAD"]
-        RP = int(col.split(" ")[-1][2:]) # Return period
-        t = 1 # period of interest in years
-        P = 1 - np.exp(-t/RP) # Probability of exceedance
-        z = D / I_AA # Social Vulnerability
-
-        R = (1 - (1 + P*((1-z)**(1-gamma)-1))**(1/(1-gamma))) / (P*z) # Risk premium
+        # Damage for return period
+        D = df_ew[col]
+        # Return period
+        RP = int(col.split(" ")[-1][2:]) 
+        # Period of interest in years
+        t = 1 
+        # Probability of exceedance
+        P = 1 - np.exp(-t/RP) 
+        # Social vulnerability
+        z = D / I_AA 
+        # Risk premium
+        R = (1 - (1 + P*((1-z)**(1-gamma)-1))**(1/(1-gamma))) / (P*z) 
         # This step is needed to avoid nan value when z is zero
         R[R.isnull()] = 0 
-        gdf_all[f"R_RP{RP}"] = R
+        # Certainty equivalent damage
+        CED = R * D  
+        # Equity weighted certainty equivalent damage
+        EWCED = EW * CED  
 
-        CED = R * D  # Certainty Equivalent Damage
-        # CEAD = R * D * P # Certainty Equivalent Annual Damage
-        # CEAD_2 = R * EAD # second method to test
-
-        ######## Why is next step needed??????
-        # EWED = EW * D  # Equity Weighted Expected Damage
-        # EWEAD = EW * D * P  # Equity Weighted Expected Annual Damage
-        # EWEAD_2 = EW * EAD  # second method to test
-        ############################################################
-
-        EWCED = EW * CED  # Equity Weighted Certainty Equivalent Damage
-        # EWCEAD = EW * CEAD  # Equity Weighted Certainty Equivalent Annual Damage
-        # EWCEAD_2 = EW * CEAD_2  # Equity Weighted Certainty Equivalent Annual Damage
-
-        # Save in dataframe
-        # gdf_all[f"EWED_RP{RP}"] = EWED 
-        gdf_all[f"EWCED_RP{RP}"] = EWCED
-        # gdf_all[f"EWCEAD_RP{RP}"] = EWCEAD
-        # gdf_all[f"EWCEAD_2_RP{RP}"] = EWCEAD_2
-
-    return gdf_all, RP_cols 
+        # Add risk premium data to dataframes
+        df_ew[f"R_RP{RP}"] = R
+        # Add expected annual damage dataframes 
+        df_ew[f"EWCED_RP{RP}"] = EWCED
+    return df_ew, RP_cols 
 
 # Taken from FIAT for now
 def calculate_coefficients(T):
@@ -131,37 +170,48 @@ def calculate_coefficients(T):
         ]
     return alpha
 
-def calculate_ewced_total(gdf_all, RP_cols):
+def calculate_ewcead(
+        df_ew_rp: pd.DataFrame,  
+        RP_cols,
+)->pd.DataFrame:
     layers = []
     return_periods = []
     for i in RP_cols:
         RP = int(i.split(" ")[-1][2:])
         return_periods.append(RP)
-        layers.append(gdf_all.loc[:, f"EWCED_RP{RP}"].values)
+        layers.append(df_ew_rp.loc[:, f"EWCED_RP{RP}"].values)
 
     stacked_layers = np.dstack(tuple(layers)).squeeze()
-    gdf_all[f"EWCEAD"] = stacked_layers @ np.array(calculate_coefficients(return_periods))[:, None]
+    df_ew_rp[f"EWCEAD"] = stacked_layers @ np.array(calculate_coefficients(return_periods))[:, None]
+    return df_ew_rp
 
-    return gdf_all
+def rank_ewced(
+        df_ewcead: pd.DataFrame, 
+)->pd.DataFrame:
+    df_ewcead["rank_EAD"] = df_ewcead["EAD"].rank(ascending=False)
+    df_ewcead["rank_EWCEAD"] = df_ewcead["EWCEAD"].rank(ascending=False)
+    df_ewcead["rank_diff"] = df_ewcead["rank_EWCEAD"] - df_ewcead["rank_EAD"]
+    return df_ewcead
 
-def rank_ewced(gdf_all):
-    gdf_all["rank_EAD"] = gdf_all["EAD"].rank(ascending=False)
-    gdf_all["rank_EWCEAD"] = gdf_all["EWCEAD"].rank(ascending=False)
-    gdf_all["rank_diff"] = gdf_all["rank_EWCEAD"] - gdf_all["rank_EAD"]
-    return gdf_all
+def calculate_resilience_index(
+        df_ewcead: pd.DataFrame, 
+)->pd.DataFrame:
+    df_ewcead["soc_res"] =  df_ewcead["EAD"]/df_ewcead["EWCEAD"]
+    df_ewcead["soc_res"][df_ewcead["soc_res"] == np.inf] = np.nan
+    return df_ewcead
 
-def calculate_resilience_index(gdf_all):
-    gdf_all["soc_res"] =  gdf_all["EAD"]/gdf_all["EWCEAD"]
-    gdf_all["soc_res"][gdf_all["soc_res"] == np.inf] = np.nan
-    return gdf_all
-
-def setup_equity_method(census_data, fiat_data, gamma, output_file):
-    gdf_all = get_equity_input(census_data , fiat_data)
-    gdf_all = calculate_equity_weights(gdf_all, gamma)
-    gdf_all, RP_cols = calculate_ewced_per_rp(gdf_all, gamma)
-    gdf_all = calculate_ewced_total(gdf_all, RP_cols)
-    # gdf_all = rank_ewced(gdf_all)
-    # gdf_all = calculate_resilience_index(gdf_all)
-    gdf_all_filtered = gdf_all[['Census_Bg', 'EW', 'EWCEAD']] 
-    gdf_all_filtered.to_csv(output_file, index=False)
-    return gdf_all_filtered 
+def setup_equity_method(
+        census_table: Union[str, pd.DataFrame], 
+        damages_table: Union[str, pd.DataFrame],
+        gamma: float,
+        output_file:  Union[str, Path],
+)->pd.DataFrame:
+    df = get_equity_input(census_table, damages_table)
+    df_ew = calculate_equity_weights(df, gamma)
+    df_ew_rp, RP_cols = calculate_ewced_per_rp(df_ew, gamma)
+    df_ewcead = calculate_ewcead(df_ew_rp, RP_cols)
+    df_ewcead = rank_ewced(df_ewcead)
+    df_ewcead = calculate_resilience_index(df_ewcead)
+    df_ewcead_filtered = df_ewcead[['Census_Bg', 'EW', 'EWCEAD']] 
+    df_ewcead_filtered.to_csv(output_file, index=False)
+    return df_ewcead_filtered 
