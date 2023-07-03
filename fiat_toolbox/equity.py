@@ -7,8 +7,18 @@ from pathlib import Path
 
 
 def get_equity_input(block_groups_census, damages):
-    block_groups_census= pd.read_csv(block_groups_census)
-    damages  = pd.read_csv(damages)
+
+    def check_datatype(variable):
+        if isinstance(variable, pd.DataFrame):
+            variable = variable
+        elif isinstance(variable, str) and variable.endswith('.csv'):
+            variable = pd.read_csv(variable)
+        else:
+            raise ValueError("Input variable is neither a pandas DataFrame nor a path to a CSV file.")
+        return variable 
+
+    block_groups_census = check_datatype(block_groups_census)
+    damages  = check_datatype(damages)
 
     # Merge census block groups with fiat output
     gdf_all = pd.merge(block_groups_census, damages, on="Census_Bg", how="left")
@@ -36,8 +46,9 @@ def calculate_equity_weights(gdf_all, gamma):
     return gdf_all
 
 def calculate_ewced_per_rp(gdf_all, gamma):
+    
     I_AA = gdf_all["I_AA"] 
-    EW = gdf_all["EW"]
+    EW   = gdf_all["EW"]
 
     RP_cols = [name for name in gdf_all.columns if "Total Damage" in name]
 
