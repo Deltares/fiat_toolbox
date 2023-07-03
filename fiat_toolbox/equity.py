@@ -144,3 +144,13 @@ def calculate_resilience_index(gdf_all):
     gdf_all["soc_res"][gdf_all["soc_res"] == np.inf] = np.nan
     return gdf_all
 
+def setup_equity_method(census_data, fiat_data, gamma, output_file):
+    gdf_all = get_equity_input(census_data , fiat_data)
+    gdf_all = calculate_equity_weights(gdf_all, gamma)
+    gdf_all, RP_cols = calculate_ewced_per_rp(gdf_all, gamma)
+    gdf_all = calculate_ewced_total(gdf_all, RP_cols)
+    # gdf_all = rank_ewced(gdf_all)
+    # gdf_all = calculate_resilience_index(gdf_all)
+    gdf_all_filtered = gdf_all[['Census_Bg', 'EW', 'EWCEAD']] 
+    gdf_all_filtered.to_csv(output_file, index=False)
+    return gdf_all_filtered 
