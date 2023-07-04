@@ -7,7 +7,7 @@ import pandas as pd
 import pandasql as pdsql
 
 from fiat_toolbox.metrics_writer.fiat_write_metrics_file import (
-    WriteMetricsFile,
+    MetricsFileWriter,
     sql_struct,
 )
 
@@ -42,7 +42,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
         sql_prompts_without_aggregates = write_class._read_metrics_file(
             include_aggregates=False
         )
@@ -95,7 +95,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
         sql_prompts_without_aggregates = write_class._read_metrics_file(
             include_aggregates=False
         )
@@ -149,7 +149,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
         sql_prompts_list_with_aggregates = write_class._read_metrics_file(
             include_aggregates=True
         )
@@ -197,7 +197,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         config_file = Path("config_file.json")
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(FileNotFoundError) as context:
@@ -219,7 +219,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         config_file = Path("config_file.txt")
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -248,7 +248,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         mock_json_load.return_value = {"aggregateBy": ["Subbasin", "Tax Use"]}
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -292,7 +292,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -314,7 +314,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         mock_json_load.return_value = {}
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -360,7 +360,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -385,7 +385,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -428,7 +428,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(KeyError) as context:
@@ -473,7 +473,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -518,7 +518,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
 
         # Assert
         with self.assertRaises(ValueError) as context:
@@ -549,7 +549,7 @@ class TestCreateSingleMetric(unittest.TestCase):
         (
             TotalDamageSumName,
             TotalDamageSumValue,
-        ) = WriteMetricsFile._create_single_metric(
+        ) = MetricsFileWriter._create_single_metric(
             df_results=df_results, sql_command=sql_command
         )
 
@@ -577,7 +577,7 @@ class TestCreateSingleMetric(unittest.TestCase):
         (
             TotalDamageSumName,
             TotalDamageSumValue,
-        ) = WriteMetricsFile._create_single_metric(
+        ) = MetricsFileWriter._create_single_metric(
             df_results=df_results, sql_command=sql_command
         )
 
@@ -612,7 +612,7 @@ class TestCreateSingleMetric(unittest.TestCase):
         (
             TotalDamageSumName,
             TotalDamageSumValue,
-        ) = WriteMetricsFile._create_single_metric(
+        ) = MetricsFileWriter._create_single_metric(
             df_results=df_results, sql_command=sql_command
         )
 
@@ -641,7 +641,7 @@ class TestCreateSingleMetric(unittest.TestCase):
 
         # Act & Assert
         with self.assertRaises(pdsql.PandaSQLException):
-            WriteMetricsFile._create_single_metric(
+            MetricsFileWriter._create_single_metric(
                 df_results=df_results, sql_command=sql_command
             )
 
@@ -663,7 +663,7 @@ class TestCreateSingleMetric(unittest.TestCase):
 
         # Act & Assert
         with self.assertRaises(ValueError) as context:
-            WriteMetricsFile._create_single_metric(
+            MetricsFileWriter._create_single_metric(
                 df_results=df_results, sql_command=sql_command
             )
             self.assertTrue(
@@ -674,7 +674,7 @@ class TestCreateSingleMetric(unittest.TestCase):
 
 class TestCreateMetricsDict(unittest.TestCase):
     @patch(
-        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.WriteMetricsFile._create_single_metric"
+        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.MetricsFileWriter._create_single_metric"
     )
     def test_create_metrics_dict(self, mock_create_single_metric):
         # Arrange
@@ -722,7 +722,7 @@ class TestCreateMetricsDict(unittest.TestCase):
         }
 
         # Act
-        metricsTable = WriteMetricsFile._create_metrics_dict(
+        metricsTable = MetricsFileWriter._create_metrics_dict(
             df_results=df_results, sql_commands=sql_prompts
         )
 
@@ -742,7 +742,7 @@ class TestCreateMetricsDict(unittest.TestCase):
 
 class TestParseMetrics(unittest.TestCase):
     @patch(
-        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.WriteMetricsFile._read_metrics_file"
+        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.MetricsFileWriter._read_metrics_file"
     )
     def test_parse_metrics_config_file_without_aggregates(self, mock_read_metrics_file):
         # Arrange
@@ -785,7 +785,7 @@ class TestParseMetrics(unittest.TestCase):
         )
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
         metrics = write_class._parse_metrics(df_results, include_aggregates=False)
 
         # Assert
@@ -794,7 +794,7 @@ class TestParseMetrics(unittest.TestCase):
         self.assertEqual(metrics, metrics_expected)
 
     @patch(
-        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.WriteMetricsFile._read_metrics_file"
+        "fiat_toolbox.metrics_writer.fiat_write_metrics_file.MetricsFileWriter._read_metrics_file"
     )
     def test_parse_metrics_config_file_with_aggregates(self, mock_read_metrics_file):
         # Arrange
@@ -855,7 +855,7 @@ class TestParseMetrics(unittest.TestCase):
         )
 
         # Act
-        write_class = WriteMetricsFile(config_file)
+        write_class = MetricsFileWriter(config_file)
         metrics = write_class._parse_metrics(df_results, include_aggregates=True)
 
         # Assert
@@ -876,7 +876,7 @@ class TestParseMetrics(unittest.TestCase):
         self.assertEqual(metrics, metrics_expected)
 
 
-class TestWriteMetricsFile(unittest.TestCase):
+class TestMetricsFileWriter(unittest.TestCase):
     def test_write_metrics_file_no_aggregation(self):
         # Arrange
         metrics_no_aggregation = {
@@ -902,7 +902,7 @@ class TestWriteMetricsFile(unittest.TestCase):
         }
 
         # Act
-        WriteMetricsFile._write_metrics_file(
+        MetricsFileWriter._write_metrics_file(
             metrics_no_aggregation,
             sql_prompts_no_aggregation,
             "tests/metrics_writer/data/metrics_no_aggregation.csv",
@@ -973,13 +973,13 @@ class TestWriteMetricsFile(unittest.TestCase):
         }
 
         # Act
-        WriteMetricsFile._write_metrics_file(
+        MetricsFileWriter._write_metrics_file(
             metrics_with_aggregation,
             sql_prompts_with_aggregation,
             "tests/metrics_writer/data/metrics_subbasin.csv",
             write_aggregate="Subbasin",
         )
-        WriteMetricsFile._write_metrics_file(
+        MetricsFileWriter._write_metrics_file(
             metrics_with_aggregation,
             sql_prompts_with_aggregation,
             "tests/metrics_writer/data/metrics_taxuse.csv",
@@ -1034,7 +1034,7 @@ class TestWriteMetricsFile(unittest.TestCase):
 
         # Act & Assert
         with self.assertLogs(level="WARNING") as cm:
-            WriteMetricsFile._write_metrics_file(
+            MetricsFileWriter._write_metrics_file(
                 metrics_no_aggregation,
                 sql_prompts_no_aggregation,
                 temporary_file_name,

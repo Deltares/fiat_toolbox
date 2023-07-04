@@ -8,7 +8,7 @@ from typing import Dict, Tuple, Union
 
 import pandas as pd
 import pandasql as pdsql
-import toml
+import tomli
 
 
 # sql command struct
@@ -21,7 +21,7 @@ class sql_struct:
     groupby: str
 
 
-class IWriteMetricsFile(ABC):
+class IMetricsFileWriter(ABC):
     """Interface for writing metrics to a file."""
 
     @abstractmethod
@@ -38,7 +38,7 @@ class IWriteMetricsFile(ABC):
         pass
 
 
-class WriteMetricsFile(IWriteMetricsFile):
+class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
 
     def __init__(self, config_file: Path):
@@ -70,7 +70,7 @@ class WriteMetricsFile(IWriteMetricsFile):
         if extension == ".json":
             metrics = json.load(open(self.config_file, "r"))
         elif extension == ".toml":
-            metrics = toml.load(open(self.config_file, "r"))
+            metrics = tomli.load(open(self.config_file, "rb"))
         else:
             raise ValueError(
                 f"Config file '{self.config_file}' has an invalid extension. Only .json and .toml are supported."
@@ -226,12 +226,12 @@ class WriteMetricsFile(IWriteMetricsFile):
         """
 
         # Initialize the metrics dictionary
-        df_metrics = dict()
+        df_metrics = {}
 
         # Run the sql commands one by one
         for name, command in sql_commands.items():
             # Create the metric (_create_single_metric is a static method, so no need to instantiate the class)
-            _, value = WriteMetricsFile._create_single_metric(df_results, command)
+            _, value = MetricsFileWriter._create_single_metric(df_results, command)
 
             # Store the metric in the metrics dictionary using the metric name as key
             df_metrics[name] = value
@@ -260,13 +260,13 @@ class WriteMetricsFile(IWriteMetricsFile):
             # Loop over the aggregation labels
             for aggregate, commands in sql_commands.items():
                 # Create the metrics dictionary for the current aggregation label (the _create_metrics_dict is a static method, so no need to instantiate the class)
-                metrics[aggregate] = WriteMetricsFile._create_metrics_dict(
+                metrics[aggregate] = MetricsFileWriter._create_metrics_dict(
                     df_results, commands
                 )
             return metrics
         else:
             # Create the metrics dictionary (the _create_metrics_dict is a static method, so no need to instantiate the class)
-            return WriteMetricsFile._create_metrics_dict(df_results, sql_commands)
+            return MetricsFileWriter._create_metrics_dict(df_results, sql_commands)
 
     @staticmethod
     def _write_metrics_file(
@@ -347,13 +347,16 @@ class WriteMetricsFile(IWriteMetricsFile):
         df_results: pd.DataFrame,
         metrics_path: Path,
         write_aggregate: str = None,
-    ) -> None:
+    ) -> Union[str, Dict[str, str]]:
         """Parse a metrics file and write the metrics to a file.
 
         Args:
             df_results (pd.DataFrame): The results dataframe.
             metrics_path (Path): The path to where to store the metrics file.
             write_aggregate (str): The name of the aggregation label to write to the metrics file (None for no aggregation label, 'all' for all possible ones).
+
+        Returns:
+            Union[str, Dict[str, str]]: The path to the metrics file or a dictionary with the aggregation labels as keys and the paths to the metrics files as values.
         """
 
         # Check whether to include aggregation labels
@@ -367,19 +370,25 @@ class WriteMetricsFile(IWriteMetricsFile):
 
         # Write the metrics to a file
         if write_aggregate == "all":
+            # Initialize the return dictionary
+            return_files = {}
             for key in config.keys():
                 # If using aggregation labels, add the aggregation label to the filename
                 directory, filename = os.path.split(metrics_path)
                 filename, extension = os.path.splitext(filename)
                 new_filename = filename + "_" + key + extension
                 new_path = os.path.join(directory, new_filename)
-
+                return_files[key] = new_path
+                
                 # Write the metrics to a file
-                WriteMetricsFile._write_metrics_file(
+                MetricsFileWriter._write_metrics_file(
                     metrics, config, new_path, write_aggregate=key
                 )
         else:
             # Write the metrics to a file
-            WriteMetricsFile._write_metrics_file(
+            MetricsFileWriter._write_metrics_file(
                 metrics, config, metrics_path, write_aggregate=write_aggregate
             )
+            return_files = metrics_path
+
+        return return_files

@@ -8,7 +8,7 @@ dependencies:
   - ipykernel
   - numpy
   - pandas
-  - pandasql
+  - pandasql<2.0
   - pip
   - pytest # tests
   - pytest-cov # tests
