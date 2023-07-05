@@ -1,5 +1,5 @@
 
-from fiat_toolbox.equity import *
+from fiat_toolbox.equity.equity import *
 import pytest
 from pathlib import Path
 
@@ -27,5 +27,8 @@ def test_equity(case):
     df_equity = setup_equity_method(census_data, fiat_data, gamma, output_file_equity)
 
     assert "EWCEAD" in df_equity.columns
+
+    # Delete file
+    output_file_equity.unlink()
 
 

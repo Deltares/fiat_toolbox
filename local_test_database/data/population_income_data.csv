@@ -1,262 +1,262 @@
-TotalPopulationBG,PerCapitaIncomeBG,NAME,state,county,tract,block group,Census_Bg
-613.0,71098.0,"Block Group 1, Census Tract 1, Charleston County, South Carolina",45,019,000100,1,000100-block1
-745.0,87167.0,"Block Group 2, Census Tract 1, Charleston County, South Carolina",45,019,000100,2,000100-block2
-623.0,113826.0,"Block Group 3, Census Tract 1, Charleston County, South Carolina",45,019,000100,3,000100-block3
-583.0,93651.0,"Block Group 1, Census Tract 2, Charleston County, South Carolina",45,019,000200,1,000200-block1
-678.0,186091.0,"Block Group 2, Census Tract 2, Charleston County, South Carolina",45,019,000200,2,000200-block2
-1167.0,83065.0,"Block Group 1, Census Tract 4, Charleston County, South Carolina",45,019,000400,1,000400-block1
-2032.0,38504.0,"Block Group 2, Census Tract 4, Charleston County, South Carolina",45,019,000400,2,000400-block2
-750.0,100054.0,"Block Group 1, Census Tract 5, Charleston County, South Carolina",45,019,000500,1,000500-block1
-874.0,58411.0,"Block Group 2, Census Tract 5, Charleston County, South Carolina",45,019,000500,2,000500-block2
-1274.0,47878.0,"Block Group 1, Census Tract 6, Charleston County, South Carolina",45,019,000600,1,000600-block1
-1807.0,22678.0,"Block Group 1, Census Tract 7, Charleston County, South Carolina",45,019,000700,1,000700-block1
-1011.0,19846.0,"Block Group 2, Census Tract 7, Charleston County, South Carolina",45,019,000700,2,000700-block2
-604.0,37036.0,"Block Group 1, Census Tract 9, Charleston County, South Carolina",45,019,000900,1,000900-block1
-892.0,33139.0,"Block Group 2, Census Tract 9, Charleston County, South Carolina",45,019,000900,2,000900-block2
-1114.0,37277.0,"Block Group 1, Census Tract 10, Charleston County, South Carolina",45,019,001000,1,001000-block1
-1546.0,29002.0,"Block Group 2, Census Tract 10, Charleston County, South Carolina",45,019,001000,2,001000-block2
-1213.0,66244.0,"Block Group 1, Census Tract 11, Charleston County, South Carolina",45,019,001100,1,001100-block1
-447.0,61099.0,"Block Group 2, Census Tract 11, Charleston County, South Carolina",45,019,001100,2,001100-block2
-1268.0,21052.0,"Block Group 3, Census Tract 11, Charleston County, South Carolina",45,019,001100,3,001100-block3
-964.0,45102.0,"Block Group 1, Census Tract 15, Charleston County, South Carolina",45,019,001500,1,001500-block1
-601.0,45494.0,"Block Group 2, Census Tract 15, Charleston County, South Carolina",45,019,001500,2,001500-block2
-1614.0,61298.0,"Block Group 1, Census Tract 19.01, Charleston County, South Carolina",45,019,001901,1,001901-block1
-814.0,56505.0,"Block Group 2, Census Tract 19.01, Charleston County, South Carolina",45,019,001901,2,001901-block2
-2061.0,37563.0,"Block Group 3, Census Tract 19.01, Charleston County, South Carolina",45,019,001901,3,001901-block3
-3243.0,41646.0,"Block Group 1, Census Tract 19.02, Charleston County, South Carolina",45,019,001902,1,001902-block1
-1014.0,29584.0,"Block Group 2, Census Tract 19.02, Charleston County, South Carolina",45,019,001902,2,001902-block2
-1295.0,64980.0,"Block Group 3, Census Tract 19.02, Charleston County, South Carolina",45,019,001902,3,001902-block3
-1765.0,42901.0,"Block Group 1, Census Tract 20.02, Charleston County, South Carolina",45,019,002002,1,002002-block1
-1716.0,46841.0,"Block Group 2, Census Tract 20.02, Charleston County, South Carolina",45,019,002002,2,002002-block2
-1551.0,35979.0,"Block Group 3, Census Tract 20.02, Charleston County, South Carolina",45,019,002002,3,002002-block3
-1173.0,45509.0,"Block Group 4, Census Tract 20.02, Charleston County, South Carolina",45,019,002002,4,002002-block4
-418.0,53311.0,"Block Group 1, Census Tract 20.04, Charleston County, South Carolina",45,019,002004,1,002004-block1
-369.0,60617.0,"Block Group 2, Census Tract 20.04, Charleston County, South Carolina",45,019,002004,2,002004-block2
-1561.0,49738.0,"Block Group 1, Census Tract 20.05, Charleston County, South Carolina",45,019,002005,1,002005-block1
-2392.0,46776.0,"Block Group 2, Census Tract 20.05, Charleston County, South Carolina",45,019,002005,2,002005-block2
-2724.0,58035.0,"Block Group 3, Census Tract 20.05, Charleston County, South Carolina",45,019,002005,3,002005-block3
-811.0,52441.0,"Block Group 1, Census Tract 20.06, Charleston County, South Carolina",45,019,002006,1,002006-block1
-1239.0,40769.0,"Block Group 2, Census Tract 20.06, Charleston County, South Carolina",45,019,002006,2,002006-block2
-2832.0,68743.0,"Block Group 3, Census Tract 20.06, Charleston County, South Carolina",45,019,002006,3,002006-block3
-1420.0,96194.0,"Block Group 1, Census Tract 20.07, Charleston County, South Carolina",45,019,002007,1,002007-block1
-2148.0,60729.0,"Block Group 2, Census Tract 20.07, Charleston County, South Carolina",45,019,002007,2,002007-block2
-1874.0,45410.0,"Block Group 1, Census Tract 20.08, Charleston County, South Carolina",45,019,002008,1,002008-block1
-1324.0,57124.0,"Block Group 2, Census Tract 20.08, Charleston County, South Carolina",45,019,002008,2,002008-block2
-1065.0,24023.0,"Block Group 3, Census Tract 20.08, Charleston County, South Carolina",45,019,002008,3,002008-block3
-3692.0,35351.0,"Block Group 1, Census Tract 20.09, Charleston County, South Carolina",45,019,002009,1,002009-block1
-1622.0,79318.0,"Block Group 2, Census Tract 20.09, Charleston County, South Carolina",45,019,002009,2,002009-block2
-240.0,47746.0,"Block Group 3, Census Tract 20.09, Charleston County, South Carolina",45,019,002009,3,002009-block3
-758.0,35265.0,"Block Group 1, Census Tract 21.03, Charleston County, South Carolina",45,019,002103,1,002103-block1
-1627.0,34904.0,"Block Group 2, Census Tract 21.03, Charleston County, South Carolina",45,019,002103,2,002103-block2
-248.0,54568.0,"Block Group 3, Census Tract 21.03, Charleston County, South Carolina",45,019,002103,3,002103-block3
-1057.0,53460.0,"Block Group 4, Census Tract 21.03, Charleston County, South Carolina",45,019,002103,4,002103-block4
-1311.0,206708.0,"Block Group 1, Census Tract 21.04, Charleston County, South Carolina",45,019,002104,1,002104-block1
-653.0,162170.0,"Block Group 2, Census Tract 21.04, Charleston County, South Carolina",45,019,002104,2,002104-block2
-1224.0,90876.0,"Block Group 1, Census Tract 21.05, Charleston County, South Carolina",45,019,002105,1,002105-block1
-754.0,119032.0,"Block Group 2, Census Tract 21.05, Charleston County, South Carolina",45,019,002105,2,002105-block2
-1805.0,51956.0,"Block Group 1, Census Tract 21.06, Charleston County, South Carolina",45,019,002106,1,002106-block1
-1357.0,49867.0,"Block Group 2, Census Tract 21.06, Charleston County, South Carolina",45,019,002106,2,002106-block2
-4732.0,47631.0,"Block Group 1, Census Tract 21.07, Charleston County, South Carolina",45,019,002107,1,002107-block1
-2412.0,39887.0,"Block Group 2, Census Tract 21.07, Charleston County, South Carolina",45,019,002107,2,002107-block2
-1432.0,43462.0,"Block Group 3, Census Tract 21.07, Charleston County, South Carolina",45,019,002107,3,002107-block3
-1960.0,43021.0,"Block Group 4, Census Tract 21.07, Charleston County, South Carolina",45,019,002107,4,002107-block4
-1086.0,29965.0,"Block Group 1, Census Tract 21.08, Charleston County, South Carolina",45,019,002108,1,002108-block1
-974.0,67178.0,"Block Group 2, Census Tract 21.08, Charleston County, South Carolina",45,019,002108,2,002108-block2
-1087.0,49088.0,"Block Group 1, Census Tract 22, Charleston County, South Carolina",45,019,002200,1,002200-block1
-1417.0,52450.0,"Block Group 2, Census Tract 22, Charleston County, South Carolina",45,019,002200,2,002200-block2
-607.0,39436.0,"Block Group 1, Census Tract 23, Charleston County, South Carolina",45,019,002300,1,002300-block1
-861.0,47177.0,"Block Group 2, Census Tract 23, Charleston County, South Carolina",45,019,002300,2,002300-block2
-1547.0,33575.0,"Block Group 1, Census Tract 24.01, Charleston County, South Carolina",45,019,002401,1,002401-block1
-793.0,22744.0,"Block Group 1, Census Tract 24.02, Charleston County, South Carolina",45,019,002402,1,002402-block1
-872.0,21715.0,"Block Group 2, Census Tract 24.02, Charleston County, South Carolina",45,019,002402,2,002402-block2
-1079.0,21361.0,"Block Group 3, Census Tract 24.02, Charleston County, South Carolina",45,019,002402,3,002402-block3
-862.0,44248.0,"Block Group 1, Census Tract 25.03, Charleston County, South Carolina",45,019,002503,1,002503-block1
-1431.0,20371.0,"Block Group 2, Census Tract 25.03, Charleston County, South Carolina",45,019,002503,2,002503-block2
-718.0,24554.0,"Block Group 1, Census Tract 25.04, Charleston County, South Carolina",45,019,002504,1,002504-block1
-1610.0,26041.0,"Block Group 2, Census Tract 25.04, Charleston County, South Carolina",45,019,002504,2,002504-block2
-558.0,35914.0,"Block Group 3, Census Tract 25.04, Charleston County, South Carolina",45,019,002504,3,002504-block3
-2016.0,64846.0,"Block Group 4, Census Tract 25.04, Charleston County, South Carolina",45,019,002504,4,002504-block4
-931.0,46604.0,"Block Group 1, Census Tract 26.04, Charleston County, South Carolina",45,019,002604,1,002604-block1
-1941.0,40950.0,"Block Group 2, Census Tract 26.04, Charleston County, South Carolina",45,019,002604,2,002604-block2
-643.0,56884.0,"Block Group 3, Census Tract 26.04, Charleston County, South Carolina",45,019,002604,3,002604-block3
-2476.0,30296.0,"Block Group 1, Census Tract 26.05, Charleston County, South Carolina",45,019,002605,1,002605-block1
-1363.0,42807.0,"Block Group 2, Census Tract 26.05, Charleston County, South Carolina",45,019,002605,2,002605-block2
-909.0,41738.0,"Block Group 1, Census Tract 26.06, Charleston County, South Carolina",45,019,002606,1,002606-block1
-1452.0,63749.0,"Block Group 2, Census Tract 26.06, Charleston County, South Carolina",45,019,002606,2,002606-block2
-1109.0,48895.0,"Block Group 1, Census Tract 26.11, Charleston County, South Carolina",45,019,002611,1,002611-block1
-1735.0,35379.0,"Block Group 2, Census Tract 26.11, Charleston County, South Carolina",45,019,002611,2,002611-block2
-1568.0,49931.0,"Block Group 1, Census Tract 26.12, Charleston County, South Carolina",45,019,002612,1,002612-block1
-713.0,39074.0,"Block Group 2, Census Tract 26.12, Charleston County, South Carolina",45,019,002612,2,002612-block2
-572.0,36107.0,"Block Group 3, Census Tract 26.12, Charleston County, South Carolina",45,019,002612,3,002612-block3
-1097.0,56662.0,"Block Group 4, Census Tract 26.12, Charleston County, South Carolina",45,019,002612,4,002612-block4
-2346.0,28580.0,"Block Group 5, Census Tract 26.12, Charleston County, South Carolina",45,019,002612,5,002612-block5
-1400.0,37144.0,"Block Group 1, Census Tract 26.13, Charleston County, South Carolina",45,019,002613,1,002613-block1
-1819.0,35794.0,"Block Group 2, Census Tract 26.13, Charleston County, South Carolina",45,019,002613,2,002613-block2
-1172.0,50488.0,"Block Group 3, Census Tract 26.13, Charleston County, South Carolina",45,019,002613,3,002613-block3
-1571.0,36248.0,"Block Group 4, Census Tract 26.13, Charleston County, South Carolina",45,019,002613,4,002613-block4
-2285.0,57057.0,"Block Group 1, Census Tract 26.14, Charleston County, South Carolina",45,019,002614,1,002614-block1
-1007.0,34454.0,"Block Group 2, Census Tract 26.14, Charleston County, South Carolina",45,019,002614,2,002614-block2
-1343.0,23670.0,"Block Group 1, Census Tract 27.01, Charleston County, South Carolina",45,019,002701,1,002701-block1
-1974.0,120762.0,"Block Group 2, Census Tract 27.01, Charleston County, South Carolina",45,019,002701,2,002701-block2
-1834.0,20440.0,"Block Group 1, Census Tract 27.02, Charleston County, South Carolina",45,019,002702,1,002702-block1
-978.0,48622.0,"Block Group 2, Census Tract 27.02, Charleston County, South Carolina",45,019,002702,2,002702-block2
-1214.0,17628.0,"Block Group 3, Census Tract 27.02, Charleston County, South Carolina",45,019,002702,3,002702-block3
-1084.0,41035.0,"Block Group 4, Census Tract 27.02, Charleston County, South Carolina",45,019,002702,4,002702-block4
-2220.0,53113.0,"Block Group 1, Census Tract 28.01, Charleston County, South Carolina",45,019,002801,1,002801-block1
-1016.0,46551.0,"Block Group 2, Census Tract 28.01, Charleston County, South Carolina",45,019,002801,2,002801-block2
-1849.0,46945.0,"Block Group 3, Census Tract 28.01, Charleston County, South Carolina",45,019,002801,3,002801-block3
-1088.0,65268.0,"Block Group 1, Census Tract 28.02, Charleston County, South Carolina",45,019,002802,1,002802-block1
-1328.0,48606.0,"Block Group 2, Census Tract 28.02, Charleston County, South Carolina",45,019,002802,2,002802-block2
-1235.0,54654.0,"Block Group 1, Census Tract 29, Charleston County, South Carolina",45,019,002900,1,002900-block1
-1292.0,36772.0,"Block Group 2, Census Tract 29, Charleston County, South Carolina",45,019,002900,2,002900-block2
-2045.0,66206.0,"Block Group 1, Census Tract 30, Charleston County, South Carolina",45,019,003000,1,003000-block1
-1590.0,97771.0,"Block Group 2, Census Tract 30, Charleston County, South Carolina",45,019,003000,2,003000-block2
-3120.0,35209.0,"Block Group 1, Census Tract 31.04, Charleston County, South Carolina",45,019,003104,1,003104-block1
-2193.0,14371.0,"Block Group 2, Census Tract 31.04, Charleston County, South Carolina",45,019,003104,2,003104-block2
-1870.0,20577.0,"Block Group 1, Census Tract 31.05, Charleston County, South Carolina",45,019,003105,1,003105-block1
-1889.0,14241.0,"Block Group 2, Census Tract 31.05, Charleston County, South Carolina",45,019,003105,2,003105-block2
-4874.0,31135.0,"Block Group 1, Census Tract 31.06, Charleston County, South Carolina",45,019,003106,1,003106-block1
-1145.0,14625.0,"Block Group 2, Census Tract 31.06, Charleston County, South Carolina",45,019,003106,2,003106-block2
-1980.0,10840.0,"Block Group 3, Census Tract 31.06, Charleston County, South Carolina",45,019,003106,3,003106-block3
-951.0,102974.0,"Block Group 4, Census Tract 31.06, Charleston County, South Carolina",45,019,003106,4,003106-block4
-990.0,25961.0,"Block Group 1, Census Tract 31.07, Charleston County, South Carolina",45,019,003107,1,003107-block1
-367.0,35614.0,"Block Group 2, Census Tract 31.07, Charleston County, South Carolina",45,019,003107,2,003107-block2
-4224.0,39399.0,"Block Group 3, Census Tract 31.07, Charleston County, South Carolina",45,019,003107,3,003107-block3
-2621.0,26046.0,"Block Group 1, Census Tract 31.08, Charleston County, South Carolina",45,019,003108,1,003108-block1
-1710.0,21903.0,"Block Group 2, Census Tract 31.08, Charleston County, South Carolina",45,019,003108,2,003108-block2
-823.0,26242.0,"Block Group 1, Census Tract 31.09, Charleston County, South Carolina",45,019,003109,1,003109-block1
-2466.0,45381.0,"Block Group 2, Census Tract 31.09, Charleston County, South Carolina",45,019,003109,2,003109-block2
-1767.0,21645.0,"Block Group 1, Census Tract 31.10, Charleston County, South Carolina",45,019,003110,1,003110-block1
-1261.0,30096.0,"Block Group 2, Census Tract 31.10, Charleston County, South Carolina",45,019,003110,2,003110-block2
-2979.0,20481.0,"Block Group 3, Census Tract 31.10, Charleston County, South Carolina",45,019,003110,3,003110-block3
-236.0,33213.0,"Block Group 4, Census Tract 31.10, Charleston County, South Carolina",45,019,003110,4,003110-block4
-1013.0,29341.0,"Block Group 1, Census Tract 31.11, Charleston County, South Carolina",45,019,003111,1,003111-block1
-504.0,21076.0,"Block Group 2, Census Tract 31.11, Charleston County, South Carolina",45,019,003111,2,003111-block2
-1646.0,29430.0,"Block Group 3, Census Tract 31.11, Charleston County, South Carolina",45,019,003111,3,003111-block3
-922.0,34872.0,"Block Group 4, Census Tract 31.11, Charleston County, South Carolina",45,019,003111,4,003111-block4
-2226.0,38614.0,"Block Group 1, Census Tract 31.13, Charleston County, South Carolina",45,019,003113,1,003113-block1
-2186.0,18320.0,"Block Group 2, Census Tract 31.13, Charleston County, South Carolina",45,019,003113,2,003113-block2
-2656.0,19724.0,"Block Group 1, Census Tract 31.15, Charleston County, South Carolina",45,019,003115,1,003115-block1
-2961.0,19568.0,"Block Group 2, Census Tract 31.15, Charleston County, South Carolina",45,019,003115,2,003115-block2
-2502.0,22949.0,"Block Group 3, Census Tract 31.15, Charleston County, South Carolina",45,019,003115,3,003115-block3
-1506.0,20462.0,"Block Group 1, Census Tract 31.16, Charleston County, South Carolina",45,019,003116,1,003116-block1
-1723.0,37543.0,"Block Group 2, Census Tract 31.16, Charleston County, South Carolina",45,019,003116,2,003116-block2
-1482.0,42743.0,"Block Group 3, Census Tract 31.16, Charleston County, South Carolina",45,019,003116,3,003116-block3
-1255.0,52562.0,"Block Group 1, Census Tract 31.17, Charleston County, South Carolina",45,019,003117,1,003117-block1
-2477.0,29099.0,"Block Group 2, Census Tract 31.17, Charleston County, South Carolina",45,019,003117,2,003117-block2
-780.0,16618.0,"Block Group 1, Census Tract 32, Charleston County, South Carolina",45,019,003200,1,003200-block1
-1019.0,23529.0,"Block Group 2, Census Tract 32, Charleston County, South Carolina",45,019,003200,2,003200-block2
-291.0,33086.0,"Block Group 1, Census Tract 33, Charleston County, South Carolina",45,019,003300,1,003300-block1
-1676.0,32853.0,"Block Group 2, Census Tract 33, Charleston County, South Carolina",45,019,003300,2,003300-block2
-608.0,20177.0,"Block Group 3, Census Tract 33, Charleston County, South Carolina",45,019,003300,3,003300-block3
-1142.0,25464.0,"Block Group 4, Census Tract 33, Charleston County, South Carolina",45,019,003300,4,003300-block4
-754.0,17455.0,"Block Group 1, Census Tract 34, Charleston County, South Carolina",45,019,003400,1,003400-block1
-1033.0,9939.0,"Block Group 2, Census Tract 34, Charleston County, South Carolina",45,019,003400,2,003400-block2
-1043.0,18883.0,"Block Group 3, Census Tract 34, Charleston County, South Carolina",45,019,003400,3,003400-block3
-2434.0,23119.0,"Block Group 4, Census Tract 34, Charleston County, South Carolina",45,019,003400,4,003400-block4
-1133.0,53189.0,"Block Group 1, Census Tract 35, Charleston County, South Carolina",45,019,003500,1,003500-block1
-2334.0,41862.0,"Block Group 2, Census Tract 35, Charleston County, South Carolina",45,019,003500,2,003500-block2
-780.0,47058.0,"Block Group 1, Census Tract 36, Charleston County, South Carolina",45,019,003600,1,003600-block1
-1511.0,33760.0,"Block Group 2, Census Tract 36, Charleston County, South Carolina",45,019,003600,2,003600-block2
-760.0,51672.0,"Block Group 3, Census Tract 36, Charleston County, South Carolina",45,019,003600,3,003600-block3
-745.0,28816.0,"Block Group 1, Census Tract 37, Charleston County, South Carolina",45,019,003700,1,003700-block1
-1413.0,31352.0,"Block Group 2, Census Tract 37, Charleston County, South Carolina",45,019,003700,2,003700-block2
-1111.0,23172.0,"Block Group 3, Census Tract 37, Charleston County, South Carolina",45,019,003700,3,003700-block3
-1094.0,23006.0,"Block Group 1, Census Tract 38, Charleston County, South Carolina",45,019,003800,1,003800-block1
-1119.0,16390.0,"Block Group 2, Census Tract 38, Charleston County, South Carolina",45,019,003800,2,003800-block2
-1896.0,18475.0,"Block Group 3, Census Tract 38, Charleston County, South Carolina",45,019,003800,3,003800-block3
-1024.0,23356.0,"Block Group 1, Census Tract 39, Charleston County, South Carolina",45,019,003900,1,003900-block1
-2706.0,10241.0,"Block Group 2, Census Tract 39, Charleston County, South Carolina",45,019,003900,2,003900-block2
-996.0,45552.0,"Block Group 3, Census Tract 39, Charleston County, South Carolina",45,019,003900,3,003900-block3
-1558.0,14772.0,"Block Group 1, Census Tract 40, Charleston County, South Carolina",45,019,004000,1,004000-block1
-969.0,18712.0,"Block Group 2, Census Tract 40, Charleston County, South Carolina",45,019,004000,2,004000-block2
-227.0,14114.0,"Block Group 1, Census Tract 43, Charleston County, South Carolina",45,019,004300,1,004300-block1
-442.0,15343.0,"Block Group 2, Census Tract 43, Charleston County, South Carolina",45,019,004300,2,004300-block2
-745.0,18897.0,"Block Group 3, Census Tract 43, Charleston County, South Carolina",45,019,004300,3,004300-block3
-1018.0,35514.0,"Block Group 4, Census Tract 43, Charleston County, South Carolina",45,019,004300,4,004300-block4
-1287.0,31882.0,"Block Group 1, Census Tract 44, Charleston County, South Carolina",45,019,004400,1,004400-block1
-1165.0,19191.0,"Block Group 2, Census Tract 44, Charleston County, South Carolina",45,019,004400,2,004400-block2
-1154.0,54190.0,"Block Group 1, Census Tract 46.07, Charleston County, South Carolina",45,019,004607,1,004607-block1
-1008.0,81233.0,"Block Group 2, Census Tract 46.07, Charleston County, South Carolina",45,019,004607,2,004607-block2
-1894.0,68327.0,"Block Group 3, Census Tract 46.07, Charleston County, South Carolina",45,019,004607,3,004607-block3
-1739.0,34882.0,"Block Group 4, Census Tract 46.07, Charleston County, South Carolina",45,019,004607,4,004607-block4
-1652.0,41162.0,"Block Group 1, Census Tract 46.09, Charleston County, South Carolina",45,019,004609,1,004609-block1
-2984.0,50146.0,"Block Group 2, Census Tract 46.09, Charleston County, South Carolina",45,019,004609,2,004609-block2
-2384.0,49085.0,"Block Group 3, Census Tract 46.09, Charleston County, South Carolina",45,019,004609,3,004609-block3
-1865.0,56656.0,"Block Group 4, Census Tract 46.09, Charleston County, South Carolina",45,019,004609,4,004609-block4
-2611.0,44300.0,"Block Group 1, Census Tract 46.10, Charleston County, South Carolina",45,019,004610,1,004610-block1
-2281.0,54981.0,"Block Group 2, Census Tract 46.10, Charleston County, South Carolina",45,019,004610,2,004610-block2
-1553.0,56402.0,"Block Group 1, Census Tract 46.12, Charleston County, South Carolina",45,019,004612,1,004612-block1
-1519.0,47712.0,"Block Group 2, Census Tract 46.12, Charleston County, South Carolina",45,019,004612,2,004612-block2
-1188.0,47887.0,"Block Group 3, Census Tract 46.12, Charleston County, South Carolina",45,019,004612,3,004612-block3
-3713.0,34138.0,"Block Group 4, Census Tract 46.12, Charleston County, South Carolina",45,019,004612,4,004612-block4
-1764.0,80745.0,"Block Group 1, Census Tract 46.13, Charleston County, South Carolina",45,019,004613,1,004613-block1
-2238.0,48416.0,"Block Group 1, Census Tract 46.14, Charleston County, South Carolina",45,019,004614,1,004614-block1
-2672.0,68976.0,"Block Group 2, Census Tract 46.14, Charleston County, South Carolina",45,019,004614,2,004614-block2
-2278.0,51932.0,"Block Group 3, Census Tract 46.14, Charleston County, South Carolina",45,019,004614,3,004614-block3
-1934.0,82232.0,"Block Group 1, Census Tract 46.15, Charleston County, South Carolina",45,019,004615,1,004615-block1
-2659.0,113202.0,"Block Group 2, Census Tract 46.15, Charleston County, South Carolina",45,019,004615,2,004615-block2
-1007.0,41560.0,"Block Group 3, Census Tract 46.15, Charleston County, South Carolina",45,019,004615,3,004615-block3
-3162.0,66573.0,"Block Group 1, Census Tract 46.16, Charleston County, South Carolina",45,019,004616,1,004616-block1
-2504.0,17580.0,"Block Group 2, Census Tract 46.16, Charleston County, South Carolina",45,019,004616,2,004616-block2
-2728.0,57054.0,"Block Group 3, Census Tract 46.16, Charleston County, South Carolina",45,019,004616,3,004616-block3
-2905.0,51536.0,"Block Group 1, Census Tract 46.17, Charleston County, South Carolina",45,019,004617,1,004617-block1
-5634.0,60788.0,"Block Group 2, Census Tract 46.17, Charleston County, South Carolina",45,019,004617,2,004617-block2
-3321.0,31251.0,"Block Group 1, Census Tract 46.18, Charleston County, South Carolina",45,019,004618,1,004618-block1
-3790.0,48937.0,"Block Group 2, Census Tract 46.18, Charleston County, South Carolina",45,019,004618,2,004618-block2
-1993.0,71236.0,"Block Group 1, Census Tract 46.19, Charleston County, South Carolina",45,019,004619,1,004619-block1
-1698.0,46415.0,"Block Group 2, Census Tract 46.19, Charleston County, South Carolina",45,019,004619,2,004619-block2
-1513.0,49242.0,"Block Group 3, Census Tract 46.19, Charleston County, South Carolina",45,019,004619,3,004619-block3
-2162.0,68096.0,"Block Group 1, Census Tract 46.20, Charleston County, South Carolina",45,019,004620,1,004620-block1
-1056.0,51018.0,"Block Group 2, Census Tract 46.20, Charleston County, South Carolina",45,019,004620,2,004620-block2
-1359.0,58684.0,"Block Group 3, Census Tract 46.20, Charleston County, South Carolina",45,019,004620,3,004620-block3
-2423.0,105615.0,"Block Group 1, Census Tract 46.21, Charleston County, South Carolina",45,019,004621,1,004621-block1
-1188.0,67157.0,"Block Group 2, Census Tract 46.21, Charleston County, South Carolina",45,019,004621,2,004621-block2
-927.0,51371.0,"Block Group 3, Census Tract 46.21, Charleston County, South Carolina",45,019,004621,3,004621-block3
-1135.0,58914.0,"Block Group 4, Census Tract 46.21, Charleston County, South Carolina",45,019,004621,4,004621-block4
-1453.0,26238.0,"Block Group 1, Census Tract 46.22, Charleston County, South Carolina",45,019,004622,1,004622-block1
-3878.0,64292.0,"Block Group 2, Census Tract 46.22, Charleston County, South Carolina",45,019,004622,2,004622-block2
-902.0,59958.0,"Block Group 1, Census Tract 47.01, Charleston County, South Carolina",45,019,004701,1,004701-block1
-327.0,53821.0,"Block Group 2, Census Tract 47.01, Charleston County, South Carolina",45,019,004701,2,004701-block2
-2479.0,51218.0,"Block Group 3, Census Tract 47.01, Charleston County, South Carolina",45,019,004701,3,004701-block3
-2651.0,98423.0,"Block Group 4, Census Tract 47.01, Charleston County, South Carolina",45,019,004701,4,004701-block4
-2031.0,46717.0,"Block Group 1, Census Tract 47.02, Charleston County, South Carolina",45,019,004702,1,004702-block1
-1267.0,89103.0,"Block Group 1, Census Tract 48, Charleston County, South Carolina",45,019,004800,1,004800-block1
-953.0,111788.0,"Block Group 2, Census Tract 48, Charleston County, South Carolina",45,019,004800,2,004800-block2
-719.0,113244.0,"Block Group 1, Census Tract 49.01, Charleston County, South Carolina",45,019,004901,1,004901-block1
-1085.0,62006.0,"Block Group 2, Census Tract 49.01, Charleston County, South Carolina",45,019,004901,2,004901-block2
-497.0,81051.0,"Block Group 1, Census Tract 49.02, Charleston County, South Carolina",45,019,004902,1,004902-block1
-1203.0,155027.0,"Block Group 2, Census Tract 49.02, Charleston County, South Carolina",45,019,004902,2,004902-block2
-814.0,72263.0,"Block Group 3, Census Tract 49.02, Charleston County, South Carolina",45,019,004902,3,004902-block3
-609.0,54027.0,"Block Group 1, Census Tract 50.01, Charleston County, South Carolina",45,019,005001,1,005001-block1
-794.0,41828.0,"Block Group 2, Census Tract 50.01, Charleston County, South Carolina",45,019,005001,2,005001-block2
-1020.0,31031.0,"Block Group 1, Census Tract 50.02, Charleston County, South Carolina",45,019,005002,1,005002-block1
-679.0,17430.0,"Block Group 2, Census Tract 50.02, Charleston County, South Carolina",45,019,005002,2,005002-block2
-1239.0,30311.0,"Block Group 3, Census Tract 50.02, Charleston County, South Carolina",45,019,005002,3,005002-block3
-537.0,16154.0,"Block Group 4, Census Tract 50.02, Charleston County, South Carolina",45,019,005002,4,005002-block4
-1153.0,68322.0,"Block Group 1, Census Tract 51, Charleston County, South Carolina",45,019,005100,1,005100-block1
-1983.0,49711.0,"Block Group 1, Census Tract 53, Charleston County, South Carolina",45,019,005300,1,005300-block1
-515.0,35784.0,"Block Group 2, Census Tract 53, Charleston County, South Carolina",45,019,005300,2,005300-block2
-570.0,9818.0,"Block Group 3, Census Tract 53, Charleston County, South Carolina",45,019,005300,3,005300-block3
-533.0,18876.0,"Block Group 1, Census Tract 54, Charleston County, South Carolina",45,019,005400,1,005400-block1
-1872.0,16135.0,"Block Group 2, Census Tract 54, Charleston County, South Carolina",45,019,005400,2,005400-block2
-799.0,19100.0,"Block Group 1, Census Tract 55, Charleston County, South Carolina",45,019,005500,1,005500-block1
-750.0,17878.0,"Block Group 2, Census Tract 55, Charleston County, South Carolina",45,019,005500,2,005500-block2
-1730.0,37856.0,"Block Group 1, Census Tract 56.01, Charleston County, South Carolina",45,019,005601,1,005601-block1
-2833.0,52822.0,"Block Group 2, Census Tract 56.01, Charleston County, South Carolina",45,019,005601,2,005601-block2
-4022.0,52342.0,"Block Group 3, Census Tract 56.01, Charleston County, South Carolina",45,019,005601,3,005601-block3
-2412.0,37971.0,"Block Group 1, Census Tract 56.02, Charleston County, South Carolina",45,019,005602,1,005602-block1
-1422.0,37223.0,"Block Group 2, Census Tract 56.02, Charleston County, South Carolina",45,019,005602,2,005602-block2
-2322.0,28923.0,"Block Group 3, Census Tract 56.02, Charleston County, South Carolina",45,019,005602,3,005602-block3
-2426.0,48933.0,"Block Group 1, Census Tract 57.01, Charleston County, South Carolina",45,019,005701,1,005701-block1
-1434.0,44015.0,"Block Group 2, Census Tract 57.01, Charleston County, South Carolina",45,019,005701,2,005701-block2
-1824.0,39505.0,"Block Group 3, Census Tract 57.01, Charleston County, South Carolina",45,019,005701,3,005701-block3
-1789.0,41372.0,"Block Group 1, Census Tract 57.02, Charleston County, South Carolina",45,019,005702,1,005702-block1
-2132.0,29404.0,"Block Group 2, Census Tract 57.02, Charleston County, South Carolina",45,019,005702,2,005702-block2
-2600.0,44076.0,"Block Group 1, Census Tract 58, Charleston County, South Carolina",45,019,005800,1,005800-block1
-1289.0,38879.0,"Block Group 2, Census Tract 58, Charleston County, South Carolina",45,019,005800,2,005800-block2
-3959.0,52481.0,"Block Group 3, Census Tract 58, Charleston County, South Carolina",45,019,005800,3,005800-block3
-1271.0,58849.0,"Block Group 1, Census Tract 59, Charleston County, South Carolina",45,019,005900,1,005900-block1
-3464.0,14507.0,"Block Group 2, Census Tract 59, Charleston County, South Carolina",45,019,005900,2,005900-block2
-1942.0,53146.0,"Block Group 3, Census Tract 59, Charleston County, South Carolina",45,019,005900,3,005900-block3
-0.0,,"Block Group 0, Census Tract 9901, Charleston County, South Carolina",45,019,990100,0,990100-block0
+Census_Bg,TotalPopulationBG,PerCapitaIncomeBG
+000100-block1,613,71098
+000100-block2,745,87167
+000100-block3,623,113826
+000200-block1,583,93651
+000200-block2,678,186091
+000400-block1,1167,83065
+000400-block2,2032,38504
+000500-block1,750,100054
+000500-block2,874,58411
+000600-block1,1274,47878
+000700-block1,1807,22678
+000700-block2,1011,19846
+000900-block1,604,37036
+000900-block2,892,33139
+001000-block1,1114,37277
+001000-block2,1546,29002
+001100-block1,1213,66244
+001100-block2,447,61099
+001100-block3,1268,21052
+001500-block1,964,45102
+001500-block2,601,45494
+001901-block1,1614,61298
+001901-block2,814,56505
+001901-block3,2061,37563
+001902-block1,3243,41646
+001902-block2,1014,29584
+001902-block3,1295,64980
+002002-block1,1765,42901
+002002-block2,1716,46841
+002002-block3,1551,35979
+002002-block4,1173,45509
+002004-block1,418,53311
+002004-block2,369,60617
+002005-block1,1561,49738
+002005-block2,2392,46776
+002005-block3,2724,58035
+002006-block1,811,52441
+002006-block2,1239,40769
+002006-block3,2832,68743
+002007-block1,1420,96194
+002007-block2,2148,60729
+002008-block1,1874,45410
+002008-block2,1324,57124
+002008-block3,1065,24023
+002009-block1,3692,35351
+002009-block2,1622,79318
+002009-block3,240,47746
+002103-block1,758,35265
+002103-block2,1627,34904
+002103-block3,248,54568
+002103-block4,1057,53460
+002104-block1,1311,206708
+002104-block2,653,162170
+002105-block1,1224,90876
+002105-block2,754,119032
+002106-block1,1805,51956
+002106-block2,1357,49867
+002107-block1,4732,47631
+002107-block2,2412,39887
+002107-block3,1432,43462
+002107-block4,1960,43021
+002108-block1,1086,29965
+002108-block2,974,67178
+002200-block1,1087,49088
+002200-block2,1417,52450
+002300-block1,607,39436
+002300-block2,861,47177
+002401-block1,1547,33575
+002402-block1,793,22744
+002402-block2,872,21715
+002402-block3,1079,21361
+002503-block1,862,44248
+002503-block2,1431,20371
+002504-block1,718,24554
+002504-block2,1610,26041
+002504-block3,558,35914
+002504-block4,2016,64846
+002604-block1,931,46604
+002604-block2,1941,40950
+002604-block3,643,56884
+002605-block1,2476,30296
+002605-block2,1363,42807
+002606-block1,909,41738
+002606-block2,1452,63749
+002611-block1,1109,48895
+002611-block2,1735,35379
+002612-block1,1568,49931
+002612-block2,713,39074
+002612-block3,572,36107
+002612-block4,1097,56662
+002612-block5,2346,28580
+002613-block1,1400,37144
+002613-block2,1819,35794
+002613-block3,1172,50488
+002613-block4,1571,36248
+002614-block1,2285,57057
+002614-block2,1007,34454
+002701-block1,1343,23670
+002701-block2,1974,120762
+002702-block1,1834,20440
+002702-block2,978,48622
+002702-block3,1214,17628
+002702-block4,1084,41035
+002801-block1,2220,53113
+002801-block2,1016,46551
+002801-block3,1849,46945
+002802-block1,1088,65268
+002802-block2,1328,48606
+002900-block1,1235,54654
+002900-block2,1292,36772
+003000-block1,2045,66206
+003000-block2,1590,97771
+003104-block1,3120,35209
+003104-block2,2193,14371
+003105-block1,1870,20577
+003105-block2,1889,14241
+003106-block1,4874,31135
+003106-block2,1145,14625
+003106-block3,1980,10840
+003106-block4,951,102974
+003107-block1,990,25961
+003107-block2,367,35614
+003107-block3,4224,39399
+003108-block1,2621,26046
+003108-block2,1710,21903
+003109-block1,823,26242
+003109-block2,2466,45381
+003110-block1,1767,21645
+003110-block2,1261,30096
+003110-block3,2979,20481
+003110-block4,236,33213
+003111-block1,1013,29341
+003111-block2,504,21076
+003111-block3,1646,29430
+003111-block4,922,34872
+003113-block1,2226,38614
+003113-block2,2186,18320
+003115-block1,2656,19724
+003115-block2,2961,19568
+003115-block3,2502,22949
+003116-block1,1506,20462
+003116-block2,1723,37543
+003116-block3,1482,42743
+003117-block1,1255,52562
+003117-block2,2477,29099
+003200-block1,780,16618
+003200-block2,1019,23529
+003300-block1,291,33086
+003300-block2,1676,32853
+003300-block3,608,20177
+003300-block4,1142,25464
+003400-block1,754,17455
+003400-block2,1033,9939
+003400-block3,1043,18883
+003400-block4,2434,23119
+003500-block1,1133,53189
+003500-block2,2334,41862
+003600-block1,780,47058
+003600-block2,1511,33760
+003600-block3,760,51672
+003700-block1,745,28816
+003700-block2,1413,31352
+003700-block3,1111,23172
+003800-block1,1094,23006
+003800-block2,1119,16390
+003800-block3,1896,18475
+003900-block1,1024,23356
+003900-block2,2706,10241
+003900-block3,996,45552
+004000-block1,1558,14772
+004000-block2,969,18712
+004300-block1,227,14114
+004300-block2,442,15343
+004300-block3,745,18897
+004300-block4,1018,35514
+004400-block1,1287,31882
+004400-block2,1165,19191
+004607-block1,1154,54190
+004607-block2,1008,81233
+004607-block3,1894,68327
+004607-block4,1739,34882
+004609-block1,1652,41162
+004609-block2,2984,50146
+004609-block3,2384,49085
+004609-block4,1865,56656
+004610-block1,2611,44300
+004610-block2,2281,54981
+004612-block1,1553,56402
+004612-block2,1519,47712
+004612-block3,1188,47887
+004612-block4,3713,34138
+004613-block1,1764,80745
+004614-block1,2238,48416
+004614-block2,2672,68976
+004614-block3,2278,51932
+004615-block1,1934,82232
+004615-block2,2659,113202
+004615-block3,1007,41560
+004616-block1,3162,66573
+004616-block2,2504,17580
+004616-block3,2728,57054
+004617-block1,2905,51536
+004617-block2,5634,60788
+004618-block1,3321,31251
+004618-block2,3790,48937
+004619-block1,1993,71236
+004619-block2,1698,46415
+004619-block3,1513,49242
+004620-block1,2162,68096
+004620-block2,1056,51018
+004620-block3,1359,58684
+004621-block1,2423,105615
+004621-block2,1188,67157
+004621-block3,927,51371
+004621-block4,1135,58914
+004622-block1,1453,26238
+004622-block2,3878,64292
+004701-block1,902,59958
+004701-block2,327,53821
+004701-block3,2479,51218
+004701-block4,2651,98423
+004702-block1,2031,46717
+004800-block1,1267,89103
+004800-block2,953,111788
+004901-block1,719,113244
+004901-block2,1085,62006
+004902-block1,497,81051
+004902-block2,1203,155027
+004902-block3,814,72263
+005001-block1,609,54027
+005001-block2,794,41828
+005002-block1,1020,31031
+005002-block2,679,17430
+005002-block3,1239,30311
+005002-block4,537,16154
+005100-block1,1153,68322
+005300-block1,1983,49711
+005300-block2,515,35784
+005300-block3,570,9818
+005400-block1,533,18876
+005400-block2,1872,16135
+005500-block1,799,19100
+005500-block2,750,17878
+005601-block1,1730,37856
+005601-block2,2833,52822
+005601-block3,4022,52342
+005602-block1,2412,37971
+005602-block2,1422,37223
+005602-block3,2322,28923
+005701-block1,2426,48933
+005701-block2,1434,44015
+005701-block3,1824,39505
+005702-block1,1789,41372
+005702-block2,2132,29404
+005800-block1,2600,44076
+005800-block2,1289,38879
+005800-block3,3959,52481
+005900-block1,1271,58849
+005900-block2,3464,14507
+005900-block3,1942,53146
+990100-block0,0,
