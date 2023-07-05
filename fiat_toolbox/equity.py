@@ -204,14 +204,15 @@ def setup_equity_method(
         census_table: Union[str, pd.DataFrame], 
         damages_table: Union[str, pd.DataFrame],
         gamma: float,
-        output_file:  Union[str, Path],
+        output_file:  Union[str, Path, None] = None,
 )->pd.DataFrame:
     df = get_equity_input(census_table, damages_table)
     df_ew = calculate_equity_weights(df, gamma)
     df_ew_rp, RP_cols = calculate_ewced_per_rp(df_ew, gamma)
     df_ewced = calculate_ewced(df_ew_rp, RP_cols)
     df_ewced = rank_ewced(df_ewced)
-    df_ewced = calculate_resilience_index(df_ewced)
-    df_ewced_filtered = df_ewced[['Census_Bg', 'EW', 'EWCEAD']] 
-    df_ewced_filtered.to_csv(output_file, index=False)
-    return df_ewced_filtered 
+    df_ewced = calculate_resilience_index(df_ewced) 
+    if output_file is not None:
+        df_ewced_filtered = df_ewced[['Census_Bg', 'EW', 'EWCEAD']]
+        df_ewced_filtered.to_csv(output_file, index=False)
+    return df_ewced
