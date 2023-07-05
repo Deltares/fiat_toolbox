@@ -66,7 +66,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         }
         self.assertEqual(sql_prompts_without_aggregates, sql_prompts_expected)
 
-    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.toml.load")
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.tomli.load")
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.open")
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.os.path.exists")
     def test_read_metrics_file_without_aggregates_toml(

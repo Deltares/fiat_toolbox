@@ -7,10 +7,12 @@ dependencies:
   - black
   - ipykernel
   - numpy
+  - sqlalchemy < 2.0
   - pandas
   - pandasql<2.0
+  - tomli
   - pip
   - pytest # tests
   - pytest-cov # tests
   - pytest-benchmark # tests
-  - python>=3.7
+  - python>=3.8

@@ -28,12 +28,18 @@ class IMetricsFileWriter(ABC):
     def parse_metrics_to_file(
         self, df_results: pd.DataFrame, metrics_path: Path, write_aggregate: str = None
     ) -> None:
-        """Parse a metrics file and write the metrics to a file.
+        """
+        Parse a metrics file and write the metrics to a file.
 
-        Args:
-            df_results (pd.DataFrame): The results dataframe.
-            metrics_path (Path): The path to where to store the metrics file.
-            write_aggregate (str): The name of the aggregation label to write to the metrics file (None for no aggregation label, 'all' for all possible ones).
+        Parameters
+        ----------
+        df_results : pd.DataFrame
+            The results dataframe.
+        metrics_path : Path
+            The path to where to store the metrics file.
+        write_aggregate : str
+            The name of the aggregation label to write to the metrics file
+            (None for no aggregation label, 'all' for all possible ones).
         """
         pass
 
@@ -42,23 +48,31 @@ class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
 
     def __init__(self, config_file: Path):
-        """Initialize the class.
+        """
+        Initialize the class.
 
-        Args:
-            config_file (Path): The path to the metrics file.
+        Parameters
+        ----------
+        config_file : Path
+            The path to the metrics file.
         """
         self.config_file = config_file
 
     def _read_metrics_file(
         self, include_aggregates: bool
     ) -> Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]:
-        """Read a metrics file and return a list of sql commands.
+        """
+        Read a metrics file and return a list of SQL commands.
 
-        Args:
-            include_aggregates (bool): Whether to include aggregation labels in the metrics.
+        Parameters
+        ----------
+        include_aggregates : bool
+            Whether to include aggregation labels in the metrics.
 
-        Returns:
-            Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]: A dictionary with the sql commands.
+        Returns
+        -------
+        Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]
+            A dictionary with the SQL commands.
         """
 
         # Check whether the file exists
@@ -167,14 +181,22 @@ class MetricsFileWriter(IMetricsFileWriter):
     def _create_single_metric(
         df_results: pd.DataFrame, sql_command: sql_struct
     ) -> Union[Tuple[str, object], Tuple[str, Dict[str, object]]]:
-        """Create a metrics table from the results dataframe based of an sql command.
+        """
+        Create a metrics table from the results dataframe based on an SQL command.
 
-        Args:
-            df_results (pd.DataFrame): The results dataframe.
-            sql_command (sql_struct): The sql command.
+        Parameters
+        ----------
+        df_results : pd.DataFrame
+            The results dataframe.
+        sql_command : sql_struct
+            The SQL command.
 
-        Returns:
-            Union[Tuple[str, object], Tuple[str, Dict[str, object]]]: A tuple with the metric name and value or in case of a groupby statement a tuple with the metric name and a dictionary with the groupby variables as keys and the metric as value.
+        Returns
+        -------
+        Union[Tuple[str, object], Tuple[str, Dict[str, object]]]
+            A tuple with the metric name and value or, in the case of a groupby statement,
+            a tuple with the metric name and a dictionary with the groupby variables as keys
+            and the metric as value.
         """
 
         # First add the the groupby variables to the query
@@ -215,14 +237,20 @@ class MetricsFileWriter(IMetricsFileWriter):
     def _create_metrics_dict(
         df_results: pd.DataFrame, sql_commands: Dict[str, sql_struct]
     ) -> Dict[str, object]:
-        """Create a metrics table from the results dataframe based of a list of sql commands.
+        """
+        Create a metrics table from the results dataframe based on a list of SQL commands.
 
-        Args:
-            df_results (pd.DataFrame): The results dataframe.
-            sql_commands (list[sql_struct]): A list of sql commands.
+        Parameters
+        ----------
+        df_results : pd.DataFrame
+            The results dataframe.
+        sql_commands : list[sql_struct]
+            A list of SQL commands.
 
-        Returns:
-            dict: A dictionary with the metric names and values.
+        Returns
+        -------
+        dict
+            A dictionary with the metric names and values.
         """
 
         # Initialize the metrics dictionary
@@ -241,14 +269,21 @@ class MetricsFileWriter(IMetricsFileWriter):
     def _parse_metrics(
         self, df_results: pd.DataFrame, include_aggregates: bool
     ) -> Union[dict, Dict[str, dict]]:
-        """Parse the metrics based on the config file and return a dictionary with the metrics.
+        """
+        Parse the metrics based on the config file and return a dictionary with the metrics.
 
-        Args:
-            df_results (pd.DataFrame): The results dataframe.
-            include_aggregates (bool): Whether to include aggregation labels in the metrics.
+        Parameters
+        ----------
+        df_results : pd.DataFrame
+            The results dataframe.
+        include_aggregates : bool
+            Whether to include aggregation labels in the metrics.
 
-        Returns:
-            Union[dict, List[dict]]: A dictionary with the metrics or in case of multiple aggregation labels a list of dictionaries.
+        Returns
+        -------
+        Union[dict, List[dict]]
+            A dictionary with the metrics or, in the case of multiple aggregation labels,
+            a list of dictionaries.
         """
 
         # Read the metrics file
@@ -275,13 +310,24 @@ class MetricsFileWriter(IMetricsFileWriter):
         metrics_path: Path,
         write_aggregate: str = None,
     ) -> None:
-        """Write a metrics dictionary to a metrics file.
+        """
+        Write a metrics dictionary to a metrics file.
 
-        Args:
-            metrics (Union[dict, List[dict]]): A dictionary with the metrics or in case of multiple aggregation labels a list of dictionaries.
-            config (Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]): A dictionary with the sql commands.
-            metrics_path (Path): The path to where to store the metrics file.
-            write_aggregate (str): The name of the aggregation label to write to the metrics file (None for no aggregation label).
+        Parameters
+        ----------
+        metrics : Union[dict, List[dict]]
+            A dictionary with the metrics or, in the case of multiple aggregation labels,
+            a list of dictionaries.
+        config : Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]
+            A dictionary with the SQL commands.
+        metrics_path : Path
+            The path to where to store the metrics file.
+        write_aggregate : str
+            The name of the aggregation label to write to the metrics file (None for no aggregation label).
+
+        Returns
+        -------
+        None
         """
 
         if write_aggregate:
@@ -348,15 +394,24 @@ class MetricsFileWriter(IMetricsFileWriter):
         metrics_path: Path,
         write_aggregate: str = None,
     ) -> Union[str, Dict[str, str]]:
-        """Parse a metrics file and write the metrics to a file.
+        """
+        Parse a metrics file and write the metrics to a file.
 
-        Args:
-            df_results (pd.DataFrame): The results dataframe.
-            metrics_path (Path): The path to where to store the metrics file.
-            write_aggregate (str): The name of the aggregation label to write to the metrics file (None for no aggregation label, 'all' for all possible ones).
+        Parameters
+        ----------
+        df_results : pd.DataFrame
+            The results dataframe.
+        metrics_path : Path
+            The path to where to store the metrics file.
+        write_aggregate : str
+            The name of the aggregation label to write to the metrics file
+            (None for no aggregation label, 'all' for all possible ones).
 
-        Returns:
-            Union[str, Dict[str, str]]: The path to the metrics file or a dictionary with the aggregation labels as keys and the paths to the metrics files as values.
+        Returns
+        -------
+        Union[str, Dict[str, str]]
+            The path to the metrics file or a dictionary with the aggregation labels as keys
+            and the paths to the metrics files as values.
         """
 
         # Check whether to include aggregation labels
