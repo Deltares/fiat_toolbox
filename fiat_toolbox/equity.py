@@ -122,7 +122,7 @@ def calculate_ewced_per_rp(
 
         # Add risk premium data to dataframes
         df_ew[f"R_RP{RP}"] = R
-        # Add expected annual damage dataframes 
+        # Add ewced to dataframes 
         df_ew[f"EWCED_RP{RP}"] = EWCED
     return df_ew, RP_cols 
 
@@ -170,7 +170,7 @@ def calculate_coefficients(T):
         ]
     return alpha
 
-def calculate_ewcead(
+def calculate_ewced(
         df_ew_rp: pd.DataFrame,  
         RP_cols,
 )->pd.DataFrame:
@@ -186,19 +186,19 @@ def calculate_ewcead(
     return df_ew_rp
 
 def rank_ewced(
-        df_ewcead: pd.DataFrame, 
+        df_ewced: pd.DataFrame, 
 )->pd.DataFrame:
-    df_ewcead["rank_EAD"] = df_ewcead["EAD"].rank(ascending=False)
-    df_ewcead["rank_EWCEAD"] = df_ewcead["EWCEAD"].rank(ascending=False)
-    df_ewcead["rank_diff"] = df_ewcead["rank_EWCEAD"] - df_ewcead["rank_EAD"]
-    return df_ewcead
+    df_ewced["rank_EAD"] = df_ewced["EAD"].rank(ascending=False)
+    df_ewced["rank_EWCEAD"] = df_ewced["EWCEAD"].rank(ascending=False)
+    df_ewced["rank_diff"] = df_ewced["rank_EWCEAD"] - df_ewced["rank_EAD"]
+    return df_ewced
 
 def calculate_resilience_index(
-        df_ewcead: pd.DataFrame, 
+        df_ewced: pd.DataFrame, 
 )->pd.DataFrame:
-    df_ewcead["soc_res"] =  df_ewcead["EAD"]/df_ewcead["EWCEAD"]
-    df_ewcead["soc_res"][df_ewcead["soc_res"] == np.inf] = np.nan
-    return df_ewcead
+    df_ewced["soc_res"] =  df_ewced["EAD"]/df_ewced["EWCEAD"]
+    df_ewced["soc_res"][df_ewced["soc_res"] == np.inf] = np.nan
+    return df_ewced
 
 def setup_equity_method(
         census_table: Union[str, pd.DataFrame], 
@@ -209,9 +209,9 @@ def setup_equity_method(
     df = get_equity_input(census_table, damages_table)
     df_ew = calculate_equity_weights(df, gamma)
     df_ew_rp, RP_cols = calculate_ewced_per_rp(df_ew, gamma)
-    df_ewcead = calculate_ewcead(df_ew_rp, RP_cols)
-    df_ewcead = rank_ewced(df_ewcead)
-    df_ewcead = calculate_resilience_index(df_ewcead)
-    df_ewcead_filtered = df_ewcead[['Census_Bg', 'EW', 'EWCEAD']] 
-    df_ewcead_filtered.to_csv(output_file, index=False)
-    return df_ewcead_filtered 
+    df_ewced = calculate_ewced(df_ew_rp, RP_cols)
+    df_ewced = rank_ewced(df_ewced)
+    df_ewced = calculate_resilience_index(df_ewced)
+    df_ewced_filtered = df_ewced[['Census_Bg', 'EW', 'EWCEAD']] 
+    df_ewced_filtered.to_csv(output_file, index=False)
+    return df_ewced_filtered 
