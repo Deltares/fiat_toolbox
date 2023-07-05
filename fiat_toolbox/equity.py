@@ -4,6 +4,7 @@ from urllib.request import urlopen
 from io import BytesIO
 from zipfile import ZipFile
 from pathlib import Path
+import os
 from typing import Union
 
 def check_datatype(
@@ -28,6 +29,8 @@ def check_datatype(
     """
     if isinstance(variable, pd.DataFrame):
         variable = variable
+    elif os.path.exists(variable):
+        variable = pd.read_csv(variable)
     elif isinstance(variable, str) and variable.endswith('.csv'):
         variable = pd.read_csv(variable)
     else:
@@ -35,8 +38,8 @@ def check_datatype(
     return variable 
 
 def get_equity_input(
-        census_table: Union[str, pd.DataFrame], 
-        damages_table: Union[str, pd.DataFrame],
+        census_table: Union[str, pd.DataFrame, Path], 
+        damages_table: Union[str, pd.DataFrame, Path],
 )->pd.DataFrame:
     """Create dataframe with damage and social data used to calculate the equity weights
 
@@ -201,8 +204,8 @@ def calculate_resilience_index(
     return df_ewced
 
 def setup_equity_method(
-        census_table: Union[str, pd.DataFrame], 
-        damages_table: Union[str, pd.DataFrame],
+        census_table: Union[str, pd.DataFrame, Path], 
+        damages_table: Union[str, pd.DataFrame, Path],
         gamma: float,
         output_file:  Union[str, Path, None] = None,
 )->pd.DataFrame:

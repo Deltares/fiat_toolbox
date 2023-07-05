@@ -24,8 +24,8 @@ def test_equity(case):
     gamma       = _cases[case]["gamma"]
     output_file_equity       = DATASET.joinpath(_cases[case]["output_file_equity"])
 
-    # df_equity = setup_equity_method(census_data, fiat_data, gamma, output_file_equity)
-    
-    assert gamma
+    df_equity = setup_equity_method(census_data, fiat_data, gamma, output_file_equity)
+
+    assert "EWCEAD" in df_equity.columns
 
 
