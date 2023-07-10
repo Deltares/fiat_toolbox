@@ -16,3 +16,4 @@ dependencies:
   - pytest-cov # tests
   - pytest-benchmark # tests
   - python>=3.8
+  - plotly
