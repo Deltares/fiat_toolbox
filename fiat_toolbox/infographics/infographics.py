@@ -485,8 +485,8 @@ class InfographicsParser(IInfographicsParser):
         charts_fig = InfographicsParser._get_pie_chart_figure(
             data=charts,
             legend_orientation="h",
-            yanchor="bottom",
-            y=1,
+            yanchor="top",
+            y=-0.1,
             title="Building damage",
         )
 
