@@ -330,6 +330,14 @@ class InfographicsParser(IInfographicsParser):
                 The pie chart figure
         """
 
+        # Get the title and legend configuration with default values
+        title = kwargs.get("title", "")
+        legend_orientation = kwargs.get("legend_orientation", "h")
+        yanchor = kwargs.get("yanchor", "bottom")
+        y = kwargs.get("y", 1)
+        xanchor = kwargs.get("xanchor", "center")
+        x = kwargs.get("x", 0.5)
+        
         # Create the pie chart figure
         fig = make_subplots(
             rows=1,
@@ -390,14 +398,6 @@ class InfographicsParser(IInfographicsParser):
                 yanchor="top",
                 showarrow=False,
             )
-
-        # Get the title and legend configuration with default values
-        title = kwargs.get("title", "")
-        legend_orientation = kwargs.get("legend_orientation", "h")
-        yanchor = kwargs.get("yanchor", "bottom")
-        y = kwargs.get("y", 1)
-        xanchor = kwargs.get("xanchor", "center")
-        x = kwargs.get("x", 0.5)
 
         # Final update for the layout
         fig.update_layout(
