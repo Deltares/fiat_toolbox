@@ -20,6 +20,9 @@ docs/
 tmp/
 whl/
 
+# Data folder
+data/
+
 # C extensions
 *.so
 
