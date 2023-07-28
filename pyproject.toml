@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fiat_toolbox"
+description = "A software package support ystem which can be used to assess the benefits and costs of flood resilience measures"
+readme = "README.md"
+authors = [
+    { name = "Frederique de Groen", email = "Frederique.deGroen@deltares.nl" },
+    { name = "Daley Adrichem", email = "Daley.Adrichem@deltares.nl" },
+    { name = "Sarwan Peiter", email = "Sarwan.Peiter@deltares.nl" },
+    {name = "Mario Fuentes Monjaraz", email = "mario.fuentesmonjaraz@deltares.nl"},
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
+    "Topic :: Scientific/Engineering :: Hydrology",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "sqlalchemy < 2.0",
+    "pandas",
+    "tomli",
+    "pandasql",
+    "plotly",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = { attr = "fiat_toolbox.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["fiat_toolbox", "fiat_toolbox.*"]
+
+[tool.setuptools.package-data]
+"fiat_toolbox" = ["py.typed"]
+
+[project.urls]
+Source = "https://github.com/Deltares/fiat_toolbox"
+
+[tool.ruff]
+select = ["E", "F", "NPY", "PD", "C4", "I"]
+ignore = ["E501", "PD901"]
