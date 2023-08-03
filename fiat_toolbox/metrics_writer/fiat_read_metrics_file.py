@@ -1,6 +1,5 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Dict
 
 import pandas as pd
 
@@ -9,9 +8,27 @@ class IMetricsFileReader(ABC):
     """Interface for reading metrics from a file."""
 
     @abstractmethod
-    def read_metrics_from_file(self, metric: str) -> pd.Series:
+    def read_metrics_from_file(self) -> pd.Series:
         """
         Reads metrics from a file.
+
+        Returns
+        -------
+        pd.DataFrame
+            The metrics read from the file.
+
+        Raises
+        ------
+        KeyError
+            If the metric is not found in the file.
+        """
+
+        pass
+
+    @abstractmethod
+    def read_aggregated_metric_from_file(self, metric: str) -> pd.Series:
+        """
+        Reads metrics from a file. These metrics are aggregated metrics.
 
         Parameters
         ----------
@@ -63,7 +80,7 @@ class MetricsFileReader(IMetricsFileReader):
         # Set the metrics file path
         self.metrics_file_path = metrics_file_path
 
-    def read_aggregated_metric_from_file(self, metric: str) -> Dict:
+    def read_aggregated_metric_from_file(self, metric: str) -> pd.Series:
         """Reads metrics from a file. These metrics are aggregated metrics.
 
         Parameters:
@@ -93,11 +110,20 @@ class MetricsFileReader(IMetricsFileReader):
             raise KeyError(f"The metric {metric} was not found in the file.")
 
         # Return the metric
-        return df_metrics[metric].to_dict()
+        return df_metrics[metric]
 
-    def read_metrics_from_file(self) -> Dict:
+    def read_metrics_from_file(self, include_long_names = False, include_metrics_table_selection = False, include_description = False) -> pd.Series:
         """
         Reads metrics from a file.
+
+        Parameters
+        ----------
+        include_long_names : bool
+            Include the long names of the metrics.
+        include_metrics_table_selection : bool
+            Include the metrics table selection.
+        include_description : bool
+            Include the description of the metrics.
 
         Returns
         -------
@@ -111,10 +137,19 @@ class MetricsFileReader(IMetricsFileReader):
         """
 
         # Read the metrics from the file
-        df_metrics = pd.read_csv(self.metrics_file_path, index_col=0)
+        df_metrics = pd.read_csv(self.metrics_file_path, index_col=0).transpose()
 
         # Remove the desctioption row
-        df_metrics = df_metrics.iloc[1:]
+        if not include_description:
+            df_metrics = df_metrics.drop("Description", axis='columns')
 
+        # Remove the long names row
+        if not include_long_names:
+            df_metrics = df_metrics.drop("Long Name", axis='columns')
+
+        # Remove the metrics table selection row
+        if not include_metrics_table_selection:
+            df_metrics = df_metrics.drop("Show In Metrics Table", axis='columns')
+            
         # Return the metric
-        return df_metrics.transpose().to_dict()["Value"]
+        return df_metrics

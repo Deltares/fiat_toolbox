@@ -15,6 +15,8 @@ import tomli
 @dataclass
 class sql_struct:
     name: str
+    long_name: str
+    show_in_metrics_table: bool
     description: str
     select: str
     filter: str
@@ -109,7 +111,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                     # Check whether the metric contains all required fields
                     if all(
                         key in metrics
-                        for key in ["name", "description", "select", "filter"]
+                        for key in ["name", "long_name", "show_in_metrics_table", "description", "select", "filter"]
                     ):
                         raise ValueError(
                             f"The metrics file for metric {metric['name']} does not contain all required fields."
@@ -117,6 +119,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                     # Create the sql command
                     sql_command = sql_struct(
                         name=metric["name"],
+                        long_name=metric["long_name"],
+                        show_in_metrics_table=metric["show_in_metrics_table"],
                         description=metric["description"],
                         select=metric["select"],
                         filter=metric["filter"],
@@ -150,7 +154,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                 # Check whether the metric contains all required fields
                 if all(
                     key in metrics
-                    for key in ["name", "description", "select", "filter"]
+                    for key in ["name", "long_name", "show_in_metrics_table", "description", "select", "filter"]
                 ):
                     raise ValueError(
                         f"The metrics file for metric {metric['name']} does not contain all required fields."
@@ -159,6 +163,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                 # Create the sql command
                 sql_command = sql_struct(
                     name=metric["name"],
+                    long_name=metric["long_name"],
+                    show_in_metrics_table=metric["show_in_metrics_table"],
                     description=metric["description"],
                     select=metric["select"],
                     filter=metric["filter"],
@@ -338,6 +344,26 @@ class MetricsFileWriter(IMetricsFileWriter):
                 .fillna(0)
             )
 
+            # Add the long name to the dataframe
+            metricsFrame.insert(
+                0,
+                "Long Name",
+                [
+                    config[write_aggregate][name].long_name
+                    for name, _ in metricsFrame.iterrows()
+                ],
+            )
+
+            # Add the metrics table selector to the dataframe
+            metricsFrame.insert(
+                0,
+                "Show In Metrics Table",
+                [
+                    config[write_aggregate][name].show_in_metrics_table
+                    for name, _ in metricsFrame.iterrows()
+                ],
+            )
+
             # Add the description to the dataframe
             metricsFrame.insert(
                 0,
@@ -366,6 +392,23 @@ class MetricsFileWriter(IMetricsFileWriter):
                 pd.DataFrame()
                 .from_dict(metrics, orient="index", columns=["Value"])
                 .fillna(0)
+            )
+
+            # Add the long name to the dataframe
+            metricsFrame.insert(
+                0,
+                "Long Name",
+                [config[name].long_name for name, _ in metricsFrame.iterrows()],
+            )
+
+            # Add the metrics table selector to the dataframe
+            metricsFrame.insert(
+                0,
+                "Show In Metrics Table",
+                [
+                    config[name].show_in_metrics_table
+                    for name, _ in metricsFrame.iterrows()
+                ],
             )
 
             # Add the description to the dataframe

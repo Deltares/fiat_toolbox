@@ -26,6 +26,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             "queries": [
                 {
                     "name": "Total Damage Sum",
+                    "long_name": "Total Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
@@ -33,6 +35,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 },
                 {
                     "name": "Single Family Damage Sum",
+                    "long_name": "Single Family Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -51,6 +55,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         sql_prompts_expected = {
             "Total Damage Sum": sql_struct(
                 name="Total Damage Sum",
+                long_name="Total Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="`Object ID` > 2",
@@ -58,6 +64,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             ),
             "Single Family Damage Sum": sql_struct(
                 name="Single Family Damage Sum",
+                long_name="Single Family Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
                 filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -79,6 +87,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             "queries": [
                 {
                     "name": "Total Damage Sum",
+                    "long_name": "Total Damage Sum",
+                    "show_in_metrics_table": True,	
                     "description": "Total of the damage event",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
@@ -86,6 +96,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 },
                 {
                     "name": "Single Family Damage Sum",
+                    "long_name": "Single Family Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -104,6 +116,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         sql_prompts_expected = {
             "Total Damage Sum": sql_struct(
                 name="Total Damage Sum",
+                long_name="Total Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="`Object ID` > 2",
@@ -111,6 +125,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             ),
             "Single Family Damage Sum": sql_struct(
                 name="Single Family Damage Sum",
+                long_name="Single Family Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
                 filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -133,6 +149,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             "queries": [
                 {
                     "name": "Total Damage Sum",
+                    "long_name": "Total Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
@@ -140,6 +158,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 },
                 {
                     "name": "Single Family Damage Sum",
+                    "long_name": "Single Family Damage Sum",
+                    "show_in_metrics_table": True,	
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -159,6 +179,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             "Subbasin": {
                 "Total Damage Sum": sql_struct(
                     name="Total Damage Sum",
+                    long_name="Total Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
@@ -166,6 +188,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
+                    long_name="Single Family Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
                     filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -175,6 +199,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             "Tax Use": {
                 "Total Damage Sum": sql_struct(
                     name="Total Damage Sum",
+                    long_name="Total Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
@@ -182,6 +208,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
+                    long_name="Single Family Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
                     filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -277,6 +305,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 {
                     "name": "Total Damage Sum",
                     "description": "Total of the damage event",
+                    "show_in_metrics_table": True,
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
                     "groupby": "",
@@ -284,6 +313,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 {
                     "name": "Single Family Damage Sum",
                     "description": "Total of the damage event for only single families",
+                    "show_in_metrics_table": True,
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
@@ -345,6 +375,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 {
                     "name": "Total Damage Sum",
                     "description": "Total of the damage event",
+                    "show_in_metrics_table": True,
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
                     "groupby": "",
@@ -352,6 +383,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 {
                     "name": "Single Family Damage Sum",
                     "description": "Total of the damage event for only single families",
+                    "show_in_metrics_table": True,
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
@@ -457,6 +489,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             "queries": [
                 {
                     "name": "Total Damage Sum",
+                    "long_name": "Total Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
@@ -464,6 +498,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 },
                 {
                     "name": "Total Damage Sum",
+                    "long_name": "Total Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -502,6 +538,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
             "queries": [
                 {
                     "name": "Total Damage Sum",
+                    "long_name": "Total Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
@@ -509,6 +547,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 },
                 {
                     "name": "Single Family Damage Sum",
+                    "long_name": "Single Family Damage Sum",
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -539,6 +579,8 @@ class TestCreateSingleMetric(unittest.TestCase):
         )
         sql_command = sql_struct(
             name="Total Damage Sum",
+            long_name="Total Damage Sum",
+            show_in_metrics_table=True,
             description="Total of the damage event",
             select="SUM(`Total Damage Event`)",
             filter="`Object ID` > 2",
@@ -567,6 +609,8 @@ class TestCreateSingleMetric(unittest.TestCase):
         )
         sql_command = sql_struct(
             name="Total Damage Sum",
+            long_name="Total Damage Sum",
+            show_in_metrics_table=True,
             description="Total of the damage event",
             select="SUM(`Total Damage Event`)",
             filter="",
@@ -602,6 +646,8 @@ class TestCreateSingleMetric(unittest.TestCase):
         )
         sql_command = sql_struct(
             name="Total Damage Sum",
+            long_name="Total Damage Sum",
+            show_in_metrics_table=True,
             description="Total of the damage event",
             select="SUM(`Total Damage Event`)",
             filter="",
@@ -633,6 +679,8 @@ class TestCreateSingleMetric(unittest.TestCase):
         )
         sql_command = sql_struct(
             name="TotalDamageSum",
+            long_name="Total Damage Sum",
+            show_in_metrics_table=True,
             description="Total of the damage event",
             select="SUM(`Total Damage Event`)",
             filter="this filter doesnt make sense",
@@ -655,6 +703,8 @@ class TestCreateSingleMetric(unittest.TestCase):
         )
         sql_command = sql_struct(
             name="TotalDamageSum",
+            long_name="Total Damage Sum",
+            show_in_metrics_table=True,
             description="Total of the damage event",
             select="",
             filter="`Object ID` > 2",
@@ -707,6 +757,8 @@ class TestCreateMetricsDict(unittest.TestCase):
         sql_prompts = {
             "Total Damage Sum": sql_struct(
                 name="Total Damage Sum",
+                long_name="Total Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="`Object ID` > 2",
@@ -714,6 +766,8 @@ class TestCreateMetricsDict(unittest.TestCase):
             ),
             "Aggregated Damage Sum": sql_struct(
                 name="Aggregated Damage Sum",
+                long_name="Aggregated Damage Sum",
+                show_in_metrics_table=True,
                 description="Aggregate of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="",
@@ -750,6 +804,8 @@ class TestParseMetrics(unittest.TestCase):
         mock_read_metrics_file.return_value = {
             "Total Damage Sum": sql_struct(
                 name="Total Damage Sum",
+                long_name="Total Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="`Object ID` > 2",
@@ -757,6 +813,8 @@ class TestParseMetrics(unittest.TestCase):
             ),
             "Single Family Damage Sum": sql_struct(
                 name="Single Family Damage Sum",
+                long_name="Single Family Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
                 filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -803,6 +861,8 @@ class TestParseMetrics(unittest.TestCase):
             "Subbasin": {
                 "Total Damage Sum": sql_struct(
                     name="Total Damage Sum",
+                    long_name="Total Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
@@ -810,6 +870,8 @@ class TestParseMetrics(unittest.TestCase):
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
+                    long_name="Single Family Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
                     filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -819,6 +881,8 @@ class TestParseMetrics(unittest.TestCase):
             "Tax Use": {
                 "Total Damage Sum": sql_struct(
                     name="Total Damage Sum",
+                    long_name="Total Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
@@ -826,6 +890,8 @@ class TestParseMetrics(unittest.TestCase):
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
+                    long_name="Single Family Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
                     filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -887,6 +953,8 @@ class TestMetricsFileWriter(unittest.TestCase):
         sql_prompts_no_aggregation = {
             "Total Damage Sum": sql_struct(
                 name="Total Damage Sum",
+                long_name="Total Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="`Object ID` > 2",
@@ -894,6 +962,8 @@ class TestMetricsFileWriter(unittest.TestCase):
             ),
             "Single Family Damage Sum": sql_struct(
                 name="Single Family Damage Sum",
+                long_name="Single Family Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
                 filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -941,6 +1011,8 @@ class TestMetricsFileWriter(unittest.TestCase):
             "Subbasin": {
                 "Total Damage Sum": sql_struct(
                     name="Total Damage Sum",
+                    long_name="Total Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
@@ -948,6 +1020,8 @@ class TestMetricsFileWriter(unittest.TestCase):
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
+                    long_name="Single Family Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
                     filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -957,6 +1031,8 @@ class TestMetricsFileWriter(unittest.TestCase):
             "Tax Use": {
                 "Total Damage Sum": sql_struct(
                     name="Total Damage Sum",
+                    long_name="Total Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
@@ -964,6 +1040,8 @@ class TestMetricsFileWriter(unittest.TestCase):
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
+                    long_name="Single Family Damage Sum",
+                    show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
                     filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -1015,6 +1093,8 @@ class TestMetricsFileWriter(unittest.TestCase):
         sql_prompts_no_aggregation = {
             "Total Damage Sum": sql_struct(
                 name="Total Damage Sum",
+                long_name="Total Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="`Object ID` > 2",
@@ -1022,6 +1102,8 @@ class TestMetricsFileWriter(unittest.TestCase):
             ),
             "Single Family Damage Sum": sql_struct(
                 name="Single Family Damage Sum",
+                long_name="Single Family Damage Sum",
+                show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
                 filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
