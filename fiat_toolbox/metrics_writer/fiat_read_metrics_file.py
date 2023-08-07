@@ -112,7 +112,12 @@ class MetricsFileReader(IMetricsFileReader):
         # Return the metric
         return df_metrics[metric]
 
-    def read_metrics_from_file(self, include_long_names = False, include_metrics_table_selection = False, include_description = False) -> pd.Series:
+    def read_metrics_from_file(
+        self,
+        include_long_names=False,
+        include_metrics_table_selection=False,
+        include_description=False,
+    ) -> pd.Series:
         """
         Reads metrics from a file.
 
@@ -141,15 +146,15 @@ class MetricsFileReader(IMetricsFileReader):
 
         # Remove the desctioption row
         if not include_description:
-            df_metrics = df_metrics.drop("Description", axis='columns')
+            df_metrics = df_metrics.drop("Description", axis="columns")
 
         # Remove the long names row
         if not include_long_names:
-            df_metrics = df_metrics.drop("Long Name", axis='columns')
+            df_metrics = df_metrics.drop("Long Name", axis="columns")
 
         # Remove the metrics table selection row
         if not include_metrics_table_selection:
-            df_metrics = df_metrics.drop("Show In Metrics Table", axis='columns')
-            
+            df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
+
         # Return the metric
         return df_metrics

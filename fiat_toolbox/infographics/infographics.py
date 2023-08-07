@@ -153,9 +153,11 @@ class InfographicsParser(IInfographicsParser):
         )
 
         # Read configured metrics
-        metrics = MetricsFileReader(
-            str(non_aggregate_file_path)
-        ).read_metrics_from_file().to_dict()["Value"]
+        metrics = (
+            MetricsFileReader(str(non_aggregate_file_path))
+            .read_metrics_from_file()
+            .to_dict()["Value"]
+        )
 
         # Remove the metrics file
         if not keep_files:
@@ -303,6 +305,10 @@ class InfographicsParser(IInfographicsParser):
         # Check if the file_path is correct
         if file_path.suffix != ".html":
             raise ValueError(f"File path must be a .html file, not {file_path}")
+
+        # Create the directory if it does not exist
+        if not file_path.parent.exists():
+            file_path.parent.mkdir(parents=True)
 
         # Write the html to the file
         with open(file_path, "w", encoding="utf-8") as infographics:

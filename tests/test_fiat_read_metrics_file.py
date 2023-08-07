@@ -103,7 +103,7 @@ class TestReadMetricsFile(unittest.TestCase):
                         "Long Name4",
                         "Long Name5",
                     ],
-                    "Show In Metrics Table": [ 
+                    "Show In Metrics Table": [
                         True,
                         True,
                         True,

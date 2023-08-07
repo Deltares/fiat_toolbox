@@ -88,7 +88,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 {
                     "name": "Total Damage Sum",
                     "long_name": "Total Damage Sum",
-                    "show_in_metrics_table": True,	
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Object ID` > 2",
@@ -159,7 +159,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 {
                     "name": "Single Family Damage Sum",
                     "long_name": "Single Family Damage Sum",
-                    "show_in_metrics_table": True,	
+                    "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
                     "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
@@ -971,25 +971,27 @@ class TestMetricsFileWriter(unittest.TestCase):
             ),
         }
 
+        cwd = Path(os.path.dirname(os.path.abspath(__file__)))
+
         # Act
         MetricsFileWriter._write_metrics_file(
             metrics_no_aggregation,
             sql_prompts_no_aggregation,
-            "tests/metrics_writer/data/metrics_no_aggregation.csv",
+            cwd.joinpath("metrics_writer", "data", "metrics_no_aggregation.csv"),
         )
 
         # Assert
         df_metrics_no_aggregation_expected = pd.read_csv(
-            "tests/metrics_writer/data/test_metrics_no_aggregation.csv"
+            cwd.joinpath("metrics_writer", "data", "test_metrics_no_aggregation.csv")
         )
         df_metrics_no_aggregation = pd.read_csv(
-            "tests/metrics_writer/data/metrics_no_aggregation.csv"
+            cwd.joinpath("metrics_writer", "data", "metrics_no_aggregation.csv")
         )
 
         self.assertTrue(
             df_metrics_no_aggregation.equals(df_metrics_no_aggregation_expected)
         )
-        os.remove("tests/metrics_writer/data/metrics_no_aggregation.csv")
+        os.remove(cwd.joinpath("metrics_writer", "data", "metrics_no_aggregation.csv"))
 
     def test_write_metrics_file_with_aggregation(self):
         # Arrange
@@ -1050,38 +1052,42 @@ class TestMetricsFileWriter(unittest.TestCase):
             },
         }
 
+        cwd = Path(os.path.dirname(os.path.abspath(__file__)))
+
         # Act
         MetricsFileWriter._write_metrics_file(
             metrics_with_aggregation,
             sql_prompts_with_aggregation,
-            "tests/metrics_writer/data/metrics_subbasin.csv",
+            cwd.joinpath("metrics_writer", "data", "metrics_subbasin.csv"),
             write_aggregate="Subbasin",
         )
         MetricsFileWriter._write_metrics_file(
             metrics_with_aggregation,
             sql_prompts_with_aggregation,
-            "tests/metrics_writer/data/metrics_taxuse.csv",
+            cwd.joinpath("metrics_writer", "data", "metrics_taxuse.csv"),
             write_aggregate="Tax Use",
         )
 
         # Assert
         df_metrics_subbasin_expected = pd.read_csv(
-            "tests/metrics_writer/data/test_metrics_subbasin.csv"
+            cwd.joinpath("metrics_writer", "data", "test_metrics_subbasin.csv")
         )
         df_metrics_taxuse_expected = pd.read_csv(
-            "tests/metrics_writer/data/test_metrics_taxuse.csv"
+            cwd.joinpath("metrics_writer", "data", "test_metrics_taxuse.csv")
         )
 
         df_metrics_subbasin = pd.read_csv(
-            "tests/metrics_writer/data/metrics_subbasin.csv"
+            cwd.joinpath("metrics_writer", "data", "metrics_subbasin.csv")
         )
-        df_metrics_taxuse = pd.read_csv("tests/metrics_writer/data/metrics_taxuse.csv")
+        df_metrics_taxuse = pd.read_csv(
+            cwd.joinpath("metrics_writer", "data", "metrics_taxuse.csv")
+        )
 
         self.assertTrue(df_metrics_subbasin.equals(df_metrics_subbasin_expected))
         self.assertTrue(df_metrics_taxuse.equals(df_metrics_taxuse_expected))
 
-        os.remove("tests/metrics_writer/data/metrics_subbasin.csv")
-        os.remove("tests/metrics_writer/data/metrics_taxuse.csv")
+        os.remove(cwd.joinpath("metrics_writer", "data", "metrics_subbasin.csv"))
+        os.remove(cwd.joinpath("metrics_writer", "data", "metrics_taxuse.csv"))
 
     def test_write_metrics_file_existing_name(self):
         # Arrange
