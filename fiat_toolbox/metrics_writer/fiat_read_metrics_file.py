@@ -144,6 +144,9 @@ class MetricsFileReader(IMetricsFileReader):
         # Read the metrics from the file
         df_metrics = pd.read_csv(self.metrics_file_path, index_col=0).transpose()
 
+        # Ensure values are interpreted as numbers
+        df_metrics["Value"] = pd.to_numeric(df_metrics["Value"])
+
         # Remove the desctioption row
         if not include_description:
             df_metrics = df_metrics.drop("Description", axis="columns")
