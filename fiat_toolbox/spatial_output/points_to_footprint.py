@@ -42,7 +42,7 @@ class PointsToFootprints(IPointsToFootprints):
         out_path: Union[str, Path],
         id: Optional[str] = "BF_FID",
         extra_footprints: Optional[gpd.GeoDataFrame] = None,
-    ) -> None:
+    ) -> gpd.GeoDataFrame:
         # Merge based on "id" column
         gdf = pd.merge(footprints[[id, "geometry"]], points, on=id, how="outer")
 
@@ -129,3 +129,5 @@ class PointsToFootprints(IPointsToFootprints):
         gdf = gdf.reset_index(drop=True)
         gdf = gdf[["Object ID", "geometry"] + agg_cols]
         gdf.to_file(out_path, driver="GPKG")
+
+        return gdf
