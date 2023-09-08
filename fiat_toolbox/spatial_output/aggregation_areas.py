@@ -46,11 +46,11 @@ class AggregationAreas(IAggregationAreas):
     """Write an aggregation areas spatial file."""
 
     @staticmethod
-    def _check_extention(out_path, ext):
+    def _check_extension(out_path, ext):
         out_path = Path(out_path)
         if out_path.suffix != ext:
             raise ValueError(
-                f"File extention given: '{out_path.suffix}' does not much the file format specified: {ext}."
+                f"File extension given: '{out_path.suffix}' does not much the file format specified: {ext}."
             )
 
     @staticmethod
@@ -102,13 +102,13 @@ class AggregationAreas(IAggregationAreas):
 
         # Save file
         if file_format == "geopackage":
-            AggregationAreas._check_extention(out_path, ".gpkg")
+            AggregationAreas._check_extension(out_path, ".gpkg")
             joined.to_file(out_path, driver="GPKG")
         elif file_format == "shapefile":
-            AggregationAreas._check_extention(out_path, ".shp")
+            AggregationAreas._check_extension(out_path, ".shp")
             joined.to_file(out_path)
         elif file_format == "GeoJSON":
-            AggregationAreas._check_extention(out_path, ".geojson")
+            AggregationAreas._check_extension(out_path, ".geojson")
             joined.to_file(out_path, driver="GeoJSON")
         else:
             raise ValueError(
