@@ -9,6 +9,7 @@ readme = "README.md"
 authors = [
     { name = "Frederique de Groen", email = "Frederique.deGroen@deltares.nl" },
     { name = "Daley Adrichem", email = "Daley.Adrichem@deltares.nl" },
+    { name = "Panos Athanasiou", email = "Panos.Athanasiou@deltares.nl" },
     { name = "Sarwan Peiter", email = "Sarwan.Peiter@deltares.nl" },
     {name = "Mario Fuentes Monjaraz", email = "mario.fuentesmonjaraz@deltares.nl"},
 ]
@@ -24,6 +25,10 @@ dependencies = [
     "pandas",
     "tomli",
     "pandasql",
+    "plotly",
+    "parse",
+    "delft_fiat @ git+https://github.com/Deltares/Delft-FIAT.git",
+    ""
 ]
 dynamic = ["version"]
 
