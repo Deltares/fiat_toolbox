@@ -15,6 +15,8 @@ import tomli
 @dataclass
 class sql_struct:
     name: str
+    long_name: str
+    show_in_metrics_table: bool
     description: str
     select: str
     filter: str
@@ -109,7 +111,14 @@ class MetricsFileWriter(IMetricsFileWriter):
                     # Check whether the metric contains all required fields
                     if all(
                         key in metrics
-                        for key in ["name", "description", "select", "filter"]
+                        for key in [
+                            "name",
+                            "long_name",
+                            "show_in_metrics_table",
+                            "description",
+                            "select",
+                            "filter",
+                        ]
                     ):
                         raise ValueError(
                             f"The metrics file for metric {metric['name']} does not contain all required fields."
@@ -117,6 +126,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                     # Create the sql command
                     sql_command = sql_struct(
                         name=metric["name"],
+                        long_name=metric["long_name"],
+                        show_in_metrics_table=metric["show_in_metrics_table"],
                         description=metric["description"],
                         select=metric["select"],
                         filter=metric["filter"],
@@ -150,7 +161,14 @@ class MetricsFileWriter(IMetricsFileWriter):
                 # Check whether the metric contains all required fields
                 if all(
                     key in metrics
-                    for key in ["name", "description", "select", "filter"]
+                    for key in [
+                        "name",
+                        "long_name",
+                        "show_in_metrics_table",
+                        "description",
+                        "select",
+                        "filter",
+                    ]
                 ):
                     raise ValueError(
                         f"The metrics file for metric {metric['name']} does not contain all required fields."
@@ -159,6 +177,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                 # Create the sql command
                 sql_command = sql_struct(
                     name=metric["name"],
+                    long_name=metric["long_name"],
+                    show_in_metrics_table=metric["show_in_metrics_table"],
                     description=metric["description"],
                     select=metric["select"],
                     filter=metric["filter"],
@@ -331,11 +351,46 @@ class MetricsFileWriter(IMetricsFileWriter):
         """
 
         if write_aggregate:
+            # Get the metrics for the current aggregation label
+            aggregate_metrics = metrics[write_aggregate]
+
+            # Find the names dynamically
+            names = set()
+            for value in aggregate_metrics.values():
+                names.update(value.keys())
+
+            # Update all empty metrics with 0
+            for key, value in aggregate_metrics.items():
+                if value == {}:
+                    aggregate_metrics[key] = {name: 0 for name in names}
+                    continue
+                for name in names:
+                    if name not in value:
+                        aggregate_metrics[key][name] = 0
+
             # Create a dataframe from the metrics dictionary
             metricsFrame = (
-                pd.DataFrame()
-                .from_dict(metrics[write_aggregate], orient="index")
-                .fillna(0)
+                pd.DataFrame().from_dict(aggregate_metrics, orient="index").fillna(0)
+            )
+
+            # Add the long name to the dataframe
+            metricsFrame.insert(
+                0,
+                "Long Name",
+                [
+                    config[write_aggregate][name].long_name
+                    for name, _ in metricsFrame.iterrows()
+                ],
+            )
+
+            # Add the metrics table selector to the dataframe
+            metricsFrame.insert(
+                0,
+                "Show In Metrics Table",
+                [
+                    config[write_aggregate][name].show_in_metrics_table
+                    for name, _ in metricsFrame.iterrows()
+                ],
             )
 
             # Add the description to the dataframe
@@ -359,6 +414,8 @@ class MetricsFileWriter(IMetricsFileWriter):
             metricsFrame = metricsFrame.transpose()
 
             # Write the metrics to a file
+            if not metrics_path.parent.exists():
+                metrics_path.parent.mkdir(parents=True)
             metricsFrame.to_csv(metrics_path)
         else:
             # Create a dataframe from the metrics dictionary
@@ -366,6 +423,23 @@ class MetricsFileWriter(IMetricsFileWriter):
                 pd.DataFrame()
                 .from_dict(metrics, orient="index", columns=["Value"])
                 .fillna(0)
+            )
+
+            # Add the long name to the dataframe
+            metricsFrame.insert(
+                0,
+                "Long Name",
+                [config[name].long_name for name, _ in metricsFrame.iterrows()],
+            )
+
+            # Add the metrics table selector to the dataframe
+            metricsFrame.insert(
+                0,
+                "Show In Metrics Table",
+                [
+                    config[name].show_in_metrics_table
+                    for name, _ in metricsFrame.iterrows()
+                ],
             )
 
             # Add the description to the dataframe
@@ -386,6 +460,8 @@ class MetricsFileWriter(IMetricsFileWriter):
             metricsFrame = metricsFrame.transpose()
 
             # Write the metrics to a file
+            if not metrics_path.parent.exists():
+                metrics_path.parent.mkdir(parents=True)
             metricsFrame.to_csv(metrics_path)
 
     def parse_metrics_to_file(
@@ -432,9 +508,9 @@ class MetricsFileWriter(IMetricsFileWriter):
                 directory, filename = os.path.split(metrics_path)
                 filename, extension = os.path.splitext(filename)
                 new_filename = filename + "_" + key + extension
-                new_path = os.path.join(directory, new_filename)
+                new_path = Path(os.path.join(directory, new_filename))
                 return_files[key] = new_path
-                
+
                 # Write the metrics to a file
                 MetricsFileWriter._write_metrics_file(
                     metrics, config, new_path, write_aggregate=key

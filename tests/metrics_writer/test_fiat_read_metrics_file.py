@@ -26,7 +26,7 @@ class TestReadMetricsFile(unittest.TestCase):
         read_class = MetricsFileReader(metrics_file_path)
         df_results = read_class.read_aggregated_metric_from_file(
             metric="Total Damage Event"
-        )
+        ).to_dict()
 
         # Assert
         df_expected = {
@@ -96,6 +96,20 @@ class TestReadMetricsFile(unittest.TestCase):
             pd.DataFrame(
                 {
                     "": ["Name1", "Name2", "Name3", "Name4", "Name5"],
+                    "Long Name": [
+                        "Long Name1",
+                        "Long Name2",
+                        "Long Name3",
+                        "Long Name4",
+                        "Long Name5",
+                    ],
+                    "Show In Metrics Table": [
+                        True,
+                        True,
+                        True,
+                        True,
+                        True,
+                    ],
                     "Description": [
                         "Description1",
                         "Description2",
@@ -114,7 +128,7 @@ class TestReadMetricsFile(unittest.TestCase):
 
         # Act
         read_class = MetricsFileReader(metrics_file_path)
-        df_results = read_class.read_metrics_from_file()
+        df_results = read_class.read_metrics_from_file().to_dict()["Value"]
 
         # Assert
         df_expected = {

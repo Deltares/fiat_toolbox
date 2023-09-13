@@ -1,5 +1,7 @@
 ,Total Damage Sum,Single Family Damage Sum
 Description,Total of the damage event,Total of the damage event for only single families
-VACANT COMMERCIAL,900.0,0.0
-VACANT RESIDENTIAL,300.0,0.0
-SINGLE FAMILY,0.0,300.0
+Show In Metrics Table,True,True
+Long Name,Total Damage Sum,Single Family Damage Sum
+VACANT COMMERCIAL,900,0
+VACANT RESIDENTIAL,300,0
+SINGLE FAMILY,0,300

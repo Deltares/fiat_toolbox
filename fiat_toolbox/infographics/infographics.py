@@ -1,5 +1,5 @@
 import os
-from abc import ABC, abstractmethod
+from abc import ABC, abstractstaticmethod
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -15,7 +15,7 @@ from fiat_toolbox.metrics_writer.fiat_write_metrics_file import MetricsFileWrite
 class IInfographicsParser(ABC):
     """Interface for creating the infographic"""
 
-    @abstractmethod
+    @abstractstaticmethod
     def get_infographics(
         scenario_name: str,
         database_path: Union[Path, str],
@@ -39,14 +39,14 @@ class IInfographicsParser(ABC):
         """
         pass
 
-    @abstractmethod
+    @abstractstaticmethod
     def write_infographics_to_file(
         scenario_name: str,
         database_path: Union[Path, str],
         keep_metrics_file: bool = False,
     ) -> str:
         """Write the infographic for a scenario to file
-        
+
         Parameters
         ----------
         scenario_name : str
@@ -60,9 +60,30 @@ class IInfographicsParser(ABC):
         -------
         str
             The path to the infographic file
-        """  
-        pass    
-    
+        """
+        pass
+
+    @abstractstaticmethod
+    def get_infographics_html(
+        scenario_name: str,
+        database_path: Union[Path, str],
+    ) -> str:
+        """Get the path to the infographic html file
+
+        Parameters
+        ----------
+        scenario_name : str
+            The name of the scenario
+        database_path : Union[Path, str]
+            The path to the database
+
+        Returns
+        -------
+        str
+            The path to the infographic html file
+        """
+        pass
+
 
 class InfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
@@ -102,7 +123,7 @@ class InfographicsParser(IInfographicsParser):
         )
 
         if not Path.exists(csv_file):
-            raise FileNotFoundError(f"FIAT results file not found at {csv_file}")        
+            raise FileNotFoundError(f"FIAT results file not found at {csv_file}")
 
         # Get the metrics configuration
         metrics_config_path = database_static_path.joinpath(
@@ -132,9 +153,11 @@ class InfographicsParser(IInfographicsParser):
         )
 
         # Read configured metrics
-        metrics = MetricsFileReader(
-            str(non_aggregate_file_path)
-        ).read_metrics_from_file()
+        metrics = (
+            MetricsFileReader(str(non_aggregate_file_path))
+            .read_metrics_from_file()
+            .to_dict()["Value"]
+        )
 
         # Remove the metrics file
         if not keep_files:
@@ -193,10 +216,8 @@ class InfographicsParser(IInfographicsParser):
 
             # Check if the categories are defined
             if "Categories" not in pie_chart_config:
-                raise KeyError(
-                    "Categories not found in pie chart configuration file"
-                )
-            
+                raise KeyError("Categories not found in pie chart configuration file")
+
             # Read the categories configuration
             categorie_dict = {}
             for key, value in pie_chart_config["Categories"].items():
@@ -207,7 +228,7 @@ class InfographicsParser(IInfographicsParser):
             # Check if the slices are defined
             if "Slices" not in pie_chart_config:
                 raise KeyError("Slices not found in pie chart configuration file")
-            
+
             # Read the configuration for the seperate pie slices
             for key, value in pie_chart_config["Slices"].items():
                 pie_dict[value["Chart"]]["Values"].append(int(metrics[value["Query"]]))
@@ -285,11 +306,27 @@ class InfographicsParser(IInfographicsParser):
         if file_path.suffix != ".html":
             raise ValueError(f"File path must be a .html file, not {file_path}")
 
+        # Create the directory if it does not exist
+        if not file_path.parent.exists():
+            file_path.parent.mkdir(parents=True)
+
         # Write the html to the file
         with open(file_path, "w", encoding="utf-8") as infographics:
-            figure1_html = figs[0].to_html().split("<body>")[1].split("</body>")[0] if len(figs) > 0 else ""
-            figure2_html = figs[1].to_html().split("<body>")[1].split("</body>")[0] if len(figs) > 1 else ""
-            figure3_html = figs[2].to_html().split("<body>")[1].split("</body>")[0] if len(figs) > 2 else ""
+            figure1_html = (
+                figs[0].to_html().split("<body>")[1].split("</body>")[0]
+                if len(figs) > 0
+                else ""
+            )
+            figure2_html = (
+                figs[1].to_html().split("<body>")[1].split("</body>")[0]
+                if len(figs) > 1
+                else ""
+            )
+            figure3_html = (
+                figs[2].to_html().split("<body>")[1].split("</body>")[0]
+                if len(figs) > 2
+                else ""
+            )
 
             infographics.write(
                 f"""<!DOCTYPE html>
@@ -337,7 +374,7 @@ class InfographicsParser(IInfographicsParser):
         y = kwargs.get("y", 1)
         xanchor = kwargs.get("xanchor", "center")
         x = kwargs.get("x", 0.5)
-        
+
         # Create the pie chart figure
         fig = make_subplots(
             rows=1,
@@ -381,7 +418,7 @@ class InfographicsParser(IInfographicsParser):
                     "sizex": 0.1,
                     "sizey": 0.1,
                     "x": domain_center_x,
-                    "y": domain_center_y-0.05,
+                    "y": domain_center_y - 0.05,
                     "xanchor": "center",
                     "yanchor": "middle",
                     "visible": True,
@@ -474,9 +511,7 @@ class InfographicsParser(IInfographicsParser):
             )
 
         # Get the pie chart dictionaries
-        charts = InfographicsParser._get_pies_dictionary(
-            pie_chart_config_path, metrics
-        )
+        charts = InfographicsParser._get_pies_dictionary(pie_chart_config_path, metrics)
         people = InfographicsParser._get_pies_dictionary(
             pie_people_config_path, metrics
         )
@@ -513,7 +548,7 @@ class InfographicsParser(IInfographicsParser):
         ----------
         scenario_name : str
             The name of the scenario
-        database_path : Union[Path, str]    
+        database_path : Union[Path, str]
             The path to the database
         keep_metrics_file : bool, optional
             Whether to keep the metrics file, by default False
@@ -558,11 +593,9 @@ class InfographicsParser(IInfographicsParser):
         # Convert the database path to a Path object
         if isinstance(database_path, str):
             database_path = Path(database_path)
-        
+
         # Get the infographic stylesheet
-        infographic_style = database_path.joinpath(
-            "input", "infographic", "styles.css"
-        )
+        infographic_style = database_path.joinpath("input", "infographic", "styles.css")
 
         # Check if the infographic stylesheet exists
         if not Path.exists(infographic_style):
@@ -593,4 +626,41 @@ class InfographicsParser(IInfographicsParser):
         )
 
         # Return the path to the infographic
+        return str(infographic_html)
+
+    @staticmethod
+    def get_infographics_html(
+        scenario_name: str,
+        database_path: Union[Path, str],
+    ) -> str:
+        """Get the path to the infographic html file
+
+        Parameters
+        ----------
+        scenario_name : str
+            The name of the scenario
+        database_path : Union[Path, str]
+            The path to the database
+
+        Returns
+        -------
+        str
+            The path to the infographic html file
+        """
+
+        # Convert the database path to a Path object
+        if isinstance(database_path, str):
+            database_path = Path(database_path)
+
+        # Create the infographic path
+        infographic_html = database_path.joinpath(
+            "output",
+            "infographics",
+            f"{scenario_name}_metrics.html",
+        )
+
+        # Check if the infographic stylesheet exists
+        if not Path.exists(infographic_html):
+            raise FileNotFoundError(f"Infographic not found at {infographic_html}")
+
         return str(infographic_html)
