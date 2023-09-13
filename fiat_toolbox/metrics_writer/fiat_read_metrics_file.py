@@ -1,58 +1,15 @@
 import os
-from abc import ABC, abstractmethod
-
+from typing import Union
+from pathlib import Path
 import pandas as pd
 
-
-class IMetricsFileReader(ABC):
-    """Interface for reading metrics from a file."""
-
-    @abstractmethod
-    def read_metrics_from_file(self) -> pd.Series:
-        """
-        Reads metrics from a file.
-
-        Returns
-        -------
-        pd.DataFrame
-            The metrics read from the file.
-
-        Raises
-        ------
-        KeyError
-            If the metric is not found in the file.
-        """
-
-        pass
-
-    @abstractmethod
-    def read_aggregated_metric_from_file(self, metric: str) -> pd.Series:
-        """
-        Reads metrics from a file. These metrics are aggregated metrics.
-
-        Parameters
-        ----------
-        metric : str
-            The metric to read from the file.
-
-        Returns
-        -------
-        pd.DataFrame
-            The metrics read from the file.
-
-        Raises
-        ------
-        KeyError
-            If the metric is not found in the file.
-        """
-
-        pass
+from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileReader
 
 
 class MetricsFileReader(IMetricsFileReader):
     """Reads metrics from a file."""
 
-    def __init__(self, metrics_file_path: str):
+    def __init__(self, metrics_file_path: Union[str, Path]):
         """
         Initializes a new instance of the MetricsFileReader class.
 
@@ -69,8 +26,12 @@ class MetricsFileReader(IMetricsFileReader):
             If the file is not a valid metrics file.
         """
 
+        # Convert the path to a Path object
+        if not isinstance(metrics_file_path, Path):
+            metrics_file_path = Path(metrics_file_path)
+
         # Check if the file is a csv file
-        if not metrics_file_path.endswith(".csv"):
+        if not metrics_file_path.suffix == ".csv":
             raise ValueError("The file must be a csv file.")
 
         # Check if the file exists
@@ -113,10 +74,7 @@ class MetricsFileReader(IMetricsFileReader):
         return df_metrics[metric]
 
     def read_metrics_from_file(
-        self,
-        include_long_names=False,
-        include_metrics_table_selection=False,
-        include_description=False,
+        self, **kwargs
     ) -> pd.Series:
         """
         Reads metrics from a file.
@@ -140,6 +98,11 @@ class MetricsFileReader(IMetricsFileReader):
         KeyError
             If the metric is not found in the file.
         """
+
+        # Set the default values
+        include_long_names = kwargs.get("include_long_names", False)
+        include_metrics_table_selection = kwargs.get("include_metrics_table_selection", False)
+        include_description = kwargs.get("include_description", False)
 
         # Read the metrics from the file
         df_metrics = pd.read_csv(self.metrics_file_path, index_col=0).transpose()

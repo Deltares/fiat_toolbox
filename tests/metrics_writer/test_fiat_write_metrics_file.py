@@ -224,18 +224,15 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         # Arrange
         config_file = Path("config_file.json")
 
-        # Act
-        write_class = MetricsFileWriter(config_file)
-
         # Assert
         with self.assertRaises(FileNotFoundError) as context:
-            write_class._read_metrics_file(include_aggregates=False)
+            MetricsFileWriter(config_file)
             self.assertTrue(
                 "Config file config_file.json not found" in str(context.exception)
             )
 
         with self.assertRaises(FileNotFoundError) as context:
-            write_class._read_metrics_file(include_aggregates=True)
+            MetricsFileWriter(config_file)
             self.assertTrue(
                 "Config file config_file.json not found" in str(context.exception)
             )
@@ -798,9 +795,11 @@ class TestParseMetrics(unittest.TestCase):
     @patch(
         "fiat_toolbox.metrics_writer.fiat_write_metrics_file.MetricsFileWriter._read_metrics_file"
     )
-    def test_parse_metrics_config_file_without_aggregates(self, mock_read_metrics_file):
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.os.path.exists")
+    def test_parse_metrics_config_file_without_aggregates(self, mock_check_exists, mock_read_metrics_file):
         # Arrange
         config_file = Path("config_file.json")
+        mock_check_exists.return_value = True
         mock_read_metrics_file.return_value = {
             "Total Damage Sum": sql_struct(
                 name="Total Damage Sum",
@@ -854,9 +853,11 @@ class TestParseMetrics(unittest.TestCase):
     @patch(
         "fiat_toolbox.metrics_writer.fiat_write_metrics_file.MetricsFileWriter._read_metrics_file"
     )
-    def test_parse_metrics_config_file_with_aggregates(self, mock_read_metrics_file):
+    @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.os.path.exists")
+    def test_parse_metrics_config_file_with_aggregates(self, mock_check_exists, mock_read_metrics_file):
         # Arrange
         config_file = Path("config_file.json")
+        mock_check_exists.return_value = True
         mock_read_metrics_file.return_value = {
             "Subbasin": {
                 "Total Damage Sum": sql_struct(
@@ -1126,6 +1127,7 @@ class TestMetricsFileWriter(unittest.TestCase):
                 metrics_no_aggregation,
                 sql_prompts_no_aggregation,
                 temporary_file_name,
+                overwrite=True,
             )
             self.assertEqual(
                 cm.output,

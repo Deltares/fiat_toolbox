@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Tuple, Union
@@ -9,6 +8,8 @@ from typing import Dict, Tuple, Union
 import pandas as pd
 import pandasql as pdsql
 import tomli
+
+from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
 
 
 # sql command struct
@@ -23,41 +24,26 @@ class sql_struct:
     groupby: str
 
 
-class IMetricsFileWriter(ABC):
-    """Interface for writing metrics to a file."""
-
-    @abstractmethod
-    def parse_metrics_to_file(
-        self, df_results: pd.DataFrame, metrics_path: Path, write_aggregate: str = None
-    ) -> None:
-        """
-        Parse a metrics file and write the metrics to a file.
-
-        Parameters
-        ----------
-        df_results : pd.DataFrame
-            The results dataframe.
-        metrics_path : Path
-            The path to where to store the metrics file.
-        write_aggregate : str
-            The name of the aggregation label to write to the metrics file
-            (None for no aggregation label, 'all' for all possible ones).
-        """
-        pass
-
-
 class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
 
-    def __init__(self, config_file: Path):
+    def __init__(self, config_file: Union[str, Path]):
         """
         Initialize the class.
 
         Parameters
         ----------
-        config_file : Path
+        config_file : Union[str, Path]
             The path to the metrics file.
         """
+        # Convert the path to a Path object
+        if isinstance(config_file, str):
+            config_file = Path(config_file)
+
+        # Check whether the file exists
+        if not os.path.exists(config_file):
+            raise FileNotFoundError(f"Config file '{config_file}' not found.")
+
         self.config_file = config_file
 
     def _read_metrics_file(
@@ -76,10 +62,6 @@ class MetricsFileWriter(IMetricsFileWriter):
         Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]
             A dictionary with the SQL commands.
         """
-
-        # Check whether the file exists
-        if not os.path.exists(self.config_file):
-            raise FileNotFoundError(f"Config file '{self.config_file}' not found.")
 
         # Read the metrics file
         _, extension = os.path.splitext(self.config_file)
@@ -329,6 +311,7 @@ class MetricsFileWriter(IMetricsFileWriter):
         config: Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]],
         metrics_path: Path,
         write_aggregate: str = None,
+        overwrite: bool = False,
     ) -> None:
         """
         Write a metrics dictionary to a metrics file.
@@ -344,6 +327,8 @@ class MetricsFileWriter(IMetricsFileWriter):
             The path to where to store the metrics file.
         write_aggregate : str
             The name of the aggregation label to write to the metrics file (None for no aggregation label).
+        overwrite : bool
+            Whether to overwrite the existing metrics file if it already exists.
 
         Returns
         -------
@@ -405,16 +390,19 @@ class MetricsFileWriter(IMetricsFileWriter):
 
             # Check if the file already exists
             if os.path.exists(metrics_path):
-                logging.warning(
-                    f"Metrics file '{metrics_path}' already exists. Overwriting..."
-                )
-                os.remove(metrics_path)
+                if overwrite:
+                    logging.warning(
+                        f"Metrics file '{metrics_path}' already exists. Overwriting..."
+                    )
+                    os.remove(metrics_path)
+                else:
+                    return
 
             # Transpose the dataframe
             metricsFrame = metricsFrame.transpose()
 
             # Write the metrics to a file
-            if not metrics_path.parent.exists():
+            if metrics_path.parent and not metrics_path.parent.exists():
                 metrics_path.parent.mkdir(parents=True)
             metricsFrame.to_csv(metrics_path)
         else:
@@ -451,24 +439,28 @@ class MetricsFileWriter(IMetricsFileWriter):
 
             # Check if the file already exists
             if os.path.exists(metrics_path):
-                logging.warning(
-                    f"Metrics file '{metrics_path}' already exists. Overwriting..."
-                )
-                os.remove(metrics_path)
+                if overwrite:
+                    logging.warning(
+                        f"Metrics file '{metrics_path}' already exists. Overwriting..."
+                    )
+                    os.remove(metrics_path)
+                else:
+                    return
 
             # Transpose the dataframe
             metricsFrame = metricsFrame.transpose()
 
             # Write the metrics to a file
-            if not metrics_path.parent.exists():
+            if metrics_path.parent and not metrics_path.parent.exists():
                 metrics_path.parent.mkdir(parents=True)
             metricsFrame.to_csv(metrics_path)
 
     def parse_metrics_to_file(
         self,
         df_results: pd.DataFrame,
-        metrics_path: Path,
+        metrics_path: Union[str, Path],
         write_aggregate: str = None,
+        overwrite: bool = False,
     ) -> Union[str, Dict[str, str]]:
         """
         Parse a metrics file and write the metrics to a file.
@@ -477,11 +469,13 @@ class MetricsFileWriter(IMetricsFileWriter):
         ----------
         df_results : pd.DataFrame
             The results dataframe.
-        metrics_path : Path
+        metrics_path : Union[str, Path]
             The path to where to store the metrics file.
         write_aggregate : str
             The name of the aggregation label to write to the metrics file
             (None for no aggregation label, 'all' for all possible ones).
+        overwrite : bool
+            Whether to overwrite the existing metrics file if it already exists.
 
         Returns
         -------
@@ -489,6 +483,10 @@ class MetricsFileWriter(IMetricsFileWriter):
             The path to the metrics file or a dictionary with the aggregation labels as keys
             and the paths to the metrics files as values.
         """
+
+        # Convert the path to a Path object
+        if isinstance(metrics_path, str):
+            metrics_path = Path(metrics_path)
 
         # Check whether to include aggregation labels
         include_aggregates = True if write_aggregate else False
@@ -511,14 +509,28 @@ class MetricsFileWriter(IMetricsFileWriter):
                 new_path = Path(os.path.join(directory, new_filename))
                 return_files[key] = new_path
 
+                # Check if the file already exists and continue if it does
+                if os.path.exists(new_path):
+                    if not overwrite:
+                        continue
+
                 # Write the metrics to a file
                 MetricsFileWriter._write_metrics_file(
-                    metrics, config, new_path, write_aggregate=key
+                    metrics, config, new_path, write_aggregate=key, overwrite=overwrite
                 )
         else:
+            # Check if the file already exists and continue if it does
+            if os.path.exists(metrics_path):
+                if not overwrite:
+                    return metrics_path
+
             # Write the metrics to a file
             MetricsFileWriter._write_metrics_file(
-                metrics, config, metrics_path, write_aggregate=write_aggregate
+                metrics,
+                config,
+                metrics_path,
+                write_aggregate=write_aggregate,
+                overwrite=overwrite,
             )
             return_files = metrics_path
 
