@@ -1,17 +1,48 @@
 import os
 from pathlib import Path
 from typing import Union
-from delft_fiat.models.calc import calc_rp_coef
+
 import numpy as np
 import pandas as pd
+import parse
+from delft_fiat.models.calc import calc_rp_coef
 
 
 class Equity:
-    def __init__(self, method):
-        self.method = method
-
-    def check_datatype(
+    def __init__(
         self,
+        census_table: Union[str, pd.DataFrame, Path],
+        damages_table: Union[str, pd.DataFrame, Path],
+        aggregation_label: str,
+        percapitalincome_label: str,
+        totalpopulation_label: str,
+        damage_column_pattern: str = "Total Damage ({rp}Y)",
+    ):
+        """_summary_
+
+        Parameters
+        ----------
+        census_table : Union[str, pd.DataFrame, Path]
+            Census data
+        damages_table : Union[str, pd.DataFrame, Path]
+            Damage results
+        aggregation_label : str
+            column name of aggregation areas
+        percapitalincome_label : str
+            column name of per capita income
+        totalpopulation_label : str
+            column name of total population
+        """
+        # Merge tables
+        self.df = self._merge_tables(census_table, damages_table, aggregation_label)
+        self.df0 = self.df.copy()  # Keep copy of original
+        self.aggregation_label = aggregation_label
+        self.percapitalincome_label = percapitalincome_label
+        self.totalpopulation_label = totalpopulation_label
+        self.damage_column_pattern = damage_column_pattern
+
+    @staticmethod
+    def _check_datatype(
         variable: Union[str, pd.DataFrame],
     ) -> pd.DataFrame:
         """Check that inputs for equity are rather .csv files or pd.Dataframes
@@ -19,17 +50,17 @@ class Equity:
         Parameters
         ----------
         variable : Union[str, pd.DataFrame]
-            _description_
+            input
 
         Returns
         -------
         pd.DataFrame
-            _description_
+            input in dataframe format
 
         Raises
         ------
         ValueError
-            _description_
+            Error if input is not in correct format
         """
 
         if isinstance(variable, pd.DataFrame):
@@ -44,8 +75,8 @@ class Equity:
             )
         return variable
 
-    def get_equity_input(
-        self,
+    @staticmethod
+    def _merge_tables(
         census_table: Union[str, pd.DataFrame, Path],
         damages_table: Union[str, pd.DataFrame, Path],
         aggregation_label: str,
@@ -55,39 +86,31 @@ class Equity:
         Parameters
         ----------
         census_table : Union[str, pd.DataFrame, Path]
-            _description_
+            Census data
         damages_table : Union[str, pd.DataFrame, Path]
-            _description_
+            Damage results
         aggregation_label : str
-            _description_
+            column name used to merge on
 
         Returns
         -------
         pd.DataFrame
-            _description_
+            merged dataframe
         """
         # Check if data inputs are wether .csv files or pd.DataFrame
-        census_table = self.check_datatype(census_table)
-        damages_table = self.check_datatype(damages_table)
+        census_table = Equity._check_datatype(census_table)
+        damages_table = Equity._check_datatype(damages_table)
 
         # Merge census block groups with fiat output (damages estimations per return period)
-        df = census_table.merge(damages_table, on=aggregation_label, how="left")
-        df = df.dropna().reset_index(drop=True)
+        df = damages_table.merge(census_table, on=aggregation_label, how="left")
+        df = df.reset_index(drop=True)
         return df
 
-    def calculate_equity_weights(
-        self,
-        df: pd.DataFrame,
-        percapitalincome_label: str,
-        totalpopulation_label: str,
-        gamma: float,
-    ) -> pd.DataFrame:
-        # Get elasticity parameter
-        # gamma = 1.2
-
+    def _calculate_equity_weights(self):
+        """Calculates equity weights per aggregation area"""
         # Get population and income per capital data
-        I_PC = df[percapitalincome_label]  # mean per capita income
-        Pop = df[totalpopulation_label]  # population
+        I_PC = self.df[self.percapitalincome_label]  # mean per capita income
+        Pop = self.df[self.totalpopulation_label]  # population
 
         # Calculate aggregated annual income
         I_AA = I_PC * Pop
@@ -96,32 +119,44 @@ class Equity:
         I_WA = np.average(I_PC, weights=Pop)
 
         # Calculate equity weights
-        EW = (I_PC / I_WA) ** -gamma  # Equity Weight
+        EW = (I_PC / I_WA) ** -self.gamma  # Equity Weight
 
         # Add annual income to the dataframe
-        df["I_AA"] = I_AA
+        self.df["I_AA"] = I_AA
         # Add equity weight calculations into the dataframe
-        df["EW"] = EW
-        return df
+        self.df["EW"] = EW
 
-    def calculate_ewced_per_rp(
-        self,
-        df_ew: pd.DataFrame,
-        gamma: float,
-    ) -> pd.DataFrame:
+    def _get_rp_from_name(self, name):
+        parser = parse.parse(self.damage_column_pattern, name, extra_types={"s": str})
+        if parser:
+            rp = parser.named["rp"]
+        else:
+            rp = None
+        return rp
+
+    def calculate_ewced_per_rp(self):
+        """Get equity weighted certainty equivalent damages per return period using a risk prenium"""
+
         # Get equity weight data
-        I_AA = df_ew["I_AA"]
-        EW = df_ew["EW"]
+        I_AA = self.df["I_AA"]
+        EW = self.df["EW"]
 
         # Retrieve columns with damage per return period data of fiat output
-        RP_cols = [name for name in df_ew.columns if "Total Damage" in name]
+        self.RP_cols = [
+            name for name in self.df.columns if self._get_rp_from_name(name)
+        ]
 
-        # Get weighted expected annual damage per return period
-        for col in RP_cols:
+        if len(self.RP_cols) == 0:
+            raise ValueError(
+                "Columns with damages per return period could not be found."
+            )
+
+        # Get Equity weighted certainty equivalent damage per return period
+        for col in self.RP_cols:
             # Damage for return period
-            D = df_ew[col]
+            D = self.df[col]
             # Return period
-            RP = int(col.split(" ")[-1][2:])
+            RP = float(self._get_rp_from_name(col))
             # Period of interest in years
             t = 1
             # Probability of exceedance
@@ -129,77 +164,102 @@ class Equity:
             # Social vulnerability
             z = D / I_AA
             # Risk premium
-            R = (1 - (1 + P * ((1 - z) ** (1 - gamma) - 1)) ** (1 / (1 - gamma))) / (
-                P * z
-            )
+            R = (
+                1
+                - (1 + P * ((1 - z) ** (1 - self.gamma) - 1)) ** (1 / (1 - self.gamma))
+            ) / (P * z)
             # This step is needed to avoid nan value when z is zero
             R[R.isna()] = 0
             # Certainty equivalent damage
             CED = R * D
             # Equity weighted certainty equivalent damage
             EWCED = EW * CED
-
             # Add risk premium data to dataframes
-            df_ew[f"R_RP{RP}"] = R
+            self.df[f"R_RP{RP}"] = R
             # Add ewced to dataframes
-            df_ew[f"EWCED_RP{RP}"] = EWCED
-        return df_ew, RP_cols
+            self.df[f"EWCED_RP{RP}"] = EWCED
 
-    def calculate_ewced(
-        self,
-        df_ew_rp: pd.DataFrame,
-        RP_cols,
-    ) -> pd.DataFrame:
+    def calculate_ewced(self):
+        """Calculates equity weighted certainty expected annual damages using log linear approach"""
         layers = []
         return_periods = []
-        for i in RP_cols:
-            RP = int(i.split(" ")[-1][2:])
+        for i in self.RP_cols:
+            RP = float(self._get_rp_from_name(i))
             return_periods.append(RP)
-            layers.append(df_ew_rp.loc[:, f"EWCED_RP{RP}"].values)
+            layers.append(self.df.loc[:, f"EWCED_RP{RP}"].values)
 
         stacked_layers = np.dstack(tuple(layers)).squeeze()
-        df_ew_rp["EWCEAD"] = (
-            stacked_layers
-            @ np.array(calc_rp_coef(return_periods))[:, None]
+        self.df["EWCEAD"] = (
+            stacked_layers @ np.array(calc_rp_coef(return_periods))[:, None]
         )
-        return df_ew_rp
 
-    def rank_ewced(
+    def equity_calculation(
         self,
-        df_ewced: pd.DataFrame,
-    ) -> pd.DataFrame:
-        df_ewced["rank_EAD"] = df_ewced["EAD"].rank(ascending=False)
-        df_ewced["rank_EWCEAD"] = df_ewced["EWCEAD"].rank(ascending=False)
-        df_ewced["rank_diff"] = df_ewced["rank_EWCEAD"] - df_ewced["rank_EAD"]
-        return df_ewced
-
-    def calculate_resilience_index(
-        self,
-        df_ewced: pd.DataFrame,
-    ) -> pd.DataFrame:
-        df_ewced["soc_res"] = df_ewced["EAD"] / df_ewced["EWCEAD"]
-        df_ewced["soc_res"][df_ewced["soc_res"] == np.inf] = np.nan
-        return df_ewced
-
-    def setup_equity_method(
-        self,
-        census_table: Union[str, pd.DataFrame, Path],
-        damages_table: Union[str, pd.DataFrame, Path],
-        aggregation_label: str,
-        percapitalincome_label: str,
-        totalpopulation_label: str,
-        gamma: float,
+        gamma: float = 1.2,
         output_file: Union[str, Path, None] = None,
     ) -> pd.DataFrame:
-        df = self.get_equity_input(census_table, damages_table, aggregation_label)
-        df_ew = self.calculate_equity_weights(
-            df, percapitalincome_label, totalpopulation_label, gamma
-        )
-        df_ew_rp, RP_cols = self.calculate_ewced_per_rp(df_ew, gamma)
-        df_ewced = self.calculate_ewced(df_ew_rp, RP_cols)
-        df_ewced = self.rank_ewced(df_ewced)
-        df_ewced = self.calculate_resilience_index(df_ewced)
+        """Calculates equity weighted risk
+
+        Parameters
+        ----------
+        gamma : float, optional
+            elasticity by default 1.2
+        output_file : Union[str, Path, None], optional
+            output file path, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            dataframe with the results
+        """
+        self.gamma = gamma
+        # Get equity weights
+        self._calculate_equity_weights()
+        # Calculate equity weighted damage per return period
+        self.calculate_ewced_per_rp()
+        # Calculate equity weighted risk
+        self.calculate_ewced()
+        # Keep only results
+        df_ewced_filtered = self.df[[self.aggregation_label, "EW", "EWCEAD"]]
+        # Save file if requested
         if output_file is not None:
-            df_ewced_filtered = df_ewced[["Census_Bg", "EW", "EWCEAD"]]
             df_ewced_filtered.to_csv(output_file, index=False)
-        return df_ewced
+
+        return df_ewced_filtered
+
+    def rank_ewced(self, ead_column: str = "Risk (EAD)") -> pd.DataFrame:
+        """Ranks areas per EAD EWCEAD and the calculates difference in ranking between 2nd and 1st
+
+        Parameters
+        ----------
+        ead_column : str, optional
+            name of column where the standard EAD calculation exists, by default "Risk (EAD)"
+
+        Returns
+        -------
+        pd.DataFrame
+            ranking results
+        """
+        self.df["rank_EAD"] = self.df[ead_column].rank(ascending=False).astype(int)
+        self.df["rank_EWCEAD"] = self.df["EWCEAD"].rank(ascending=False).astype(int)
+        self.df["rank_diff"] = self.df["rank_EWCEAD"] - self.df["rank_EAD"]
+        return self.df[[self.aggregation_label, "rank_EAD", "rank_EWCEAD", "rank_diff"]]
+
+    def calculate_resilience_index(
+        self, ead_column: str = "Risk (EAD)"
+    ) -> pd.DataFrame:
+        """Calculates a simple socioeconomic resilience indicators by the ratio of the standard EAD to the EWCEAD
+
+        Parameters
+        ----------
+        ead_column : str, optional
+            name of column where the standard EAD calculation exists, by default "Risk (EAD)"
+
+        Returns
+        -------
+        pd.DataFrame
+            index results
+        """
+        self.df["SRI"] = self.df[ead_column] / self.df["EWCEAD"]
+        self.df = self.df.replace([np.inf, -np.inf], np.nan)
+        return self.df[[self.aggregation_label, "SRI"]]

@@ -29,19 +29,23 @@ def test_equity(case):
     gamma = _cases[case]["gamma"]
     output_file_equity = DATASET.joinpath(_cases[case]["output_file_equity"])
 
-    equity = Equity(method="JarlKind")
-
-    df_equity = equity.setup_equity_method(
+    equity = Equity(
         census_data,
         fiat_data,
         aggregation_label,
         percapitalincome_label,
         totalpopulation_label,
+    )
+
+    df_equity = equity.equity_calculation(
         gamma,
         output_file_equity,
     )
-
     assert "EWCEAD" in df_equity.columns
+    ranking = equity.rank_ewced()
+    assert "rank_diff" in ranking.columns
+    sri = equity.calculate_resilience_index()
+    assert "SRI" in sri.columns
 
     # Delete file
     output_file_equity.unlink()
