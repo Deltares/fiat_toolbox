@@ -17,3 +17,6 @@ dependencies:
   - pytest-benchmark # tests
   - python>=3.8
   - plotly
+  - parse
+  - seaborn # examples
+  - git+https://github.com/Deltares/Delft-FIAT.git
