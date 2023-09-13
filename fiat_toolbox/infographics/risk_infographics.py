@@ -109,7 +109,7 @@ class RiskInfographicsParser(IInfographicsParser):
             raise ValueError(f"File path must be a .html file, not {file_path}")
 
         # Create the directory if it does not exist
-        if not file_path.parent.exists():
+        if not Path.exists(file_path.parent):
             file_path.parent.mkdir(parents=True)
 
         # Write the html to the file

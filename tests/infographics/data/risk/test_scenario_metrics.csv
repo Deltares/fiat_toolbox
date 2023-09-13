@@ -1,0 +1,5 @@
+,ExpectedAnnualDamages,FloodedHomes,ImpactedHomes2Y,ImpactedHomes5Y,ImpactedHomes10Y,ImpactedHomes25Y,ImpactedHomes50Y,ImpactedHomes100Y
+Description,Expected annual damages,Homes flooded (Inundation Depth > 0.5) in 30 years,Homes impacted (Inundation Depth > 0.2) in 2 years,Homes impacted (Inundation Depth > 0.2) in 5 years,Homes impacted (Inundation Depth > 0.2) in 10 years,Homes impacted (Inundation Depth > 0.2) in 25 years,Homes impacted (Inundation Depth > 0.2) in 50 years,Homes impacted (Inundation Depth > 0.2) in 100 years
+Show In Metrics Table,True,True,True,True,True,True,True,True
+Long Name,Expected Annual Damages,Flooded homes,Impacted Homes 2 Years,Impacted Homes 5 Years,Impacted Homes 10 Years,Impacted Homes 25 Years,Impacted Homes 50 Years,Impacted Homes 100 Years
+Value,166119191.2,1122.0,128.0,1122.0,1122.0,1122.0,1122.0,1122.0
