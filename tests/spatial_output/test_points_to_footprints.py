@@ -22,10 +22,10 @@ def test_write_footprints_event():
     outpath = file_path / "building_footprints_event.gpkg"
     out = PointsToFootprints.write_footprint_file(footprints, results, outpath)
 
-    out_example = out["Total Damage"][out["Object ID"] == "1393_1394"].values[0]
+    out_example = out["Total Damage"][out["Object ID"] == "1393_1394"].to_numpy()[0]
     in_example = (
-        results["Total Damage"][results["Object ID"] == 1393].values[0]
-        + results["Total Damage"][results["Object ID"] == 1394].values[0]
+        results["Total Damage"][results["Object ID"] == 1393].to_numpy()[0]
+        + results["Total Damage"][results["Object ID"] == 1394].to_numpy()[0]
     )
     assert out_example == in_example
     # Delete created files
@@ -45,10 +45,10 @@ def test_write_footprints_risk():
     outpath = file_path / "building_footprints_risk.gpkg"
     out = PointsToFootprints.write_footprint_file(footprints, results, outpath)
 
-    out_example = out["Risk (EAD)"][out["Object ID"] == "1393_1394"].values[0]
+    out_example = out["Risk (EAD)"][out["Object ID"] == "1393_1394"].to_numpy()[0]
     in_example = (
-        results["Risk (EAD)"][results["Object ID"] == 1393].values[0]
-        + results["Risk (EAD)"][results["Object ID"] == 1394].values[0]
+        results["Risk (EAD)"][results["Object ID"] == 1393].to_numpy()[0]
+        + results["Risk (EAD)"][results["Object ID"] == 1394].to_numpy()[0]
     )
     assert out_example == in_example
     # Delete created files

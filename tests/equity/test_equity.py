@@ -1,14 +1,12 @@
-
-# from fiat_toolbox.equity.equity import *
-from fiat_toolbox.equity.equity import Equity
-import pytest
 from pathlib import Path
 
+import pytest
 
-DATASET = Path().absolute() / "local_test_database" / "data"
+from fiat_toolbox.equity.equity import Equity
+
+DATASET = Path(__file__).parent / "data"
 
 _cases = {
-
     "equity": {
         "census_data": "population_income_data.csv",
         "fiat_data": "aggregated_damage.csv",
@@ -20,9 +18,9 @@ _cases = {
     }
 }
 
+
 @pytest.mark.parametrize("case", list(_cases.keys()))
 def test_equity(case):
-
     census_data = DATASET.joinpath(_cases[case]["census_data"])
     fiat_data = DATASET.joinpath(_cases[case]["fiat_data"])
     aggregation_label = _cases[case]["aggregation_label"]
@@ -31,21 +29,19 @@ def test_equity(case):
     gamma = _cases[case]["gamma"]
     output_file_equity = DATASET.joinpath(_cases[case]["output_file_equity"])
 
-    equity = Equity("J.K.")
+    equity = Equity(method="JarlKind")
 
     df_equity = equity.setup_equity_method(
-         census_data, 
-         fiat_data,
-         aggregation_label,
-         percapitalincome_label,
-         totalpopulation_label, 
-         gamma, 
-         output_file_equity
+        census_data,
+        fiat_data,
+        aggregation_label,
+        percapitalincome_label,
+        totalpopulation_label,
+        gamma,
+        output_file_equity,
     )
 
     assert "EWCEAD" in df_equity.columns
 
     # Delete file
-    # output_file_equity.unlink()
-
-
+    output_file_equity.unlink()

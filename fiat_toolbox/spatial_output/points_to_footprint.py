@@ -44,10 +44,10 @@ class PointsToFootprints(IPointsToFootprints):
         extra_footprints: Optional[gpd.GeoDataFrame] = None,
     ) -> gpd.GeoDataFrame:
         # Merge based on "id" column
-        gdf = pd.merge(footprints[[id, "geometry"]], points, on=id, how="outer")
+        gdf = footprints[[id, "geometry"]].merge(points, on=id, how="outer")
 
         # Remove the building footprints without any object attached
-        gdf = gdf.loc[~gdf["Object ID"].isnull()]
+        gdf = gdf.loc[~gdf["Object ID"].isna()]
         gdf["Object ID"] = gdf["Object ID"].astype(int)
 
         # Get columns that will be used
@@ -85,8 +85,8 @@ class PointsToFootprints(IPointsToFootprints):
         bffid_object_mapping = {}
         bffid_objectid_mapping = {}
         for bffid in multiple_bffid:
-            all_objects = gdf.loc[gdf[id] == bffid, "Primary Object Type"].values
-            all_object_ids = gdf.loc[gdf[id] == bffid, "Object ID"].values
+            all_objects = gdf.loc[gdf[id] == bffid, "Primary Object Type"].to_numpy()
+            all_object_ids = gdf.loc[gdf[id] == bffid, "Object ID"].to_numpy()
             bffid_object_mapping.update(
                 {bffid: "_".join(PointsToFootprints._mode(all_objects))}
             )
