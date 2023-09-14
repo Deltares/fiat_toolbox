@@ -27,8 +27,7 @@ dependencies = [
     "pandasql",
     "plotly",
     "parse",
-    "delft_fiat @ git+https://github.com/Deltares/Delft-FIAT.git",
-    ""
+    "delft_fiat @ git+https://github.com/Deltares/Delft-FIAT.git"
 ]
 dynamic = ["version"]
 
