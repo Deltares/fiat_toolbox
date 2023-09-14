@@ -796,7 +796,9 @@ class TestParseMetrics(unittest.TestCase):
         "fiat_toolbox.metrics_writer.fiat_write_metrics_file.MetricsFileWriter._read_metrics_file"
     )
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.os.path.exists")
-    def test_parse_metrics_config_file_without_aggregates(self, mock_check_exists, mock_read_metrics_file):
+    def test_parse_metrics_config_file_without_aggregates(
+        self, mock_check_exists, mock_read_metrics_file
+    ):
         # Arrange
         config_file = Path("config_file.json")
         mock_check_exists.return_value = True
@@ -854,7 +856,9 @@ class TestParseMetrics(unittest.TestCase):
         "fiat_toolbox.metrics_writer.fiat_write_metrics_file.MetricsFileWriter._read_metrics_file"
     )
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.os.path.exists")
-    def test_parse_metrics_config_file_with_aggregates(self, mock_check_exists, mock_read_metrics_file):
+    def test_parse_metrics_config_file_with_aggregates(
+        self, mock_check_exists, mock_read_metrics_file
+    ):
         # Arrange
         config_file = Path("config_file.json")
         mock_check_exists.return_value = True
@@ -1077,12 +1081,8 @@ class TestMetricsFileWriter(unittest.TestCase):
             cwd.joinpath("data", "test_metrics_taxuse.csv")
         )
 
-        df_metrics_subbasin = pd.read_csv(
-            cwd.joinpath("data", "metrics_subbasin.csv")
-        )
-        df_metrics_taxuse = pd.read_csv(
-            cwd.joinpath("data", "metrics_taxuse.csv")
-        )
+        df_metrics_subbasin = pd.read_csv(cwd.joinpath("data", "metrics_subbasin.csv"))
+        df_metrics_taxuse = pd.read_csv(cwd.joinpath("data", "metrics_taxuse.csv"))
 
         self.assertTrue(df_metrics_subbasin.equals(df_metrics_subbasin_expected))
         self.assertTrue(df_metrics_taxuse.equals(df_metrics_taxuse_expected))

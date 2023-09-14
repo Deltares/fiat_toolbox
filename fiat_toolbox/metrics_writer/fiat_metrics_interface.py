@@ -9,7 +9,11 @@ class IMetricsFileWriter(ABC):
 
     @abstractmethod
     def parse_metrics_to_file(
-        self, df_results: pd.DataFrame, metrics_path: Path, write_aggregate: str = None, overwrite: bool = False
+        self,
+        df_results: pd.DataFrame,
+        metrics_path: Path,
+        write_aggregate: str = None,
+        overwrite: bool = False,
     ) -> None:
         """
         Parse a metrics file and write the metrics to a file.
@@ -27,6 +31,7 @@ class IMetricsFileWriter(ABC):
             Whether to overwrite the existing metrics file if it already exists.
         """
         pass
+
 
 class IMetricsFileReader(ABC):
     """Interface for reading metrics from a file."""
@@ -76,4 +81,3 @@ class IMetricsFileReader(ABC):
         """
 
         pass
-    

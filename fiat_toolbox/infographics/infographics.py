@@ -1,8 +1,6 @@
-import os
 from pathlib import Path
 from typing import Dict, List, Union
 
-import pandas as pd
 import plotly.graph_objects as go
 import tomli
 from plotly.subplots import make_subplots
@@ -14,17 +12,19 @@ from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
 class InfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
 
-    def __init__(self, 
+    def __init__(
+        self,
         scenario_name: str,
         metrics_full_path: Union[Path, str],
         config_base_path: Union[Path, str],
-        output_base_path: Union[Path, str]) -> None:
+        output_base_path: Union[Path, str],
+    ) -> None:
         """Initialize the InfographicsParser
 
         Parameters
         ----------
         scenario_name : str
-            The name of the scenario    
+            The name of the scenario
         metrics_full_path : Union[Path, str]
             The path to the metrics file
         config_base_path : Union[Path, str]
@@ -32,7 +32,7 @@ class InfographicsParser(IInfographicsParser):
         output_base_path : Union[Path, str]
             The path to the output folder
         """
-        
+
         # Save the scenario name
         self.scenario_name = scenario_name
 
@@ -51,9 +51,7 @@ class InfographicsParser(IInfographicsParser):
             output_base_path = Path(output_base_path)
         self.output_base_path = output_base_path
 
-    def _get_impact_metrics(
-        self
-    ) -> Dict:
+    def _get_impact_metrics(self) -> Dict:
         """Get the impact metrics for a scenario
 
         Returns
@@ -64,7 +62,9 @@ class InfographicsParser(IInfographicsParser):
 
         # Check if the metrics file exists
         if not Path.exists(self.metrics_full_path):
-            raise FileNotFoundError(f"Metrics file not found at {self.metrics_full_path}")
+            raise FileNotFoundError(
+                f"Metrics file not found at {self.metrics_full_path}"
+            )
 
         # Read configured metrics
         metrics = (
@@ -141,7 +141,9 @@ class InfographicsParser(IInfographicsParser):
 
             # Read the configuration for the seperate pie slices
             for key, value in pie_chart_config["Slices"].items():
-                pie_dict[value["Chart"]]["Values"].append(float(metrics[value["Query"]]))
+                pie_dict[value["Chart"]]["Values"].append(
+                    float(metrics[value["Query"]])
+                )
                 pie_dict[value["Chart"]]["Labels"].append(value["Category"])
                 pie_dict[value["Chart"]]["Colors"].append(
                     categorie_dict[value["Category"]]["Color"]
@@ -151,7 +153,7 @@ class InfographicsParser(IInfographicsParser):
             if "Other" in pie_chart_config:
                 pie_dict["Other"] = {}
                 for key, value in pie_chart_config["Other"].items():
-                    pie_dict['Other'][key] = value          
+                    pie_dict["Other"][key] = value
 
         return pie_dict
 
@@ -434,9 +436,7 @@ class InfographicsParser(IInfographicsParser):
         # Return the figure
         return [charts_fig, people_fig]
 
-    def get_infographics(
-        self
-    ) -> Union[List[go.Figure], go.Figure]:
+    def get_infographics(self) -> Union[List[go.Figure], go.Figure]:
         """Get the infographic for a scenario
 
         Returns
@@ -451,9 +451,7 @@ class InfographicsParser(IInfographicsParser):
         # Return the infographic
         return infographic
 
-    def write_infographics_to_file(
-        self
-    ) -> str:
+    def write_infographics_to_file(self) -> str:
         """Write the infographic for a scenario to file
 
         Returns
@@ -472,7 +470,9 @@ class InfographicsParser(IInfographicsParser):
             )
 
         # Create the infographic path
-        infographic_html = self.output_base_path.joinpath(f"{self.scenario_name}_metrics.html")
+        infographic_html = self.output_base_path.joinpath(
+            f"{self.scenario_name}_metrics.html"
+        )
 
         # Check if the infographic already exists. If so, return the path
         if Path.exists(infographic_html):
@@ -498,6 +498,8 @@ class InfographicsParser(IInfographicsParser):
         """
 
         # Create the infographic path
-        infographic_path = self.output_base_path.joinpath(f"{self.scenario_name}_metrics.html")
+        infographic_path = self.output_base_path.joinpath(
+            f"{self.scenario_name}_metrics.html"
+        )
 
         return str(infographic_path)

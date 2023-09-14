@@ -1,11 +1,9 @@
-import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 import plotly.graph_objects as go
-import pytest
 
 from fiat_toolbox.infographics.infographics import InfographicsParser
 
@@ -24,13 +22,17 @@ class TestInfographicsParserGetMetrics(unittest.TestCase):
         mock_path_exists.return_value = True
 
         mock_reader = mock_metrics_file_reader.return_value
-        mock_reader.read_metrics_from_file.return_value = pd.DataFrame({"Value": [1, 2, 3]})
+        mock_reader.read_metrics_from_file.return_value = pd.DataFrame(
+            {"Value": [1, 2, 3]}
+        )
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="metrics_path.csv", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="metrics_path.csv",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
         df_results = parser._get_impact_metrics()
 
         # Assert
@@ -40,7 +42,6 @@ class TestInfographicsParserGetMetrics(unittest.TestCase):
             str(mock_path_exists.call_args_list[0][0][0]),
             "metrics_path.csv",
         )
-
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.MetricsFileReader")
@@ -56,10 +57,12 @@ class TestInfographicsParserGetMetrics(unittest.TestCase):
         mock_reader.read_metrics_from_file.return_value = {"test": [1, 2, 3]}
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="metrics_path.csv", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="metrics_path.csv",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(FileNotFoundError) as context:
@@ -129,11 +132,13 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         }
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
-        
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
+
         pie_dict = parser._get_pies_dictionary(path, metrics)
 
         # Assert
@@ -174,10 +179,12 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         mock_path_exists.return_value = False
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(FileNotFoundError) as context:
@@ -238,10 +245,12 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         }
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(KeyError) as context:
@@ -301,10 +310,12 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         }
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(KeyError) as context:
@@ -343,10 +354,12 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         }
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(KeyError) as context:
@@ -379,16 +392,18 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
                 return False
             else:
                 return True
-            
+
         mock_path_exists.side_effect = exists_side_effect
         mock_to_html.return_value = "<body>some_figure</body>"
         figs = [go.Figure(), go.Figure(), go.Figure()]
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
         parser._figures_list_to_html(figs, figure_path, styles_path)
 
         # Assert
@@ -413,14 +428,21 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
                     </html>"""
 
         # Tabs and spaces are removed to make the comparison easier
-        self.assertEqual(mock_file.write.call_args[0][0].replace(" ", ""), expected_html.replace(" ", ""))
+        self.assertEqual(
+            mock_file.write.call_args[0][0].replace(" ", ""),
+            expected_html.replace(" ", ""),
+        )
         self.assertEqual(mock_file.write.call_count, 1)
         self.assertEqual(mock_open.call_count, 1)
         self.assertEqual(mock_to_html.call_count, 3)
         self.assertEqual(mock_path_exists.call_count, 3)
         self.assertEqual(str(mock_path_exists.call_args_list[0][0][0]), styles_path)
-        self.assertEqual(str(mock_path_exists.call_args_list[1][0][0]), str(figure_path))
-        self.assertEqual(str(mock_path_exists.call_args_list[2][0][0]), str(figure_path.parent))
+        self.assertEqual(
+            str(mock_path_exists.call_args_list[1][0][0]), str(figure_path)
+        )
+        self.assertEqual(
+            str(mock_path_exists.call_args_list[2][0][0]), str(figure_path.parent)
+        )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.go.Figure.to_html")
@@ -438,7 +460,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
                 return False
             else:
                 return True
-            
+
         mock_path_exists.side_effect = exists_side_effect
 
         mock_to_html.return_value = "<body>some_figure</body>"
@@ -446,10 +468,12 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         figs = []
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
         parser._figures_list_to_html(figs, figure_path, styles_path)
 
         # Assert
@@ -474,15 +498,21 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
                     </html>"""
 
         # Tabs and spaces are removed to make the comparison easier
-        self.assertEqual(mock_file.write.call_args[0][0].replace(" ", ""), expected_html.replace(" ", ""))
+        self.assertEqual(
+            mock_file.write.call_args[0][0].replace(" ", ""),
+            expected_html.replace(" ", ""),
+        )
         self.assertEqual(mock_file.write.call_count, 1)
         self.assertEqual(mock_open.call_count, 1)
         self.assertEqual(mock_to_html.call_count, 0)
         self.assertEqual(mock_path_exists.call_count, 3)
         self.assertEqual(str(mock_path_exists.call_args_list[0][0][0]), styles_path)
-        self.assertEqual(str(mock_path_exists.call_args_list[1][0][0]), str(figure_path))
-        self.assertEqual(str(mock_path_exists.call_args_list[2][0][0]), str(figure_path.parent))
-
+        self.assertEqual(
+            str(mock_path_exists.call_args_list[1][0][0]), str(figure_path)
+        )
+        self.assertEqual(
+            str(mock_path_exists.call_args_list[2][0][0]), str(figure_path.parent)
+        )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     def test_figure_to_html_no_styles(self, mock_path_exists):
@@ -494,10 +524,12 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         figs = [go.Figure(), go.Figure(), go.Figure()]
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(FileNotFoundError) as context:
@@ -505,30 +537,30 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
 
         self.assertTrue("Stylesheet not found at styles.css" in str(context.exception))
 
-
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    def test_figure_to_html_wrong_css_suffix(
-        self, mock_path_exists
-    ):
+    def test_figure_to_html_wrong_css_suffix(self, mock_path_exists):
         # Arrange
         figure_path = "some_figure.html"
         styles_path = "styles.txt"
+
         def exists_side_effect(path):
             if ".html" in str(path):
                 # In case of the html file, we want it to not exist
                 return False
             else:
                 return True
-            
+
         mock_path_exists.side_effect = exists_side_effect
         figs = [go.Figure(), go.Figure(), go.Figure()]
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
-        
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
+
         # Assert
         with self.assertRaises(ValueError) as context:
             parser._figures_list_to_html(figs, figure_path, styles_path)
@@ -536,7 +568,6 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         self.assertTrue(
             "Stylesheet must be a .css file, not styles.txt" in str(context.exception)
         )
-
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     def test_html_already_exists(self, mock_path_exists):
@@ -547,10 +578,12 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         figs = [go.Figure(), go.Figure(), go.Figure()]
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(FileExistsError) as context:
@@ -565,26 +598,30 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         # Arrange
         figure_path = "some_figure.txt"
         styles_path = "styles.css"
+
         def exists_side_effect(path):
             if ".txt" in str(path):
                 # In case of the txt file, we want it to not exist
                 return False
             else:
                 return True
-            
+
         mock_path_exists.side_effect = exists_side_effect
         figs = [go.Figure(), go.Figure(), go.Figure()]
 
         # Act
-        parser = InfographicsParser(scenario_name="test_scenario", 
-                                    metrics_full_path="DontCare", 
-                                    config_base_path="DontCare", 
-                                    output_base_path="DontCare") 
+        parser = InfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
 
         # Assert
         with self.assertRaises(ValueError) as context:
             parser._figures_list_to_html(figs, figure_path, styles_path)
 
         self.assertTrue(
-            "File path must be a .html file, not some_figure.txt" in str(context.exception)
+            "File path must be a .html file, not some_figure.txt"
+            in str(context.exception)
         )

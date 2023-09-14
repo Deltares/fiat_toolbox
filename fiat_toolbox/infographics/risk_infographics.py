@@ -82,7 +82,7 @@ class RiskInfographicsParser(IInfographicsParser):
         rp_fig: go.Figure,
         metrics: Dict,
         charts: Dict,
-        file_path: Union[str, Path] = "infographics.html"
+        file_path: Union[str, Path] = "infographics.html",
     ):
         """Save a list of plotly figures in an HTML file
 
@@ -114,12 +114,10 @@ class RiskInfographicsParser(IInfographicsParser):
 
         # Write the html to the file
         with open(file_path, "w", encoding="utf-8") as infographics:
-            rp_charts = (
-                rp_fig.to_html().split("<body>")[1].split("</body>")[0]
-            )
+            rp_charts = rp_fig.to_html().split("<body>")[1].split("</body>")[0]
 
             infographics.write(
-                f'''
+                f"""
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -170,7 +168,7 @@ class RiskInfographicsParser(IInfographicsParser):
                     </div>
                 </body>
                 </html>
-                '''
+                """
             )
 
     def _get_infographics(

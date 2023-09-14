@@ -1,6 +1,7 @@
 import os
-from typing import Union
 from pathlib import Path
+from typing import Union
+
 import pandas as pd
 
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileReader
@@ -73,9 +74,7 @@ class MetricsFileReader(IMetricsFileReader):
         # Return the metric
         return df_metrics[metric]
 
-    def read_metrics_from_file(
-        self, **kwargs
-    ) -> pd.Series:
+    def read_metrics_from_file(self, **kwargs) -> pd.Series:
         """
         Reads metrics from a file.
 
@@ -101,7 +100,9 @@ class MetricsFileReader(IMetricsFileReader):
 
         # Set the default values
         include_long_names = kwargs.get("include_long_names", False)
-        include_metrics_table_selection = kwargs.get("include_metrics_table_selection", False)
+        include_metrics_table_selection = kwargs.get(
+            "include_metrics_table_selection", False
+        )
         include_description = kwargs.get("include_description", False)
 
         # Read the metrics from the file

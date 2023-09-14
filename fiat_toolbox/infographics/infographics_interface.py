@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Union
 
 
 class IInfographicsParser(ABC):
@@ -29,7 +27,7 @@ class IInfographicsParser(ABC):
         pass
 
     @abstractmethod
-    def get_infographics_html( ) -> str:
+    def get_infographics_html() -> str:
         """Get the path to the infographic html file
 
         Returns
@@ -38,4 +36,3 @@ class IInfographicsParser(ABC):
             The path to the infographic html file
         """
         pass
-
