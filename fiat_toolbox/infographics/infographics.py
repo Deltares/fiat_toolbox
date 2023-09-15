@@ -1,107 +1,58 @@
-import os
-from abc import ABC, abstractstaticmethod
 from pathlib import Path
 from typing import Dict, List, Union
 
-import pandas as pd
 import plotly.graph_objects as go
 import tomli
 from plotly.subplots import make_subplots
 
+from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
-from fiat_toolbox.metrics_writer.fiat_write_metrics_file import MetricsFileWriter
-
-
-class IInfographicsParser(ABC):
-    """Interface for creating the infographic"""
-
-    @abstractstaticmethod
-    def get_infographics(
-        scenario_name: str,
-        database_path: Union[Path, str],
-        keep_metrics_file: bool = False,
-    ) -> str:
-        """Get the infographic for a scenario
-
-        Parameters
-        ----------
-        scenario_name : str
-            The name of the scenario
-        database_path : Union[Path, str]
-            The path to the database
-        keep_metrics_file : bool, optional
-            Whether to keep the metrics file, by default False
-
-        Returns
-        -------
-        str
-            The infographic for the scenario as a string in html format
-        """
-        pass
-
-    @abstractstaticmethod
-    def write_infographics_to_file(
-        scenario_name: str,
-        database_path: Union[Path, str],
-        keep_metrics_file: bool = False,
-    ) -> str:
-        """Write the infographic for a scenario to file
-
-        Parameters
-        ----------
-        scenario_name : str
-            The name of the scenario
-        database_path : Union[Path, str]
-            The path to the database
-        keep_metrics_file : bool, optional
-            Whether to keep the metrics file, by default False
-
-        Returns
-        -------
-        str
-            The path to the infographic file
-        """
-        pass
-
-    @abstractstaticmethod
-    def get_infographics_html(
-        scenario_name: str,
-        database_path: Union[Path, str],
-    ) -> str:
-        """Get the path to the infographic html file
-
-        Parameters
-        ----------
-        scenario_name : str
-            The name of the scenario
-        database_path : Union[Path, str]
-            The path to the database
-
-        Returns
-        -------
-        str
-            The path to the infographic html file
-        """
-        pass
 
 
 class InfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
 
-    @staticmethod
-    def _get_impact_metrics(
-        database_path: Union[str, Path], scenario_name: str, keep_files: bool = False
-    ) -> Dict:
-        """Get the impact metrics for a scenario
+    def __init__(
+        self,
+        scenario_name: str,
+        metrics_full_path: Union[Path, str],
+        config_base_path: Union[Path, str],
+        output_base_path: Union[Path, str],
+    ) -> None:
+        """Initialize the InfographicsParser
 
         Parameters
         ----------
-        database_path : Union[str, Path]
-            The path to the database
         scenario_name : str
             The name of the scenario
-        keep_files : bool, optional
-            Whether to keep the metrics file, by default False
+        metrics_full_path : Union[Path, str]
+            The path to the metrics file
+        config_base_path : Union[Path, str]
+            The path to the config folder
+        output_base_path : Union[Path, str]
+            The path to the output folder
+        """
+
+        # Save the scenario name
+        self.scenario_name = scenario_name
+
+        # Convert the metrics path to a Path object
+        if isinstance(metrics_full_path, str):
+            metrics_full_path = Path(metrics_full_path)
+        self.metrics_full_path = metrics_full_path
+
+        # Convert the config path to a Path object
+        if isinstance(config_base_path, str):
+            config_base_path = Path(config_base_path)
+        self.config_base_path = config_base_path
+
+        # Convert the output path to a Path object
+        if isinstance(output_base_path, str):
+            output_base_path = Path(output_base_path)
+        self.output_base_path = output_base_path
+
+    def _get_impact_metrics(self) -> Dict:
+        """Get the impact metrics for a scenario
 
         Returns
         -------
@@ -109,59 +60,18 @@ class InfographicsParser(IInfographicsParser):
             The impact metrics for the scenario
         """
 
-        # Convert the database path to a Path object
-        if isinstance(database_path, str):
-            database_path = Path(database_path)
-
-        # Get the database paths
-        database_output_path = database_path.joinpath("output")
-        database_static_path = database_path.joinpath("static")
-
-        # Read FIAT results per object from csv file
-        csv_file = database_output_path.joinpath(
-            "results", scenario_name, "fiat_model", "output", "output.csv"
-        )
-
-        if not Path.exists(csv_file):
-            raise FileNotFoundError(f"FIAT results file not found at {csv_file}")
-
-        # Get the metrics configuration
-        metrics_config_path = database_static_path.joinpath(
-            "templates",
-            "infometrics",
-            "metrics_config.toml",
-        )
-
-        if not Path.exists(metrics_config_path):
+        # Check if the metrics file exists
+        if not Path.exists(self.metrics_full_path):
             raise FileNotFoundError(
-                f"Metrics configuration file not found at {metrics_config_path}"
+                f"Metrics file not found at {self.metrics_full_path}"
             )
-
-        # Read the results from the csv file
-        df = pd.read_csv(csv_file)
-
-        # Specify the metrics output path
-        metrics_outputs_path = database_output_path.joinpath(
-            "infometrics",
-            f"{scenario_name}_metrics.csv",
-        )
-
-        # Write the metrics to file
-        metrics_writer = MetricsFileWriter(metrics_config_path)
-        non_aggregate_file_path = metrics_writer.parse_metrics_to_file(
-            df_results=df, metrics_path=metrics_outputs_path, write_aggregate=None
-        )
 
         # Read configured metrics
         metrics = (
-            MetricsFileReader(str(non_aggregate_file_path))
+            MetricsFileReader(self.metrics_full_path)
             .read_metrics_from_file()
             .to_dict()["Value"]
         )
-
-        # Remove the metrics file
-        if not keep_files:
-            os.remove(non_aggregate_file_path)
 
         # Return the metrics
         return metrics
@@ -231,11 +141,19 @@ class InfographicsParser(IInfographicsParser):
 
             # Read the configuration for the seperate pie slices
             for key, value in pie_chart_config["Slices"].items():
-                pie_dict[value["Chart"]]["Values"].append(int(metrics[value["Query"]]))
+                pie_dict[value["Chart"]]["Values"].append(
+                    float(metrics[value["Query"]])
+                )
                 pie_dict[value["Chart"]]["Labels"].append(value["Category"])
                 pie_dict[value["Chart"]]["Colors"].append(
                     categorie_dict[value["Category"]]["Color"]
                 )
+
+            # Check if the "Other" category is defined
+            if "Other" in pie_chart_config:
+                pie_dict["Other"] = {}
+                for key, value in pie_chart_config["Other"].items():
+                    pie_dict["Other"][key] = value
 
         return pie_dict
 
@@ -307,7 +225,7 @@ class InfographicsParser(IInfographicsParser):
             raise ValueError(f"File path must be a .html file, not {file_path}")
 
         # Create the directory if it does not exist
-        if not file_path.parent.exists():
+        if not Path.exists(file_path.parent):
             file_path.parent.mkdir(parents=True)
 
         # Write the html to the file
@@ -366,6 +284,10 @@ class InfographicsParser(IInfographicsParser):
             go.Figure
                 The pie chart figure
         """
+
+        # Remove the "Other" category if it exists
+        if "Other" in data:
+            data.pop("Other")
 
         # Get the title and legend configuration with default values
         title = kwargs.get("title", "")
@@ -459,22 +381,10 @@ class InfographicsParser(IInfographicsParser):
 
         return fig
 
-    @staticmethod
     def _get_infographics(
-        scenario_name: str,
-        database_path: Union[Path, str],
-        keep_metrics_file: bool = False,
+        self,
     ) -> go.Figure:
         """Get the infographic for a scenario
-
-        Parameters
-        ----------
-        scenario_name : str
-            The name of the scenario
-        database_path : Union[Path, str]
-            The path to the database
-        keep_metrics_file : bool, optional
-            Whether to keep the metrics file, by default False
 
         Returns
         -------
@@ -484,21 +394,11 @@ class InfographicsParser(IInfographicsParser):
         """
 
         # Get the impact metrics
-        metrics = InfographicsParser._get_impact_metrics(
-            database_path, scenario_name, keep_metrics_file
-        )
-
-        # Convert the database path to a Path object
-        if isinstance(database_path, str):
-            database_path = Path(database_path)
+        metrics = self._get_impact_metrics()
 
         # Get the infographic configuration
-        pie_chart_config_path = database_path.joinpath(
-            "input", "infographic", "config_charts.toml"
-        )
-        pie_people_config_path = database_path.joinpath(
-            "input", "infographic", "config_people.toml"
-        )
+        pie_chart_config_path = self.config_base_path.joinpath("config_charts.toml")
+        pie_people_config_path = self.config_base_path.joinpath("config_people.toml")
 
         # Check if the infographic configuration files exist
         if not Path.exists(pie_chart_config_path):
@@ -518,7 +418,7 @@ class InfographicsParser(IInfographicsParser):
 
         # Create the pie chart figures
         charts_fig = InfographicsParser._get_pie_chart_figure(
-            data=charts,
+            data=charts.copy(),
             legend_orientation="h",
             yanchor="top",
             y=-0.1,
@@ -526,7 +426,7 @@ class InfographicsParser(IInfographicsParser):
         )
 
         people_fig = InfographicsParser._get_pie_chart_figure(
-            data=people,
+            data=people.copy(),
             legend_orientation="h",
             yanchor="top",
             y=-0.1,
@@ -536,22 +436,8 @@ class InfographicsParser(IInfographicsParser):
         # Return the figure
         return [charts_fig, people_fig]
 
-    @staticmethod
-    def get_infographics(
-        scenario_name: str,
-        database_path: Union[Path, str],
-        keep_metrics_file: bool = False,
-    ) -> Union[List[go.Figure], go.Figure]:
+    def get_infographics(self) -> Union[List[go.Figure], go.Figure]:
         """Get the infographic for a scenario
-
-        Parameters
-        ----------
-        scenario_name : str
-            The name of the scenario
-        database_path : Union[Path, str]
-            The path to the database
-        keep_metrics_file : bool, optional
-            Whether to keep the metrics file, by default False
 
         Returns
         -------
@@ -560,29 +446,13 @@ class InfographicsParser(IInfographicsParser):
         """
 
         # Get the infographic
-        infographic = InfographicsParser._get_infographics(
-            scenario_name, database_path, keep_metrics_file
-        )
+        infographic = self._get_infographics()
 
         # Return the infographic
         return infographic
 
-    @staticmethod
-    def write_infographics_to_file(
-        scenario_name: str,
-        database_path: Union[Path, str],
-        keep_metrics_file: bool = False,
-    ) -> str:
+    def write_infographics_to_file(self) -> str:
         """Write the infographic for a scenario to file
-
-        Parameters
-        ----------
-        scenario_name : str
-            The name of the scenario
-        database_path : Union[Path, str]
-            The path to the database
-        keep_metrics_file : bool, optional
-            Whether to keep the metrics file, by default False
 
         Returns
         -------
@@ -590,12 +460,8 @@ class InfographicsParser(IInfographicsParser):
             The path to the infographic file
         """
 
-        # Convert the database path to a Path object
-        if isinstance(database_path, str):
-            database_path = Path(database_path)
-
         # Get the infographic stylesheet
-        infographic_style = database_path.joinpath("input", "infographic", "styles.css")
+        infographic_style = self.config_base_path.joinpath("styles.css")
 
         # Check if the infographic stylesheet exists
         if not Path.exists(infographic_style):
@@ -604,10 +470,8 @@ class InfographicsParser(IInfographicsParser):
             )
 
         # Create the infographic path
-        infographic_html = database_path.joinpath(
-            "output",
-            "infographics",
-            f"{scenario_name}_metrics.html",
+        infographic_html = self.output_base_path.joinpath(
+            f"{self.scenario_name}_metrics.html"
         )
 
         # Check if the infographic already exists. If so, return the path
@@ -616,31 +480,16 @@ class InfographicsParser(IInfographicsParser):
             return str(infographic_html)
 
         # Get the infographic
-        infographic = InfographicsParser._get_infographics(
-            scenario_name, database_path, keep_metrics_file
-        )
+        infographic = self._get_infographics()
 
         # Convert the infographic to html
-        InfographicsParser._figures_list_to_html(
-            infographic, infographic_html, infographic_style
-        )
+        self._figures_list_to_html(infographic, infographic_html, infographic_style)
 
         # Return the path to the infographic
         return str(infographic_html)
 
-    @staticmethod
-    def get_infographics_html(
-        scenario_name: str,
-        database_path: Union[Path, str],
-    ) -> str:
+    def get_infographics_html(self) -> str:
         """Get the path to the infographic html file
-
-        Parameters
-        ----------
-        scenario_name : str
-            The name of the scenario
-        database_path : Union[Path, str]
-            The path to the database
 
         Returns
         -------
@@ -648,19 +497,9 @@ class InfographicsParser(IInfographicsParser):
             The path to the infographic html file
         """
 
-        # Convert the database path to a Path object
-        if isinstance(database_path, str):
-            database_path = Path(database_path)
-
         # Create the infographic path
-        infographic_html = database_path.joinpath(
-            "output",
-            "infographics",
-            f"{scenario_name}_metrics.html",
+        infographic_path = self.output_base_path.joinpath(
+            f"{self.scenario_name}_metrics.html"
         )
 
-        # Check if the infographic stylesheet exists
-        if not Path.exists(infographic_html):
-            raise FileNotFoundError(f"Infographic not found at {infographic_html}")
-
-        return str(infographic_html)
+        return str(infographic_path)
