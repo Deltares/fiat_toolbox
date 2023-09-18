@@ -206,20 +206,14 @@ class Equity:
     def calculate_ewced(self):
         """Calculates equity weighted certainty expected annual damages using log linear approach"""
         layers = []
-        layers2 = []
         return_periods = []
         for rp in self.RPs:
             return_periods.append(rp)
             layers.append(self.df.loc[:, f"EWCED_RP_{rp}"].values)
-            layers2.append(self.df.loc[:, f"TotalDmg_RP_{rp}"].values)
 
         stacked_layers = np.dstack(tuple(layers)).squeeze()
         self.df["EWCEAD"] = (
             stacked_layers @ np.array(calc_rp_coef(return_periods))[:, None]
-        )
-        stacked_layers2 = np.dstack(tuple(layers2)).squeeze()
-        self.df["EAD_2"] = (
-            stacked_layers2 @ np.array(calc_rp_coef(return_periods))[:, None]
         )
 
     def equity_calculation(
