@@ -122,6 +122,7 @@ class Equity:
             damages_table = damages_table.apply(pd.to_numeric)
         # Merge census block groups with fiat output (damages estimations per return period)
         df = damages_table.merge(census_table, on=aggregation_label, how="left")
+        df = df[~df[aggregation_label].isna()]
         df = df.reset_index(drop=True)
         return df
 

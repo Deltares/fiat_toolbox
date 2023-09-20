@@ -55,6 +55,9 @@ class PointsToFootprints(IPointsToFootprints):
             col for col in gdf.columns if "Aggregation Label:" in col
         ]
 
+        for col in strings:
+            gdf[col] = gdf[col].astype(str)
+
         depths = []
 
         # Get type of run
@@ -76,7 +79,8 @@ class PointsToFootprints(IPointsToFootprints):
             raise ValueError(
                 "The is no 'Total Damage' or 'Risk (EAD)' column in the results."
             )
-
+        pot_dmgs = [col for col in gdf.columns if "Max Potential Damage" in col]
+        dmgs = pot_dmgs + dmgs
         # Aggregate objects with the same "id"
         count = np.unique(gdf[id], return_counts=True)
         multiple_bffid = count[0][count[1] > 1][:-1]
@@ -125,9 +129,14 @@ class PointsToFootprints(IPointsToFootprints):
             )
 
         # Drop duplicates
-        gdf = gdf.drop_duplicates("BF_FID")
+        gdf = gdf.drop_duplicates(subset=[id])
         gdf = gdf.reset_index(drop=True)
         gdf = gdf[["Object ID", "geometry"] + agg_cols]
-        gdf.to_file(out_path, driver="GPKG")
 
+        for col in strings:
+            for ind, val in enumerate(gdf[col]):
+                if isinstance(val, np.ndarray):
+                    gdf.loc[ind, col] = str(val[0])
+
+        gdf.to_file(out_path, driver="GPKG")
         return gdf
