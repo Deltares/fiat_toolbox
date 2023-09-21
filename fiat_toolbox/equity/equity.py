@@ -110,7 +110,7 @@ class Equity:
             damages_table = damages_table.set_index(index_name)
             metrics_to_keep = (
                 damages_table.loc["Show In Metrics Table", :]
-                .map(lambda x: True if x == "True" else False)
+                .map(lambda x: True if x.upper() == "TRUE" else False)
                 .astype(bool)
             )
             damages_table = damages_table.loc[:, metrics_to_keep]
@@ -136,7 +136,8 @@ class Equity:
         I_AA = I_PC * Pop
 
         # Calculate weighted average income per capita
-        I_WA = np.average(I_PC, weights=Pop)
+        I_PC = np.ma.MaskedArray(I_PC, mask=np.isnan(I_PC))
+        I_WA = np.ma.average(I_PC, weights=Pop) 
 
         # Calculate equity weights
         EW = (I_PC / I_WA) ** -self.gamma  # Equity Weight
