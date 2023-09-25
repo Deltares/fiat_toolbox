@@ -137,7 +137,7 @@ class Equity:
 
         # Calculate weighted average income per capita
         I_PC = np.ma.MaskedArray(I_PC, mask=np.isnan(I_PC))
-        I_WA = np.ma.average(I_PC, weights=Pop) 
+        I_WA = np.ma.average(I_PC, weights=Pop)
 
         # Calculate equity weights
         EW = (I_PC / I_WA) ** -self.gamma  # Equity Weight
@@ -214,8 +214,8 @@ class Equity:
             layers.append(self.df.loc[:, f"EWCED_RP_{rp}"].values)
 
         stacked_layers = np.dstack(tuple(layers)).squeeze()
-        self.df["EWCEAD"] = (
-            stacked_layers @ np.array(calc_rp_coef(return_periods))[:, None]
+        self.df["EWCEAD"] = stacked_layers.dot(
+            np.array(calc_rp_coef(return_periods))[:, None]
         )
 
     def equity_calculation(
