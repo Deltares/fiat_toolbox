@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Tuple, Union
 
+import duckdb
 import pandas as pd
-import pandasql as pdsql
 import tomli
 
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
@@ -222,7 +222,8 @@ class MetricsFileWriter(IMetricsFileWriter):
             sql_query += f" GROUP BY {sql_command.groupby}"
 
         # Execute the query. If the query is invalid, an error PandaSQLException will be raised
-        result = pdsql.sqldf(sql_query, locals())
+        sql_query = sql_query.replace("`", '"')
+        result = duckdb.query(sql_query).df()
 
         # If the command contains a groupby statement, return a dictionary with the groupby variables as keys and the metric as value
         if sql_command.groupby:

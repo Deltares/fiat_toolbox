@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import duckdb
 import pandas as pd
-import pandasql as pdsql
 
 from fiat_toolbox.metrics_writer.fiat_write_metrics_file import (
     MetricsFileWriter,
@@ -685,7 +685,7 @@ class TestCreateSingleMetric(unittest.TestCase):
         )
 
         # Act & Assert
-        with self.assertRaises(pdsql.PandaSQLException):
+        with self.assertRaises(duckdb.ParserException):
             MetricsFileWriter._create_single_metric(
                 df_results=df_results, sql_command=sql_command
             )

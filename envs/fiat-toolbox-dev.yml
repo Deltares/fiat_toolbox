@@ -1,4 +1,4 @@
-name: fiat_toolbox-dev
+name: fiat_toolbox
 
 channels:
   - conda-forge
@@ -8,8 +8,7 @@ dependencies:
   - ipykernel
   - numpy
   - sqlalchemy < 2.0
-  - pandas
-  - pandasql<2.0
+  - pandas <= 2.0.0
   - tomli
   - pip
   - pytest # tests
@@ -19,4 +18,6 @@ dependencies:
   - plotly
   - parse
   - seaborn # examples
-  - git+https://github.com/Deltares/Delft-FIAT.git
+  - pip:
+    - duckdb
+    - git+https://github.com/Deltares/Delft-FIAT.git
