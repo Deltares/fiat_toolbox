@@ -100,9 +100,29 @@ class Equity:
         # Check if data inputs are wether .csv files or pd.DataFrame
         census_table = Equity._check_datatype(census_table)
         damages_table = Equity._check_datatype(damages_table)
+        # Check if damage table format is fiat metrics style
+        if "Show In Metrics Table" in damages_table.iloc[:, 0].tolist():
+            # Use name from input label
+            damages_table = damages_table.rename(
+                columns={damages_table.columns[0]: aggregation_label}
+            )
+            index_name = damages_table.columns[0]
+            damages_table = damages_table.set_index(index_name)
+            metrics_to_keep = (
+                damages_table.loc["Show In Metrics Table", :]
+                .map(lambda x: True if x.upper() == "TRUE" else False)
+                .astype(bool)
+            )
+            damages_table = damages_table.loc[:, metrics_to_keep]
 
+            # Drop rows containing other variables
+            damages_table = damages_table.drop(
+                ["Description", "Show In Metrics Table", "Long Name"]
+            )
+            damages_table = damages_table.apply(pd.to_numeric)
         # Merge census block groups with fiat output (damages estimations per return period)
         df = damages_table.merge(census_table, on=aggregation_label, how="left")
+        df = df[~df[aggregation_label].isna()]
         df = df.reset_index(drop=True)
         return df
 
@@ -116,7 +136,8 @@ class Equity:
         I_AA = I_PC * Pop
 
         # Calculate weighted average income per capita
-        I_WA = np.average(I_PC, weights=Pop)
+        I_PC = np.ma.MaskedArray(I_PC, mask=np.isnan(I_PC))
+        I_WA = np.ma.average(I_PC, weights=Pop)
 
         # Calculate equity weights
         EW = (I_PC / I_WA) ** -self.gamma  # Equity Weight
@@ -129,7 +150,7 @@ class Equity:
     def _get_rp_from_name(self, name):
         parser = parse.parse(self.damage_column_pattern, name, extra_types={"s": str})
         if parser:
-            rp = parser.named["rp"]
+            rp = int(parser.named["rp"])
         else:
             rp = None
         return rp
@@ -142,25 +163,30 @@ class Equity:
         EW = self.df["EW"]
 
         # Retrieve columns with damage per return period data of fiat output
-        self.RP_cols = [
-            name for name in self.df.columns if self._get_rp_from_name(name)
-        ]
+        RPs = {}
+        for name in self.df.columns:
+            if self._get_rp_from_name(name):
+                rp = self._get_rp_from_name(name)
+                RPs[rp] = name
+        # Make sure data is sorted
+        self.RPs = {}
+        for key in sorted(RPs.keys()):
+            self.RPs[key] = RPs[key]
 
-        if len(self.RP_cols) == 0:
+        if len(self.RPs) == 0:
             raise ValueError(
                 "Columns with damages per return period could not be found."
             )
 
         # Get Equity weighted certainty equivalent damage per return period
-        for col in self.RP_cols:
+        for rp in self.RPs:
+            col = self.RPs[rp]
             # Damage for return period
             D = self.df[col]
-            # Return period
-            RP = float(self._get_rp_from_name(col))
             # Period of interest in years
             t = 1
             # Probability of exceedance
-            P = 1 - np.exp(-t / RP)
+            P = 1 - np.exp(-t / rp)
             # Social vulnerability
             z = D / I_AA
             # Risk premium
@@ -175,22 +201,21 @@ class Equity:
             # Equity weighted certainty equivalent damage
             EWCED = EW * CED
             # Add risk premium data to dataframes
-            self.df[f"R_RP{RP}"] = R
+            self.df[f"R_RP_{rp}"] = R
             # Add ewced to dataframes
-            self.df[f"EWCED_RP{RP}"] = EWCED
+            self.df[f"EWCED_RP_{rp}"] = EWCED
 
     def calculate_ewced(self):
         """Calculates equity weighted certainty expected annual damages using log linear approach"""
         layers = []
         return_periods = []
-        for i in self.RP_cols:
-            RP = float(self._get_rp_from_name(i))
-            return_periods.append(RP)
-            layers.append(self.df.loc[:, f"EWCED_RP{RP}"].values)
+        for rp in self.RPs:
+            return_periods.append(rp)
+            layers.append(self.df.loc[:, f"EWCED_RP_{rp}"].values)
 
         stacked_layers = np.dstack(tuple(layers)).squeeze()
-        self.df["EWCEAD"] = (
-            stacked_layers @ np.array(calc_rp_coef(return_periods))[:, None]
+        self.df["EWCEAD"] = stacked_layers.dot(
+            np.array(calc_rp_coef(return_periods))[:, None]
         )
 
     def equity_calculation(
