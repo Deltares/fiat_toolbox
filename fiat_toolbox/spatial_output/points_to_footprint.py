@@ -137,6 +137,10 @@ class PointsToFootprints(IPointsToFootprints):
             for ind, val in enumerate(gdf[col]):
                 if isinstance(val, np.ndarray):
                     gdf.loc[ind, col] = str(val[0])
-
+        if extra_footprints is not None:
+            extra_footprints = extra_footprints.to_crs(gdf.crs)
+            # Merge based on "Object ID" column
+            extra_footprints = extra_footprints[["Object ID", "geometry"]].merge(points, on="Object ID", how="left")[["Object ID", "geometry"]+agg_cols]
+            gdf = pd.concat([gdf, extra_footprints], axis=0)
         gdf.to_file(out_path, driver="GPKG")
         return gdf
