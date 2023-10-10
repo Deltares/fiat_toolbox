@@ -27,6 +27,7 @@ dependencies = [
     "plotly",
     "parse",
     "fiat @ git+https://github.com/Deltares/Delft-FIAT.git",
+    "GDAL @ https://github.com/cgohlke/geospatial-wheels/releases/download/v2023.4.22/GDAL-3.6.4-cp311-cp311-win_amd64.whl",
     "geopandas",
     "duckdb"
 ]
