@@ -448,9 +448,6 @@ class MetricsFileWriter(IMetricsFileWriter):
                 else:
                     return
 
-            # Transpose the dataframe
-            metricsFrame = metricsFrame.transpose()
-
             # Write the metrics to a file
             if metrics_path.parent and not metrics_path.parent.exists():
                 metrics_path.parent.mkdir(parents=True)

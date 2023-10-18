@@ -106,7 +106,7 @@ class MetricsFileReader(IMetricsFileReader):
         include_description = kwargs.get("include_description", False)
 
         # Read the metrics from the file
-        df_metrics = pd.read_csv(self.metrics_file_path, index_col=0).transpose()
+        df_metrics = pd.read_csv(self.metrics_file_path, index_col=0)
 
         # Ensure values are interpreted as numbers
         df_metrics["Value"] = pd.to_numeric(df_metrics["Value"])
