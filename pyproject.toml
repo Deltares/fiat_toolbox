@@ -28,7 +28,8 @@ dependencies = [
     "parse",
     "fiat @ git+https://github.com/Deltares/Delft-FIAT.git",
     "geopandas",
-    "duckdb"
+    "duckdb",
+    "validators"
 ]
 dynamic = ["version"]
 

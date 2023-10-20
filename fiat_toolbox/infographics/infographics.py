@@ -8,6 +8,9 @@ from plotly.subplots import make_subplots
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
 
+from PIL import Image
+import validators
+
 
 class InfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
@@ -276,8 +279,30 @@ class InfographicsParser(IInfographicsParser):
         ----------
             data : Dict
                 The pie chart dictionary
-            **kwargs : dict
-                Additional arguments for the figure
+            **title : str, optional
+                The title of the pie chart, by default ""
+            **title_font_size : int, optional
+                The font size of the title, by default 25
+            **subtitle_font_size : int, optional
+                The font size of the subtitle, by default 20
+            **image_scale : float, optional
+                The scale of the image, by default 0.2
+            **numers_font : int, optional
+                The font size of the numbers, by default 20
+            **legend_font_size : int, optional
+                The font size of the legend, by default 20
+            **legend_orientation : str, optional
+                The orientation of the legend, by default "h"
+            **yanchor : str, optional
+                The y anchor of the legend, by default "bottom"
+            **y : float, optional
+                The y position of the legend, by default 1
+            **xanchor : str, optional
+                The x anchor of the legend, by default "center"
+            **x : float, optional
+                The x position of the legend, by default 0.5
+            **image_path : Union[str, Path], optional
+                The path to the image folder, by default None
 
         Returns
         -------
@@ -291,11 +316,17 @@ class InfographicsParser(IInfographicsParser):
 
         # Get the title and legend configuration with default values
         title = kwargs.get("title", "")
+        title_font_size = kwargs.get("title_font_size", 25)
+        subtitle_font_size = kwargs.get("subtitle_font_size", 20)
+        image_scale = kwargs.get("image_scale", 0.2)
+        numers_font = kwargs.get("numers_font", 20)
+        legend_font_size = kwargs.get("legend_font_size", 20)
         legend_orientation = kwargs.get("legend_orientation", "h")
         yanchor = kwargs.get("yanchor", "bottom")
         y = kwargs.get("y", 1)
         xanchor = kwargs.get("xanchor", "center")
         x = kwargs.get("x", 0.5)
+        image_path = kwargs.get("image_path", None)
 
         # Create the pie chart figure
         fig = make_subplots(
@@ -336,32 +367,69 @@ class InfographicsParser(IInfographicsParser):
                 x=domain_center_x,
                 y=1,
                 text=f"{ value['Name'] } <br> ",
-                font={"size": 20, "family": "Verdana", "color": "black"},
+                font={"size": subtitle_font_size, "family": "Verdana", "color": "black"},
                 xanchor="center",
                 yanchor="middle",
                 showarrow=False,
             )
 
-            # Add the pie chart image
-            fig.add_layout_image(
-                {
-                    "source": value["Image"],
-                    "sizex": 0.15,
-                    "sizey": 0.15,
-                    "x": domain_center_x,
-                    "y": domain_center_y + 0.05,
-                    "xanchor": "center",
-                    "yanchor": "middle",
-                    "visible": True,
-                }
-            )
+            # Check if the image is a url. If so, add the image to the pie chart
+            if validators.url(value["Image"]):
+                # Add the pie chart image
+                fig.add_layout_image(
+                    {
+                        "source": value["Image"],
+                        "sizex": image_scale,
+                        "sizey": image_scale,
+                        "x": domain_center_x,
+                        "y": domain_center_y + 0.05,
+                        "xanchor": "center",
+                        "yanchor": "middle",
+                        "visible": True,
+                    }
+                )
+            elif image_path and "{image_path}" in value["Image"]:
+                path = Path(value["Image"].replace("{image_path}", str(image_path)))
+                if Path.exists(path):
+                    pyImage = Image.open(path)
+                    # Add the pie chart image
+                    fig.add_layout_image(
+                        {
+                            "source": pyImage,
+                            "sizex": image_scale,
+                            "sizey": image_scale,
+                            "x": domain_center_x,
+                            "y": domain_center_y + 0.05,
+                            "xanchor": "center",
+                            "yanchor": "middle",
+                            "visible": True,
+                        }
+                    )
+            else: 
+                path = Path(value["Image"])
+                # Check if the given path is an absolute path
+                if Path.exists(path):
+                    pyImage = Image.open(path)
+                    # Add the pie chart image
+                    fig.add_layout_image(
+                        {
+                            "source": pyImage,
+                            "sizex": image_scale,
+                            "sizey": image_scale,
+                            "x": domain_center_x,
+                            "y": domain_center_y + 0.05,
+                            "xanchor": "center",
+                            "yanchor": "middle",
+                            "visible": True,
+                        }
+                    )
 
             # Add the sum of all slices to the pie chart
             fig.add_annotation(
                 x=domain_center_x,
                 y=domain_center_y - 0.05,
                 text="{:,.0f}".format(sum(value["Values"])),
-                font={"size": 20, "family": "Verdana", "color": "black"},
+                font={"size": numers_font, "family": "Verdana", "color": "black"},
                 xanchor="center",
                 yanchor="top",
                 showarrow=False,
@@ -369,9 +437,8 @@ class InfographicsParser(IInfographicsParser):
 
         # Final update for the layout
         fig.update_layout(
-            font={"size": 20, "family": "Verdana", "color": "black"},
             title_text=title,
-            title_font={"size": 25, "family": "Verdana", "color": "black"},
+            title_font={"size": title_font_size, "family": "Verdana", "color": "black"},
             title_x=0.5,
             autosize=True,
             legend={
@@ -382,6 +449,7 @@ class InfographicsParser(IInfographicsParser):
                 "x": x,
                 "itemclick": False,
                 "itemdoubleclick": False,
+                "font": {"size": legend_font_size, "family": "Verdana", "color": "black"},
             },
         )
 
@@ -431,7 +499,13 @@ class InfographicsParser(IInfographicsParser):
             legend_orientation="h",
             yanchor="top",
             y=-0.1,
-            title="Building damage",
+            image_path = self.config_base_path.joinpath("images"),
+            title=charts['Other']['title'],
+            title_font_size=charts['Other']['title_font'],
+            subtitle_font_size=charts['Other']['subtitle_font'],
+            image_scale=charts['Other']['image_scale'],
+            numers_font=charts['Other']['numers_font'],
+            legend_font_size=charts['Other']['legend_font'],
         )
 
         people_fig = InfographicsParser._get_pie_chart_figure(
@@ -439,7 +513,13 @@ class InfographicsParser(IInfographicsParser):
             legend_orientation="h",
             yanchor="top",
             y=-0.1,
-            title="People",
+            image_path = self.config_base_path.joinpath("images"),
+            title=people['Other']['title'],
+            title_font_size=people['Other']['title_font'],
+            subtitle_font_size=people['Other']['subtitle_font'],
+            image_scale=people['Other']['image_scale'],
+            numers_font=people['Other']['numers_font'],
+            legend_font_size=people['Other']['legend_font'],
         )
 
         # Return the figure
