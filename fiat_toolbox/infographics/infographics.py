@@ -313,8 +313,6 @@ class InfographicsParser(IInfographicsParser):
                 values=value["Values"],
                 labels=value["Labels"],
                 hole=0.6,
-                title=f"{ value['Name'] } <br> ",
-                title_position="top center",
                 hoverinfo="label+percent+name+value",
                 textinfo="none",
                 name=value["Name"],
@@ -333,14 +331,25 @@ class InfographicsParser(IInfographicsParser):
             domain_center_x = sum(fig.get_subplot(row=1, col=idx + 1).x) / 2
             domain_center_y = sum(fig.get_subplot(row=1, col=idx + 1).y) / 2
 
+            # Add the title annotation
+            fig.add_annotation(
+                x=domain_center_x,
+                y=1,
+                text=f"{ value['Name'] } <br> ",
+                font={"size": 20, "family": "Verdana", "color": "black"},
+                xanchor="center",
+                yanchor="middle",
+                showarrow=False,
+            )
+
             # Add the pie chart image
             fig.add_layout_image(
                 {
                     "source": value["Image"],
-                    "sizex": 0.1,
-                    "sizey": 0.1,
+                    "sizex": 0.15,
+                    "sizey": 0.15,
                     "x": domain_center_x,
-                    "y": domain_center_y - 0.05,
+                    "y": domain_center_y + 0.05,
                     "xanchor": "center",
                     "yanchor": "middle",
                     "visible": True,
@@ -350,8 +359,8 @@ class InfographicsParser(IInfographicsParser):
             # Add the sum of all slices to the pie chart
             fig.add_annotation(
                 x=domain_center_x,
-                y=domain_center_y - 0.1,
-                text="{}".format(sum(value["Values"])),
+                y=domain_center_y - 0.05,
+                text="{:,.0f}".format(sum(value["Values"])),
                 font={"size": 20, "family": "Verdana", "color": "black"},
                 xanchor="center",
                 yanchor="top",

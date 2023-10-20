@@ -155,12 +155,12 @@ class RiskInfographicsParser(IInfographicsParser):
                         <div class="inner-div">
                             <h1>Expected annual damages</h1>
                             <img src="{charts['Other']['expected_damage_image']}" alt="Expected Damage" class="img-container">
-                            <p>${metrics['ExpectedAnnualDamages']}</p>
+                            <p>${'{:,.0f}'.format(metrics['ExpectedAnnualDamages'])}</p>
                         </div>
                         <div class="inner-div">
                             <h1>{charts['Other']['flooded_title']}</h1>
                             <img src="{charts['Other']['flooded_image']}" alt="Flooded Homes" class="img-container">
-                            <p>{metrics['FloodedHomes']}</p>
+                            <p>{'{:,.0f}'.format(metrics['FloodedHomes'])}</p>
                         </div>
                         <div class="inner-div chart-container">
                             {rp_charts}
