@@ -9,7 +9,7 @@ from fiat_toolbox.metrics_writer.fiat_read_metrics_file import (
     MetricsFileReader,
 )
 
-
+import validators
 class RiskInfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
 
@@ -78,11 +78,28 @@ class RiskInfographicsParser(IInfographicsParser):
         return metrics
 
     @staticmethod
+    def _check_image_path(
+        image_path: str,
+        relative_path: Path,
+    ) -> Union[str, Path]:
+        # Check if expected_damage_image is an url, absolute or relative path
+        if Path.is_absolute(Path(image_path)) or validators.url(image_path):
+            return image_path
+        else:
+            temp_path = relative_path.joinpath(image_path)
+            if Path.exists(temp_path):
+                return temp_path
+
+        # Raise error if image_path is not returned yet
+        raise FileNotFoundError(f"Image not found for {image_path}")
+
+    @staticmethod
     def _figures_list_to_html(
         rp_fig: go.Figure,
         metrics: Dict,
         charts: Dict,
         file_path: Union[str, Path] = "infographics.html",
+        image_path: Union[str, Path] = None,
     ):
         """Save a list of plotly figures in an HTML file
 
@@ -94,6 +111,8 @@ class RiskInfographicsParser(IInfographicsParser):
                 The impact metrics for the scenario
             file_path : Union[str, Path], optional
                 Path to the HTML file, by default "infographics.html"
+            image_path : Union[str, Path], optional
+                Path to the image folder, by default None
         """
 
         # Convert the file_path to a Path object
@@ -111,6 +130,10 @@ class RiskInfographicsParser(IInfographicsParser):
         # Create the directory if it does not exist
         if not Path.exists(file_path.parent):
             file_path.parent.mkdir(parents=True)
+
+        # Check if the image_path exists
+        expected_damage_image = RiskInfographicsParser._check_image_path(charts['Other']['expected_damage_image'], Path(image_path))
+        flooded_image = RiskInfographicsParser._check_image_path(charts['Other']['flooded_image'], Path(image_path))
 
         # Write the html to the file
         with open(file_path, "w", encoding="utf-8") as infographics:
@@ -141,25 +164,31 @@ class RiskInfographicsParser(IInfographicsParser):
                             /* Add your CSS styling for chart container here */
                         }}
                         h1 {{
-                            font-size: 25px; /* Adjust the font size as needed */
-                            font-family: Verdana, sans-serif; /* Specify the font family as Verdana */
+                            font-size: {charts['Other']['expected_damage_font_size']}px; /* Adjust the font size as needed */
+                            font-family: Verdana; /* Specify the font family as Verdana */
+                            font-weight:normal; 
+                        }}
+                        h2 {{
+                            font-size: {charts['Other']['flooded_font_size']}px; /* Adjust the font size as needed */
+                            font-family: Verdana; /* Specify the font family as Verdana */
+                            font-weight:normal; 
                         }}
                         p {{
                             font-size: 20px; /* Adjust the font size as needed */
-                            font-family: Verdana, sans-serif; /* Specify the font family as Verdana */
+                            font-family: Verdana; /* Specify the font family as Verdana */
                         }}
                     </style>
                 </head>
                 <body>
                     <div class="container">
                         <div class="inner-div">
-                            <h1>Expected annual damages</h1>
-                            <img src="{charts['Other']['expected_damage_image']}" alt="Expected Damage" class="img-container">
+                            <h1>{charts['Other']['expected_damage_title']}</h1>
+                            <img src="{str(expected_damage_image)}" alt="Expected Damage" class="img-container">
                             <p>${'{:,.0f}'.format(metrics['ExpectedAnnualDamages'])}</p>
                         </div>
                         <div class="inner-div">
-                            <h1>{charts['Other']['flooded_title']}</h1>
-                            <img src="{charts['Other']['flooded_image']}" alt="Flooded Homes" class="img-container">
+                            <h2>{charts['Other']['flooded_title']}</h2>
+                            <img src="{str(flooded_image)}" alt="Flooded Homes" class="img-container">
                             <p>{'{:,.0f}'.format(metrics['FloodedHomes'])}</p>
                         </div>
                         <div class="inner-div chart-container">
@@ -206,7 +235,13 @@ class RiskInfographicsParser(IInfographicsParser):
             legend_orientation="h",
             yanchor="top",
             y=-0.1,
-            title="Building damage",
+            title=charts['Other']['return_periods_title'],
+            image_path = self.config_base_path.joinpath("images"),
+            title_font_size=charts['Other']['return_periods_font_size'],
+            subtitle_font_size=charts['Other']['return_periods_subtitle_font'],
+            image_scale=charts['Other']['return_periods_image_scale'],
+            numers_font=charts['Other']['return_periods_numers_font'],
+            legend_font_size=charts['Other']['return_periods_legend_font'],
         )
 
         # Return the figure
@@ -249,8 +284,8 @@ class RiskInfographicsParser(IInfographicsParser):
         # Get the infographic
         metrics, charts, infographic = self._get_infographics()
 
-        # Convert the infographic to html
-        self._figures_list_to_html(infographic, metrics, charts, infographic_html)
+        # Convert the infographic to html. The default for using relative image paths is to have an images folder in the same directory as the config files
+        self._figures_list_to_html(infographic, metrics, charts, infographic_html, self.config_base_path.joinpath("images"))
 
         # Return the path to the infographic
         return str(infographic_html)
