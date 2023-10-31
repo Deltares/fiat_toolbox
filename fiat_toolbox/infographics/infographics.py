@@ -3,13 +3,12 @@ from typing import Dict, List, Union
 
 import plotly.graph_objects as go
 import tomli
+import validators
+from PIL import Image
 from plotly.subplots import make_subplots
 
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
-
-from PIL import Image
-import validators
 
 
 class InfographicsParser(IInfographicsParser):
@@ -287,7 +286,7 @@ class InfographicsParser(IInfographicsParser):
                 The font size of the subtitle, by default 20
             **image_scale : float, optional
                 The scale of the image, by default 0.2
-            **numers_font : int, optional
+            **numbers_font : int, optional
                 The font size of the numbers, by default 20
             **legend_font_size : int, optional
                 The font size of the legend, by default 20
@@ -319,7 +318,7 @@ class InfographicsParser(IInfographicsParser):
         title_font_size = kwargs.get("title_font_size", 25)
         subtitle_font_size = kwargs.get("subtitle_font_size", 20)
         image_scale = kwargs.get("image_scale", 0.2)
-        numers_font = kwargs.get("numers_font", 20)
+        numbers_font = kwargs.get("numbers_font", 20)
         legend_font_size = kwargs.get("legend_font_size", 20)
         legend_orientation = kwargs.get("legend_orientation", "h")
         yanchor = kwargs.get("yanchor", "bottom")
@@ -429,7 +428,7 @@ class InfographicsParser(IInfographicsParser):
                 x=domain_center_x,
                 y=domain_center_y - 0.05,
                 text="{:,.0f}".format(sum(value["Values"])),
-                font={"size": numers_font, "family": "Verdana", "color": "black"},
+                font={"size": numbers_font, "family": "Verdana", "color": "black"},
                 xanchor="center",
                 yanchor="top",
                 showarrow=False,
@@ -504,7 +503,7 @@ class InfographicsParser(IInfographicsParser):
             title_font_size=charts['Other']['title_font'],
             subtitle_font_size=charts['Other']['subtitle_font'],
             image_scale=charts['Other']['image_scale'],
-            numers_font=charts['Other']['numers_font'],
+            numbers_font=charts['Other']['numbers_font'],
             legend_font_size=charts['Other']['legend_font'],
         )
 
@@ -518,7 +517,7 @@ class InfographicsParser(IInfographicsParser):
             title_font_size=people['Other']['title_font'],
             subtitle_font_size=people['Other']['subtitle_font'],
             image_scale=people['Other']['image_scale'],
-            numers_font=people['Other']['numers_font'],
+            numbers_font=people['Other']['numbers_font'],
             legend_font_size=people['Other']['legend_font'],
         )
 

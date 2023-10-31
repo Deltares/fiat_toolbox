@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 import plotly.graph_objects as go
+import validators
 
 from fiat_toolbox.infographics.infographics import InfographicsParser
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
@@ -9,7 +10,7 @@ from fiat_toolbox.metrics_writer.fiat_read_metrics_file import (
     MetricsFileReader,
 )
 
-import validators
+
 class RiskInfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
 
@@ -240,7 +241,7 @@ class RiskInfographicsParser(IInfographicsParser):
             title_font_size=charts['Other']['return_periods_font_size'],
             subtitle_font_size=charts['Other']['return_periods_subtitle_font'],
             image_scale=charts['Other']['return_periods_image_scale'],
-            numers_font=charts['Other']['return_periods_numers_font'],
+            numbers_font=charts['Other']['return_periods_numbers_font'],
             legend_font_size=charts['Other']['return_periods_legend_font'],
         )
 
