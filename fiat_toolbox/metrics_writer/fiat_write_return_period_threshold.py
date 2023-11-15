@@ -77,27 +77,33 @@ class ExceedanceProbabilityCalculator:
             Series containing the exceedance probability.
         """
 
+        # Convert all non-numerical values to nan
+        df = df.apply(lambda x: pd.to_numeric(x, errors='coerce'))
+
         # Extract values for the selected columns
         values = df.filter(like=self.column_prefix).to_numpy()
 
-        # If all values are nan, return nan
-        result = np.where(np.isnan(values).all(axis=1), np.nan, 0)
+        # Create a mask where True indicates a NaN value
+        nan_mask = np.isnan(values)
+
+        # Check if there are any NaN values after the first non-NaN value in each row
+        invalid_rows = np.any(np.diff(nan_mask.astype(int), axis=1) == -1, axis=1)
 
         # Custom interpolation function
         def custom_interp(x, xp, fp):
-            res = np.interp(x, xp, fp)
-            if res == fp[-1]:
+            if x > xp[-1]:
                 return np.nan
-            elif res <= fp[0]:
+            elif x < xp[0]:
                 return fp[0]
             else: 
-                return res
+                return np.interp(x, xp, fp)
 
         # Interpolate to find the return period for which the threshold is first exceeded
         RP = np.array([custom_interp(threshold, row, return_periods) for row in values])
 
         # Calculate exceedance probability
-        mask = ~np.isnan(RP)
+        mask = ~invalid_rows
+        result = np.full(len(df), np.nan)
         result[mask] = np.round((1 - np.exp(-T / RP[mask])) * 100, 1)
 
         return pd.Series(result, name = 'Exceedance Probability')
