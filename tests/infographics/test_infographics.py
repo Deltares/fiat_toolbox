@@ -383,7 +383,6 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
     def test_figure_to_html(self, mock_open, mock_to_html, mock_path_exists):
         # Arrange
         figure_path = Path("parent/some_figure.html")
-        styles_path = "styles.css"
         mock_file = mock_open.return_value.__enter__.return_value
 
         def exists_side_effect(path):
@@ -404,19 +403,44 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
             config_base_path="DontCare",
             output_base_path="DontCare",
         )
-        parser._figures_list_to_html(figs, figure_path, styles_path)
+        parser._figures_list_to_html(figs, figure_path)
 
         # Assert
-        expected_html = f"""<!DOCTYPE html>
-                    <html>
-                        <head>
-                            <link rel="stylesheet" type="text/css" href="{styles_path}">
-                        </head>
-                        <body>
-                            <div class="container">
-                                <div class="top-half">
-                                    some_figure
-                                </div>
+        expected_html = """
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <style>
+                        .container {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;  # Center the plots vertically
+                        }
+                        .top-half, .bottom {
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;  # Center the plots vertically within their divs
+                            width: 100%;
+                        }
+                        .top-half {
+                            width: 100%;
+                        }
+                        .bottom {
+                            flex-direction: row;
+                        }
+                        .bottom-left, .bottom-right {
+                            width: 50%;
+                            align-items: center;  # Center the plots vertically within their divs
+                        }
+                    </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="top-half">
+                                some_figure
+                            </div>
+                            <div class="bottom">
                                 <div class="bottom-left">
                                     some_figure
                                 </div>
@@ -424,8 +448,10 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
                                     some_figure
                                 </div>
                             </div>
-                        </body>
-                    </html>"""
+                        </div>
+                    </body>
+                </html>
+                """
 
         # Tabs and spaces are removed to make the comparison easier
         self.assertEqual(
@@ -435,13 +461,12 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         self.assertEqual(mock_file.write.call_count, 1)
         self.assertEqual(mock_open.call_count, 1)
         self.assertEqual(mock_to_html.call_count, 3)
-        self.assertEqual(mock_path_exists.call_count, 3)
-        self.assertEqual(str(mock_path_exists.call_args_list[0][0][0]), styles_path)
+        self.assertEqual(mock_path_exists.call_count, 2)
         self.assertEqual(
-            str(mock_path_exists.call_args_list[1][0][0]), str(figure_path)
+            str(mock_path_exists.call_args_list[0][0][0]), str(figure_path)
         )
         self.assertEqual(
-            str(mock_path_exists.call_args_list[2][0][0]), str(figure_path.parent)
+            str(mock_path_exists.call_args_list[1][0][0]), str(figure_path.parent)
         )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
@@ -450,7 +475,6 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
     def test_figure_to_html_no_figures(self, mock_open, mock_to_html, mock_path_exists):
         # Arrange
         figure_path = Path("parent/some_figure.html")
-        styles_path = "styles.css"
 
         mock_file = mock_open.return_value.__enter__.return_value
 
@@ -474,28 +498,55 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
             config_base_path="DontCare",
             output_base_path="DontCare",
         )
-        parser._figures_list_to_html(figs, figure_path, styles_path)
+        parser._figures_list_to_html(figs, figure_path)
 
         # Assert
-        expected_html = f"""<!DOCTYPE html>
-                    <html>
-                        <head>
-                            <link rel="stylesheet" type="text/css" href="{styles_path}">
-                        </head>
-                        <body>
-                            <div class="container">
-                                <div class="top-half">
-
-                                </div>
+        expected_html = """
+                    <!DOCTYPE html>
+                <html>
+                    <head>
+                        <style>
+                        .container {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;  # Center the plots vertically
+                        }
+                        .top-half, .bottom {
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;  # Center the plots vertically within their divs
+                            width: 100%;
+                        }
+                        .top-half {
+                            width: 100%;
+                        }
+                        .bottom {
+                            flex-direction: row;
+                        }
+                        .bottom-left, .bottom-right {
+                            width: 50%;
+                            align-items: center;  # Center the plots vertically within their divs
+                        }
+                    </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="top-half">
+                                
+                            </div>
+                            <div class="bottom">
                                 <div class="bottom-left">
-
+                                    
                                 </div>
                                 <div class="bottom-right">
-
+                                    
                                 </div>
                             </div>
-                        </body>
-                    </html>"""
+                        </div>
+                    </body>
+                </html>
+                """
 
         # Tabs and spaces are removed to make the comparison easier
         self.assertEqual(
@@ -505,75 +556,18 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         self.assertEqual(mock_file.write.call_count, 1)
         self.assertEqual(mock_open.call_count, 1)
         self.assertEqual(mock_to_html.call_count, 0)
-        self.assertEqual(mock_path_exists.call_count, 3)
-        self.assertEqual(str(mock_path_exists.call_args_list[0][0][0]), styles_path)
+        self.assertEqual(mock_path_exists.call_count, 2)
         self.assertEqual(
-            str(mock_path_exists.call_args_list[1][0][0]), str(figure_path)
+            str(mock_path_exists.call_args_list[0][0][0]), str(figure_path)
         )
         self.assertEqual(
-            str(mock_path_exists.call_args_list[2][0][0]), str(figure_path.parent)
-        )
-
-    @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    def test_figure_to_html_no_styles(self, mock_path_exists):
-        # Arrange
-        figure_path = "some_figure.html"
-        styles_path = "styles.css"
-        mock_path_exists.return_value = False
-
-        figs = [go.Figure(), go.Figure(), go.Figure()]
-
-        # Act
-        parser = InfographicsParser(
-            scenario_name="test_scenario",
-            metrics_full_path="DontCare",
-            config_base_path="DontCare",
-            output_base_path="DontCare",
-        )
-
-        # Assert
-        with self.assertRaises(FileNotFoundError) as context:
-            parser._figures_list_to_html(figs, figure_path, styles_path)
-
-        self.assertTrue("Stylesheet not found at styles.css" in str(context.exception))
-
-    @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    def test_figure_to_html_wrong_css_suffix(self, mock_path_exists):
-        # Arrange
-        figure_path = "some_figure.html"
-        styles_path = "styles.txt"
-
-        def exists_side_effect(path):
-            if ".html" in str(path):
-                # In case of the html file, we want it to not exist
-                return False
-            else:
-                return True
-
-        mock_path_exists.side_effect = exists_side_effect
-        figs = [go.Figure(), go.Figure(), go.Figure()]
-
-        # Act
-        parser = InfographicsParser(
-            scenario_name="test_scenario",
-            metrics_full_path="DontCare",
-            config_base_path="DontCare",
-            output_base_path="DontCare",
-        )
-
-        # Assert
-        with self.assertRaises(ValueError) as context:
-            parser._figures_list_to_html(figs, figure_path, styles_path)
-
-        self.assertTrue(
-            "Stylesheet must be a .css file, not styles.txt" in str(context.exception)
+            str(mock_path_exists.call_args_list[1][0][0]), str(figure_path.parent)
         )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     def test_html_already_exists(self, mock_path_exists):
         # Arrange
         figure_path = "some_figure.html"
-        styles_path = "styles.css"
         mock_path_exists.return_value = True
         figs = [go.Figure(), go.Figure(), go.Figure()]
 
@@ -587,7 +581,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
 
         # Assert
         with self.assertRaises(FileExistsError) as context:
-            parser._figures_list_to_html(figs, figure_path, styles_path)
+            parser._figures_list_to_html(figs, figure_path)
 
         self.assertTrue(
             "File already exists at some_figure.html" in str(context.exception)
@@ -597,7 +591,6 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
     def test_html_wrong_suffix(self, mock_path_exists):
         # Arrange
         figure_path = "some_figure.txt"
-        styles_path = "styles.css"
 
         def exists_side_effect(path):
             if ".txt" in str(path):
@@ -619,7 +612,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
 
         # Assert
         with self.assertRaises(ValueError) as context:
-            parser._figures_list_to_html(figs, figure_path, styles_path)
+            parser._figures_list_to_html(figs, figure_path)
 
         self.assertTrue(
             "File path must be a .html file, not some_figure.txt"

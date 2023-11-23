@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Optional, Union
 
 import plotly.graph_objects as go
 import tomli
 import validators
 from PIL import Image
-from plotly.subplots import make_subplots
 from plotly.graph_objects import Figure
+from plotly.subplots import make_subplots
 
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
@@ -289,7 +289,7 @@ class InfographicsParser(IInfographicsParser):
             )
 
     @staticmethod
-    def _check_image_source(img: str, image_folder_path: str = None) -> Union[str, Image, None]:
+    def _check_image_source(img: str, image_folder_path: str = None, return_image: bool = True) -> Union[str, Image.Image, None]:
         """Check if the image source is a url or a local path. If so, return the image source. If not, return None
 
         Parameters
@@ -298,6 +298,8 @@ class InfographicsParser(IInfographicsParser):
                 The image source
             image_folder_path : str, optional
                 The path to the image folder, by default None
+            return_image : bool, optional
+                Whether to return the image or the path to the image, by default True returns the image
         
         Returns
         -------
@@ -308,27 +310,30 @@ class InfographicsParser(IInfographicsParser):
         # Check if the image is a url. If so, add the image to the pie chart
         if validators.url(img):
             # Add the pie chart image
-            img_source = img
+            return img
         elif image_folder_path and "{image_path}" in img:
             path = Path(img.replace("{image_path}", str(image_folder_path)))
             if Path.exists(path):
-                img_source = Image.open(path)
+                if return_image:
+                    return Image.open(path)
+                else:
+                    return str(path)
             else:
-                img_source = None
+                return None
         else:
             path = Path(img)
             # Check if the given path is an absolute path
             if Path.exists(path):
-                img_source = Image.open(path)
+                if return_image:
+                    return Image.open(path)
+                else:    
+                    return str(path)    
             else:
-                img_source = None
-
-        return img_source
-
+                return None
 
 
     @staticmethod
-    def __add_info_button(fig: Figure, plot_info: str, img: str, img_path: str, scale: float) -> Figure:
+    def _add_info_button(fig: Figure, plot_info: str, img: str, img_path: str, scale: float) -> Figure:
         """Add an info button to a plotly figure
 
         Parameters
@@ -552,7 +557,7 @@ class InfographicsParser(IInfographicsParser):
         )
 
         # Add an info button
-        fig = InfographicsParser.__add_info_button(fig, plot_info, plot_info_img, image_path, plot_info_scale)
+        fig = InfographicsParser._add_info_button(fig, plot_info, plot_info_img, image_path, plot_info_scale)
 
         # Update the layout images
         fig.update_layout_images()
@@ -728,7 +733,7 @@ class InfographicsParser(IInfographicsParser):
             )
 
         # Add an info button
-        fig = InfographicsParser.__add_info_button(fig, plot_info, plot_info_img, image_path, plot_info_scale)
+        fig = InfographicsParser._add_info_button(fig, plot_info, plot_info_img, image_path, plot_info_scale)
 
         return fig
 
