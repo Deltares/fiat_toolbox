@@ -18,7 +18,7 @@ class ExceedanceProbabilityCalculator:
             Threshold value.
         T : float
             Time horizon.
-            
+        
         Returns
         -------
         pandas.DataFrame
@@ -57,6 +57,30 @@ class ExceedanceProbabilityCalculator:
         # Calculate exceedance probability
         return self._calculate(df, return_periods, threshold, T).to_frame()
         
+    def append_to_file(self, input_file: str, output_file: str, threshold: float, T: float) -> None:
+        """Append exceedance probability to file.
+
+        Parameters
+        ----------
+        input_file : str
+            Path to input file.
+        output_file : str
+            Path to output file.
+        threshold : float
+            Threshold value.
+        T : float
+            Time horizon.
+        """
+
+        # Read data from file
+        df = pd.read_csv(input_file, index_col=0)
+
+        # Append exceedance probability
+        result = self.append_probability(df, threshold, T)
+
+        # Write data to file
+        result.to_csv(output_file)
+
     def _calculate(self, df: pd.DataFrame, return_periods: list, threshold: float, T: float) -> pd.Series:
         """Calculate exceedance probability.
 
@@ -87,7 +111,10 @@ class ExceedanceProbabilityCalculator:
         nan_mask = np.isnan(values)
 
         # Check if there are any NaN values after the first non-NaN value in each row
-        invalid_rows = np.any(np.diff(nan_mask.astype(int), axis=1) == -1, axis=1)
+        invalid_rows = np.any(np.diff(nan_mask.astype(int), axis=1) == 1, axis=1)
+
+        # Add the check if all elements in a row are NaN
+        invalid_rows = invalid_rows | np.all(nan_mask, axis=1)
 
         # Custom interpolation function
         def custom_interp(x, xp, fp):
