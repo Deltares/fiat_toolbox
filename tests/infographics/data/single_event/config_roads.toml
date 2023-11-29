@@ -14,7 +14,7 @@
     [Categories.Major_Flooded]
         Name = "Major Flooded"
         Color = "#D5DEE1"
-        Image = "https://openclipart.org/image/800px/272335"
+        Image = "{image_path}/truck.png"
     [Categories.Fully_Flooded]
         Name = "Fully Flooded"
         Color = "#D5DEE1"

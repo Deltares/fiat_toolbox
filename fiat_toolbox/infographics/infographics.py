@@ -671,7 +671,7 @@ class InfographicsParser(IInfographicsParser):
                     # Add image below the bar
                     fig.add_layout_image(
                         {
-                            'source': image,
+                            'source': img_source,
                             'xref': "paper",
                             'yref': "paper",
                             'x': x_paper,
@@ -681,6 +681,7 @@ class InfographicsParser(IInfographicsParser):
                             'xanchor': "center",
                             'yanchor': "top",
                             'sizing': "contain",
+                            "visible": True,
                         }
                     )
 

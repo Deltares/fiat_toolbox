@@ -119,12 +119,18 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                 "Expected_Damages": {
                     "title": "Expected annual damages",
                     "image": "money.png",
-                    "font_size": 30
+                    "image_scale": 0.125,
+                    "title_font_size": 30,
+                    "numbers_font_size": 15,
+                    "height": 300,
                 },
                 "Flooded": {
                     "title": "Number of homes with a high chance of being flooded in a 30-year period",
                     "image": "house.png",
-                    "font_size": 30
+                    "image_scale": 0.125,
+                    "title_font_size": 30,
+                    "numbers_font_size": 15,
+                    "height": 300,
                 },
                 "Return_Periods": {
                     "title": "Building damages",
@@ -132,7 +138,8 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                     "image_scale": 0.125,
                     "numbers_font": 15,
                     "subtitle_font": 25,
-                    "legend_font": 20
+                    "legend_font": 20,
+                    "plot_height": 300,
                 },
                 "Info": {
                     "title": "Building damages",
@@ -167,17 +174,29 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                         }
                         .inner-div {
                             text-align: center;
-                        }
-                        .img-container {
-                            max-width: 10%;
-                            height: auto;
-                            margin: 0 auto;
+                            max-height: 300px; /* Add your max height here */
+                            overflow: auto; /* Add this to handle content that exceeds the max height */
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
                         }
                         .chart-container {
                             /* Add your CSS styling for chart container here */
                         }
+                        .img-container1 {
+                            max-width: 10%;
+                            height: auto;
+                            margin: 0 auto;
+                            transform: scale(0.125); /* Add your scale factor here */
+                        }
+                        .img-container2 {
+                            max-width: 10%;
+                            height: auto;
+                            margin: 0 auto;
+                            transform: scale(0.125); /* Add your scale factor here */
+                        }
                         h1 {
-                            font-size: 30px; /* Adjust the font size as needed */
+                            font-size:  30px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                             font-weight:normal; 
                         }
@@ -186,8 +205,12 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                             font-family: Verdana; /* Specify the font family as Verdana */
                             font-weight:normal; 
                         }
-                        p {
-                            font-size: 20px; /* Adjust the font size as needed */
+                        p1 {
+                            font-size: 15px; /* Adjust the font size as needed */
+                            font-family: Verdana; /* Specify the font family as Verdana */
+                        }
+                        p2 {
+                            font-size: 15px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                         }
                     </style>
@@ -196,13 +219,13 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                     <div class="container">
                         <div class="inner-div">
                             <h1>Expected annual damages</h1>
-                            <img src="money.png" alt="Expected Damage" class="img-container">
-                            <p>$1,000,000</p>
+                            <img src="money.png" alt="Expected Damage" class="img-container1">
+                            <p1>$1,000,000</p1>
                         </div>
                         <div class="inner-div">
                             <h2>Number of homes with a high chance of being flooded in a 30-year period</h2>
-                            <img src="house.png" alt="Flooded Homes" class="img-container">
-                            <p>1,000</p>
+                            <img src="house.png" alt="Flooded Homes" class="img-container2">
+                            <p2>1,000</p2>
                         </div>
                         <div class="inner-div chart-container">
                             some_figure
@@ -256,12 +279,18 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                 "Expected_Damages": {
                     "title": "Expected annual damages",
                     "image": "money.png",
-                    "font_size": 30
+                    "image_scale": 0.125,
+                    "title_font_size": 30,
+                    "numbers_font_size": 15,
+                    "height": 300,
                 },
                 "Flooded": {
                     "title": "Number of homes with a high chance of being flooded in a 30-year period",
                     "image": "house.png",
-                    "font_size": 30
+                    "image_scale": 0.125,
+                    "title_font_size": 30,
+                    "numbers_font_size": 15,
+                    "height": 300,
                 },
                 "Return_Periods": {
                     "title": "Building damages",
@@ -269,7 +298,8 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                     "image_scale": 0.125,
                     "numbers_font": 15,
                     "subtitle_font": 25,
-                    "legend_font": 20
+                    "legend_font": 20,
+                    "plot_height": 300,
                 },
                 "Info": {
                     "title": "Building damages",
