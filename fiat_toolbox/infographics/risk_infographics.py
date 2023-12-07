@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 import plotly.graph_objects as go
-import validators
 
 from fiat_toolbox.infographics.infographics import InfographicsParser
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
@@ -79,22 +78,6 @@ class RiskInfographicsParser(IInfographicsParser):
         return metrics
 
     @staticmethod
-    def _check_image_path(
-        image_path: str,
-        relative_path: Path,
-    ) -> Union[str, Path]:
-        # Check if expected_damage_image is an url, absolute or relative path
-        if Path.is_absolute(Path(image_path)) or validators.url(image_path):
-            return image_path
-        else:
-            temp_path = relative_path.joinpath(image_path)
-            if Path.exists(temp_path):
-                return temp_path
-
-        # Raise error if image_path is not returned yet
-        raise FileNotFoundError(f"Image not found for {image_path}")
-
-    @staticmethod
     def _figures_list_to_html(
         rp_fig: go.Figure,
         metrics: Dict,
@@ -133,8 +116,11 @@ class RiskInfographicsParser(IInfographicsParser):
             file_path.parent.mkdir(parents=True)
 
         # Check if the image_path exists
-        expected_damage_image = RiskInfographicsParser._check_image_path(charts['Other']['expected_damage_image'], Path(image_path))
-        flooded_image = RiskInfographicsParser._check_image_path(charts['Other']['flooded_image'], Path(image_path))
+        expected_damage_image = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_path, return_image=False)
+        flooded_image = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_path, return_image=False)
+
+        # Div height is the max of the chart heights
+        div_height = max(charts['Other']['Expected_Damages']['height'], charts['Other']['Flooded']['height'], charts['Other']['Return_Periods']['plot_height'])
 
         # Write the html to the file
         with open(file_path, "w", encoding="utf-8") as infographics:
@@ -150,32 +136,49 @@ class RiskInfographicsParser(IInfographicsParser):
                         .container {{
                             display: flex;
                             flex-direction: column;
-                            justify-content: space-between;
+                            align-items: center;
+                            justify-content: center;  # Center the plots vertically
                             height: 100vh;
                         }}
                         .inner-div {{
                             text-align: center;
-                        }}
-                        .img-container {{
-                            max-width: 10%;
-                            height: auto;
-                            margin: 0 auto;
+                            max-height: {div_height}px; /* Add your max height here */
+                            overflow: auto; /* Add this to handle content that exceeds the max height */
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
                         }}
                         .chart-container {{
                             /* Add your CSS styling for chart container here */
                         }}
+                        .img-container1 {{
+                            max-width: 10%;
+                            height: auto;
+                            margin: 0 auto;
+                            transform: scale({charts['Other']['Expected_Damages']['image_scale']}); /* Add your scale factor here */
+                        }}
+                        .img-container2 {{
+                            max-width: 10%;
+                            height: auto;
+                            margin: 0 auto;
+                            transform: scale({charts['Other']['Flooded']['image_scale']}); /* Add your scale factor here */
+                        }}
                         h1 {{
-                            font-size: {charts['Other']['expected_damage_font_size']}px; /* Adjust the font size as needed */
+                            font-size: {charts['Other']['Expected_Damages']['title_font_size']}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                             font-weight:normal; 
                         }}
                         h2 {{
-                            font-size: {charts['Other']['flooded_font_size']}px; /* Adjust the font size as needed */
+                            font-size: {charts['Other']['Flooded']['title_font_size']}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                             font-weight:normal; 
                         }}
-                        p {{
-                            font-size: 20px; /* Adjust the font size as needed */
+                        p1 {{
+                            font-size: {charts['Other']['Flooded']['numbers_font_size']}px; /* Adjust the font size as needed */
+                            font-family: Verdana; /* Specify the font family as Verdana */
+                        }}
+                        p2 {{
+                            font-size: {charts['Other']['Flooded']['numbers_font_size']}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                         }}
                     </style>
@@ -183,14 +186,14 @@ class RiskInfographicsParser(IInfographicsParser):
                 <body>
                     <div class="container">
                         <div class="inner-div">
-                            <h1>{charts['Other']['expected_damage_title']}</h1>
-                            <img src="{str(expected_damage_image)}" alt="Expected Damage" class="img-container">
-                            <p>${'{:,.0f}'.format(metrics['ExpectedAnnualDamages'])}</p>
+                            <h1>{charts['Other']['Expected_Damages']['title']}</h1>
+                            <img src="{str(expected_damage_image)}" alt="Expected Damage" class="img-container1">
+                            <p1>${'{:,.0f}'.format(metrics['ExpectedAnnualDamages'])}</p1>
                         </div>
                         <div class="inner-div">
-                            <h2>{charts['Other']['flooded_title']}</h2>
-                            <img src="{str(flooded_image)}" alt="Flooded Homes" class="img-container">
-                            <p>{'{:,.0f}'.format(metrics['FloodedHomes'])}</p>
+                            <h2>{charts['Other']['Flooded']['title']}</h2>
+                            <img src="{str(flooded_image)}" alt="Flooded Homes" class="img-container2">
+                            <p2>{'{:,.0f}'.format(metrics['FloodedHomes'])}</p2>
                         </div>
                         <div class="inner-div chart-container">
                             {rp_charts}
@@ -236,13 +239,17 @@ class RiskInfographicsParser(IInfographicsParser):
             legend_orientation="h",
             yanchor="top",
             y=-0.1,
-            title=charts['Other']['return_periods_title'],
-            image_path = self.config_base_path.joinpath("images"),
-            title_font_size=charts['Other']['return_periods_font_size'],
-            subtitle_font_size=charts['Other']['return_periods_subtitle_font'],
-            image_scale=charts['Other']['return_periods_image_scale'],
-            numbers_font=charts['Other']['return_periods_numbers_font'],
-            legend_font_size=charts['Other']['return_periods_legend_font'],
+            title=charts['Other']['Return_Periods']['title'],
+            image_path=self.config_base_path.joinpath("images"),
+            title_font_size=charts['Other']['Return_Periods']['font_size'],
+            subtitle_font_size=charts['Other']['Return_Periods']['subtitle_font'],
+            image_scale=charts['Other']['Return_Periods']['image_scale'],
+            numbers_font=charts['Other']['Return_Periods']['numbers_font'],
+            legend_font_size=charts['Other']['Return_Periods']['legend_font'],
+            plot_info=charts["Other"]['Info']["text"],
+            plot_info_img=charts["Other"]["Info"]["image"],
+            plot_info_scale=charts["Other"]["Info"]["scale"],
+            plot_height=charts['Other']['Return_Periods']['plot_height'],
         )
 
         # Return the figure

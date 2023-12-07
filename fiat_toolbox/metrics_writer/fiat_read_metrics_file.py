@@ -108,6 +108,10 @@ class MetricsFileReader(IMetricsFileReader):
         # Read the metrics from the file
         df_metrics = pd.read_csv(self.metrics_file_path, index_col=0)
 
+        # If you can't grab the value, transpose the data
+        if 'Value' not in df_metrics.columns:
+            df_metrics = df_metrics.transpose()
+            
         # Ensure values are interpreted as numbers
         df_metrics["Value"] = pd.to_numeric(df_metrics["Value"])
 

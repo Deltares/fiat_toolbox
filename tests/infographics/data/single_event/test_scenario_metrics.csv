@@ -1,5 +1,25 @@
-,TotalDamageEvent,ResidentialAffectedCount,ResidentialMinorCount,ResidentialMajorCount,ResidentialDestroyedCount,CommercialAffectedCount,CommercialMinorCount,CommercialMajorCount,CommercialDestroyedCount,PublicAffectedCount,PublicMinorCount,PublicMajorCount,PublicDestroyedCount,IndustrialAffectedCount,IndustrialMinorCount,IndustrialMajorCount,IndustrialDestroyedCount,FloodedLowVulnerability,FloodedHighVulnerability,DisplacedLowVulnerability,DisplacedHighVulnerability
-Description,Total Damage of the Event on buldings,Number of affected damaged residential buildings,Number of minor damaged residential buildings,Number of major damaged residential buildings,Number of destroyed residential buildings,Number of affected damaged commercial buildings,Number of minor damaged commercial buildings,Number of major damaged commercial buildings,Number of destroyed commercial buildings,Number of affected damaged Public buildings,Number of minor damaged Public buildings,Number of major damaged Public buildings,Number of destroyed Public buildings,Number of affected damaged Industrial buildings,Number of minor damaged Industrial buildings,Number of major damaged Industrial buildings,Number of destroyed Industrial buildings,Number of flooded people with low vulnerability,Number of flooded people with high vulnerability,Number of displaced people with low vulnerability,Number of displaced people with low vulnerability
-Show In Metrics Table,True,True,True,True,True,False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,False
-Long Name,Total Damage of the Event,Affected Residential Buildings,Minor Damaged Residential Buildings,Major Damaged Residential Buildings,Destroyed Residential Buildings,Affected Commercial Buildings,Minor Damaged Commercial Buildings,Major Damaged Commercial Buildings,Destroyed Commercial Buildings,Affected Public Buildings,Minor Damaged Public Buildings,Major Damaged Public Buildings,Destroyed Public Buildings,Affected Industrial Buildings,Minor Damaged Industrial Buildings,Major Damaged Industrial Buildings,Destroyed Industrial Buildings,Flooded Low Vulnerability,Flooded High Vulnerability,Displaced Low Vulnerability,Displaced High Vulnerability
-Value,31819391.52,797.0,303.0,0.0,0.0,267.0,53.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1100.0,1100.0,0.0,0.0
+,Description,Show In Metrics Table,Long Name,Value
+TotalDamageEvent,Total building damage,True,Total building damage,28498776790.659584
+ResidentialMinorCount,Number of residences with minor damage,True,Minor Damage Residential Buildings,11689.0
+ResidentialMajorCount,Number of residences with major damage,True,Major Damaged Residential Buildings,47374.0
+ResidentialDestroyedCount,Number of destroyed residences,True,Destroyed Residential Buildings,9799.0
+CommercialMinorCount,Number of commercial buildings with minor damage,False,Minor Damaged Commercial Buildings,959.0
+CommercialMajorCount,Number of commercial buildings with major damage,False,Major Damaged Commercial Buildings,2475.0
+CommercialDestroyedCount,Number of destroyed commercial buildings,False,Destroyed Commercial Buildings,1708.0
+HealthMinorCount,Number of minor damaged health facilities,False,Minor Damaged Health Buildings,67.0
+HealthMajorCount,Number of major damaged health facilities,False,Major Damaged Health Buildings,162.0
+HealthDestroyedCount,Number of destroyed health facilities,False,Destroyed Health Buildings,42.0
+SchoolsMinorCount,Number of minor damaged Schools facilities,False,Minor Damaged Schools Buildings,0.0
+SchoolsMajorCount,Number of major damaged Schools facilities,False,Major Damaged Schools Buildings,0.0
+SchoolsDestroyedCount,Number of destroyed Schools facilities,False,Destroyed Schools Buildings,0.0
+EmergencyMinorCount,Number of minor damaged emergency response buildings,False,Minor Damaged Emergency Buildings,2.0
+EmergencyMajorCount,Number of major damaged emergency response buildings,False,Major Damaged Emergency Buildings,4.0
+EmergencyDestroyedCount,Number of destroyed emergency response buildings,False,Destroyed Emergency Buildings,2.0
+FloodedLowVulnerability,Number of flooded people with low vulnerability,False,Flooded Low Vulnerability,62502.0
+FloodedHighVulnerability,Number of flooded people with high vulnerability,False,Flooded High Vulnerability,3569.0
+DisplacedLowVulnerability,Number of displaced people with low vulnerability,False,Displaced Low Vulnerability,9633.0
+DisplacedHighVulnerability,Number of displaced people with high vulnerability,False,Displaced High Vulnerability,164.0
+SlightlyFloodedRoads,Total length of the roads with an indundation depth between 2 and 4,True,Slightly flooded roads,654.45045
+MinorFloodedRoads,Total length of the roads with an indundation depth between 6 and 12,True,Minor flooded roads,265.248648
+MajorFloodedRoads,Total length of the roads with an indundation depth between 12 and 24,True,Major flooded roads,164.453645
+FullyFloodedRoads,Total length of the roads with an indundation depth over 24,True,Fully flooded roads,18.65446
