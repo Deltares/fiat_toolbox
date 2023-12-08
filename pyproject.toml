@@ -26,7 +26,7 @@ dependencies = [
     "tomli",
     "plotly",
     "parse",
-    "fiat @ git+https://github.com/Deltares/Delft-FIAT.git",
+    "delft-fiat",
     "geopandas",
     "duckdb",
     "validators"
