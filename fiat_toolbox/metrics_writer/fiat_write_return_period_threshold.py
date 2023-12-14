@@ -52,7 +52,7 @@ class ExceedanceProbabilityCalculator:
         """
 
         # Extract return periods from column names
-        return_periods = [int(col.split('(')[1][:-2]) for col in df.columns if col.startswith(self.column_prefix)]
+        return_periods = [float(col.split('(')[1][:-2]) for col in df.columns if col.startswith(self.column_prefix)]
         
         # Calculate exceedance probability
         return self._calculate(df, return_periods, threshold, T).to_frame()
