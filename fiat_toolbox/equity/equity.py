@@ -196,8 +196,6 @@ class Equity:
             ) / (P * z)
             # This step is needed to avoid nan value when z is zero
             R[R.isna()] = 0
-            # Certainty equivalent damage
-            R * D
             # Equity weighted damage
             EWD = EW * D
             # Equity weighted certainty equivalent damage
@@ -283,9 +281,11 @@ class Equity:
             ranking results
         """
         self.df["rank_EAD"] = self.df[ead_column].rank(ascending=False).astype(int)
+        self.df["rank_EWEAD"] = self.df["EWEAD"].rank(ascending=False).astype(int)
         self.df["rank_EWCEAD"] = self.df["EWCEAD"].rank(ascending=False).astype(int)
-        self.df["rank_diff"] = self.df["rank_EWCEAD"] - self.df["rank_EAD"]
-        return self.df[[self.aggregation_label, "rank_EAD", "rank_EWCEAD", "rank_diff"]]
+        self.df["rank_diff_EWEAD"] = self.df["rank_EWEAD"] - self.df["rank_EAD"]     
+        self.df["rank_diff_EWCEAD"] = self.df["rank_EWCEAD"] - self.df["rank_EAD"]
+        return self.df[[self.aggregation_label, "rank_EAD", "rank_EWCEAD", "rank_diff_EWCEAD",  "rank_EWEAD", "rank_diff_EWEAD"]]
 
     def calculate_resilience_index(
         self, ead_column: str = "Risk (EAD)"
