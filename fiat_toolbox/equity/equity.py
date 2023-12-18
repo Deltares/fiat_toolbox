@@ -196,16 +196,17 @@ class Equity:
             ) / (P * z)
             # This step is needed to avoid nan value when z is zero
             R[R.isna()] = 0
-            # Certainty equivalent damage
-            CED = R * D
+            # Equity weighted damage
+            EWD = EW * D
             # Equity weighted certainty equivalent damage
-            EWCED = EW * CED
+            EWCED = R * EWD
             # Add risk premium data to dataframes
             self.df[f"R_RP_{rp}"] = R
-            # Add ewced to dataframes
+            # Add ewd and ewced to dataframes
+            self.df[f"EWD_RP_{rp}"] = EWD
             self.df[f"EWCED_RP_{rp}"] = EWCED
 
-    def calculate_ewced(self):
+    def calculate_ewcead(self):
         """Calculates equity weighted certainty expected annual damages using log linear approach"""
         layers = []
         return_periods = []
@@ -215,6 +216,19 @@ class Equity:
 
         stacked_layers = np.dstack(tuple(layers)).squeeze()
         self.df["EWCEAD"] = stacked_layers.dot(
+            np.array(calc_rp_coef(return_periods))[:, None]
+        )
+    
+    def calculate_ewead(self):
+        """Calculates equity weighted certainty expected annual damages using log linear approach"""
+        layers = []
+        return_periods = []
+        for rp in self.RPs:
+            return_periods.append(rp)
+            layers.append(self.df.loc[:, f"EWD_RP_{rp}"].values)
+
+        stacked_layers = np.dstack(tuple(layers)).squeeze()
+        self.df["EWEAD"] = stacked_layers.dot(
             np.array(calc_rp_coef(return_periods))[:, None]
         )
 
@@ -243,9 +257,10 @@ class Equity:
         # Calculate equity weighted damage per return period
         self.calculate_ewced_per_rp()
         # Calculate equity weighted risk
-        self.calculate_ewced()
+        self.calculate_ewead()
+        self.calculate_ewcead()
         # Keep only results
-        df_ewced_filtered = self.df[[self.aggregation_label, "EW", "EWCEAD"]]
+        df_ewced_filtered = self.df[[self.aggregation_label, "EW", "EWEAD", "EWCEAD"]]
         # Save file if requested
         if output_file is not None:
             df_ewced_filtered.to_csv(output_file, index=False)
@@ -266,9 +281,11 @@ class Equity:
             ranking results
         """
         self.df["rank_EAD"] = self.df[ead_column].rank(ascending=False).astype(int)
+        self.df["rank_EWEAD"] = self.df["EWEAD"].rank(ascending=False).astype(int)
         self.df["rank_EWCEAD"] = self.df["EWCEAD"].rank(ascending=False).astype(int)
-        self.df["rank_diff"] = self.df["rank_EWCEAD"] - self.df["rank_EAD"]
-        return self.df[[self.aggregation_label, "rank_EAD", "rank_EWCEAD", "rank_diff"]]
+        self.df["rank_diff_EWEAD"] = self.df["rank_EWEAD"] - self.df["rank_EAD"]     
+        self.df["rank_diff_EWCEAD"] = self.df["rank_EWCEAD"] - self.df["rank_EAD"]
+        return self.df[[self.aggregation_label, "rank_EAD", "rank_EWCEAD", "rank_diff_EWCEAD",  "rank_EWEAD", "rank_diff_EWEAD"]]
 
     def calculate_resilience_index(
         self, ead_column: str = "Risk (EAD)"
