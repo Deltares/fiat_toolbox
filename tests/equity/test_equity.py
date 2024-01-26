@@ -43,7 +43,7 @@ def test_equity(case):
     )
     assert "EWCEAD" in df_equity.columns
     ranking = equity.rank_ewced()
-    assert "rank_diff" in ranking.columns
+    assert "rank_diff_EWCEAD" in ranking.columns
     sri = equity.calculate_resilience_index()
     assert "SRI" in sri.columns
 
