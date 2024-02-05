@@ -1,5 +1,6 @@
+import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 import plotly.graph_objects as go
 import tomli
@@ -10,6 +11,8 @@ from plotly.subplots import make_subplots
 
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
+
+logging.basicConfig(level=logging.INFO)
 
 
 class InfographicsParser(IInfographicsParser):
@@ -289,7 +292,9 @@ class InfographicsParser(IInfographicsParser):
             )
 
     @staticmethod
-    def _check_image_source(img: str, image_folder_path: str = None, return_image: bool = True) -> Union[str, Image.Image, None]:
+    def _check_image_source(
+        img: str, image_folder_path: str = None, return_image: bool = True
+    ) -> Union[str, Image.Image, None]:
         """Check if the image source is a url or a local path. If so, return the image source. If not, return None
 
         Parameters
@@ -300,13 +305,13 @@ class InfographicsParser(IInfographicsParser):
                 The path to the image folder, by default None
             return_image : bool, optional
                 Whether to return the image or the path to the image, by default True returns the image
-        
+
         Returns
         -------
             Union[str, Image, None]
                 The image source or None if the image source is not a url or a local path
         """
-        
+
         # Check if the image is a url. If so, add the image to the pie chart
         if validators.url(img):
             # Add the pie chart image
@@ -326,14 +331,15 @@ class InfographicsParser(IInfographicsParser):
             if Path.exists(path):
                 if return_image:
                     return Image.open(path)
-                else:    
-                    return str(path)    
+                else:
+                    return str(path)
             else:
                 return None
 
-
     @staticmethod
-    def _add_info_button(fig: Figure, plot_info: str, img: str, img_path: str, scale: float) -> Figure:
+    def _add_info_button(
+        fig: Figure, plot_info: str, img: str, img_path: str, scale: float
+    ) -> Figure:
         """Add an info button to a plotly figure
 
         Parameters
@@ -361,23 +367,30 @@ class InfographicsParser(IInfographicsParser):
         # Add an image
         fig.add_layout_image(
             {
-                "source": img_source, 
-                "xref": "paper", "yref": "paper",
-                "x": 1, "y": 1,
-                "sizex": scale, "sizey": scale,
-                "xanchor": "center", "yanchor": "top"
+                "source": img_source,
+                "xref": "paper",
+                "yref": "paper",
+                "x": 1,
+                "y": 1,
+                "sizex": scale,
+                "sizey": scale,
+                "xanchor": "center",
+                "yanchor": "top",
             }
         )
 
         # Add a hover label to the image
         fig.add_annotation(
-            xref="paper", yref="paper",
-            x=1, y=1,
+            xref="paper",
+            yref="paper",
+            x=1,
+            y=1,
             text="   ",
-            xanchor="center", yanchor="top",
+            xanchor="center",
+            yanchor="top",
             showarrow=False,
             font={"size": 16, "color": "LightSeaGreen"},
-            hovertext=plot_info
+            hovertext=plot_info,
         )
 
         return fig
@@ -448,12 +461,11 @@ class InfographicsParser(IInfographicsParser):
         xanchor = kwargs.get("xanchor", "center")
         x = kwargs.get("x", 0.5)
         image_path = kwargs.get("image_path", None)
-        plot_width = kwargs.get("plot_width", len(data)*200)
+        plot_width = kwargs.get("plot_width", len(data) * 200)
         plot_height = kwargs.get("plot_height", 500)
         plot_info = kwargs.get("plot_info", "")
         plot_info_img = kwargs.get("plot_info_img", "")
         plot_info_scale = kwargs.get("plot_info_scale", 0.2)
-
 
         # Create the pie chart figure
         fig = make_subplots(
@@ -504,10 +516,11 @@ class InfographicsParser(IInfographicsParser):
                 showarrow=False,
             )
 
-
             # Add the image to the pie chart
-            img_source = InfographicsParser._check_image_source(value["Image"], image_path)
-            
+            img_source = InfographicsParser._check_image_source(
+                value["Image"], image_path
+            )
+
             if img_source:
                 fig.add_layout_image(
                     {
@@ -538,8 +551,8 @@ class InfographicsParser(IInfographicsParser):
             title_text=title,
             title_font={"size": title_font_size, "family": "Verdana", "color": "black"},
             title_x=0.5,
-            width=plot_width, # Set the width in pixels
-            height=plot_height, # Set the height in pixels
+            width=plot_width,  # Set the width in pixels
+            height=plot_height,  # Set the height in pixels
             legend={
                 "orientation": legend_orientation,
                 "yanchor": yanchor,
@@ -557,7 +570,9 @@ class InfographicsParser(IInfographicsParser):
         )
 
         # Add an info button
-        fig = InfographicsParser._add_info_button(fig, plot_info, plot_info_img, image_path, plot_info_scale)
+        fig = InfographicsParser._add_info_button(
+            fig, plot_info, plot_info_img, image_path, plot_info_scale
+        )
 
         # Update the layout images
         fig.update_layout_images()
@@ -653,8 +668,8 @@ class InfographicsParser(IInfographicsParser):
                     text="{:,.0f}".format(value),
                     showarrow=False,
                     font={
-                        'color': "black",  # Set text color to white
-                        'size': numbers_font,  # Set text size to 14
+                        "color": "black",  # Set text color to white
+                        "size": numbers_font,  # Set text size to 14
                     },
                     xref="x",
                     yref="y",
@@ -663,7 +678,7 @@ class InfographicsParser(IInfographicsParser):
 
                 # Add the image to the bar chart
                 img_source = InfographicsParser._check_image_source(image, image_path)
-                
+
                 if img_source:
                     # Calculate paper coordinates for the image
                     x_paper = (i + 0.5) / len(chart["Labels"])
@@ -671,16 +686,16 @@ class InfographicsParser(IInfographicsParser):
                     # Add image below the bar
                     fig.add_layout_image(
                         {
-                            'source': img_source,
-                            'xref': "paper",
-                            'yref': "paper",
-                            'x': x_paper,
-                            'y': -0.1 * image_scale,
-                            'sizex': image_scale,
-                            'sizey': image_scale,
-                            'xanchor': "center",
-                            'yanchor': "top",
-                            'sizing': "contain",
+                            "source": img_source,
+                            "xref": "paper",
+                            "yref": "paper",
+                            "x": x_paper,
+                            "y": -0.1 * image_scale,
+                            "sizex": image_scale,
+                            "sizey": image_scale,
+                            "xanchor": "center",
+                            "yanchor": "top",
+                            "sizing": "contain",
                             "visible": True,
                         }
                     )
@@ -688,41 +703,41 @@ class InfographicsParser(IInfographicsParser):
             # Add a new annotation to serve as the x-axis title
             fig.add_annotation(
                 {
-                    'x': 0.5,
-                    'y': -image_scale,  # Adjust this value to move the title up or down
-                    'xref': "paper",
-                    'yref': "paper",
-                    'showarrow': False,
-                    'text': "Road users",  # X-axis title
-                    'font': {'size': numbers_font},  # Adjust font size as needed
-                    'xanchor': "center",
-                    'yanchor': "top",
+                    "x": 0.5,
+                    "y": -image_scale,  # Adjust this value to move the title up or down
+                    "xref": "paper",
+                    "yref": "paper",
+                    "showarrow": False,
+                    "text": "Road users",  # X-axis title
+                    "font": {"size": numbers_font},  # Adjust font size as needed
+                    "xanchor": "center",
+                    "yanchor": "top",
                 }
             )
 
             # Update layout for better visualization
             fig.update_layout(
                 title={
-                    'text': title,
-                    'x': 0.5,  # Center the main title
+                    "text": title,
+                    "x": 0.5,  # Center the main title
                 },
                 title_font={
-                    'size': title_font_size, 
-                    'family': "Verdana", 
-                    'color': "black"
+                    "size": title_font_size,
+                    "family": "Verdana",
+                    "color": "black",
                 },  # Adjust font size as needed
                 xaxis={
-                    'showticklabels': False,  # Hide x-axis labels
+                    "showticklabels": False,  # Hide x-axis labels
                 },
                 yaxis={
-                    'title': "Miles of interruption",
-                    'showgrid': False,  # Hide y-axis grid lines
-                    'zeroline': False,  # Hide zero line
-                    'showticklabels': False,  # Hide y-axis labels
-                    'title_font': {
-                        'size': subtitle_font_size, 
-                        'family': "Verdana", 
-                        'color': "black"
+                    "title": "Miles of interruption",
+                    "showgrid": False,  # Hide y-axis grid lines
+                    "zeroline": False,  # Hide zero line
+                    "showticklabels": False,  # Hide y-axis labels
+                    "title_font": {
+                        "size": subtitle_font_size,
+                        "family": "Verdana",
+                        "color": "black",
                     },  # Adjust font size as needed
                 },
                 width=plot_width,  # Set the width in pixels
@@ -734,7 +749,9 @@ class InfographicsParser(IInfographicsParser):
             )
 
         # Add an info button
-        fig = InfographicsParser._add_info_button(fig, plot_info, plot_info_img, image_path, plot_info_scale)
+        fig = InfographicsParser._add_info_button(
+            fig, plot_info, plot_info_img, image_path, plot_info_scale
+        )
 
         return fig
 
@@ -758,83 +775,84 @@ class InfographicsParser(IInfographicsParser):
         pie_people_config_path = self.config_base_path.joinpath("config_people.toml")
         roads_config_path = self.config_base_path.joinpath("config_roads.toml")
 
-        # Check if the infographic configuration files exist
-        if not Path.exists(pie_chart_config_path):
-            raise FileNotFoundError(
-                f"Infographic configuration file not found at {pie_chart_config_path}"
+        # Get the pie chart dictionaries from the configuration for charts
+        return_fig = []
+        try:
+            charts = InfographicsParser._get_pies_dictionary(
+                pie_chart_config_path, metrics
             )
-        if not Path.exists(pie_people_config_path):
-            raise FileNotFoundError(
-                f"Infographic configuration file not found at {pie_people_config_path}"
+            charts_fig = InfographicsParser._get_pie_chart_figure(
+                data=charts.copy(),
+                legend_orientation="h",
+                yanchor="top",
+                y=-0.1,
+                image_path=self.config_base_path.joinpath("images"),
+                title=charts["Other"]["Title"]["text"],
+                title_font_size=charts["Other"]["Title"]["font"],
+                subtitle_font_size=charts["Other"]["Subtitle"]["font"],
+                image_scale=charts["Other"]["Plot"]["image_scale"],
+                numbers_font=charts["Other"]["Plot"]["numbers_font"],
+                legend_font_size=charts["Other"]["Legend"]["font"],
+                plot_width=charts["Other"]["Plot"]["width"],
+                plot_height=charts["Other"]["Plot"]["height"],
+                plot_info=charts["Other"]["Info"]["text"],
+                plot_info_img=charts["Other"]["Info"]["image"],
+                plot_info_scale=charts["Other"]["Info"]["scale"],
             )
-        if not Path.exists(roads_config_path):
-            raise FileNotFoundError(
-                f"Infographic configuration file not found at {roads_config_path}"
+            return_fig.append(charts_fig)
+        except FileNotFoundError:
+            logging.warning("No charts configuration file found")
+
+        # Get the pie chart dictionaries from the configuration for people
+        try:
+            people = InfographicsParser._get_pies_dictionary(
+                pie_people_config_path, metrics
             )
+            people_fig = InfographicsParser._get_pie_chart_figure(
+                data=people.copy(),
+                legend_orientation="h",
+                yanchor="top",
+                y=-0.1,
+                image_path=self.config_base_path.joinpath("images"),
+                title=people["Other"]["Title"]["text"],
+                title_font_size=people["Other"]["Title"]["font"],
+                subtitle_font_size=people["Other"]["Subtitle"]["font"],
+                image_scale=people["Other"]["Plot"]["image_scale"],
+                numbers_font=people["Other"]["Plot"]["numbers_font"],
+                legend_font_size=people["Other"]["Legend"]["font"],
+                plot_width=people["Other"]["Plot"]["width"],
+                plot_height=people["Other"]["Plot"]["height"],
+                plot_info=people["Other"]["Info"]["text"],
+                plot_info_img=people["Other"]["Info"]["image"],
+                plot_info_scale=people["Other"]["Info"]["scale"],
+            )
+            return_fig.append(people_fig)
+        except FileNotFoundError:
+            logging.warning("No people configuration file found")
 
-        # Get the pie chart dictionaries
-        charts = InfographicsParser._get_pies_dictionary(pie_chart_config_path, metrics)
-        people = InfographicsParser._get_pies_dictionary(
-            pie_people_config_path, metrics
-        )
-        roads = InfographicsParser._get_pies_dictionary(roads_config_path, metrics)
-
-        # Create the pie chart figures
-        charts_fig = InfographicsParser._get_pie_chart_figure(
-            data=charts.copy(),
-            legend_orientation="h",
-            yanchor="top",
-            y=-0.1,
-            image_path=self.config_base_path.joinpath("images"),
-            title=charts["Other"]["Title"]['text'],
-            title_font_size=charts["Other"]["Title"]["font"],
-            subtitle_font_size=charts["Other"]["Subtitle"]["font"],
-            image_scale=charts["Other"]['Plot']["image_scale"],
-            numbers_font=charts["Other"]['Plot']["numbers_font"],
-            legend_font_size=charts["Other"]['Legend']["font"],
-            plot_width=charts["Other"]['Plot']['width'],
-            plot_height=charts["Other"]["Plot"]["height"],
-            plot_info=charts["Other"]['Info']["text"],
-            plot_info_img=charts["Other"]["Info"]["image"],
-            plot_info_scale=charts["Other"]["Info"]["scale"],
-        )
-
-        people_fig = InfographicsParser._get_pie_chart_figure(
-            data=people.copy(),
-            legend_orientation="h",
-            yanchor="top",
-            y=-0.1,
-            image_path=self.config_base_path.joinpath("images"),
-            title=people["Other"]["Title"]['text'],
-            title_font_size=people["Other"]["Title"]["font"],
-            subtitle_font_size=people["Other"]["Subtitle"]["font"],
-            image_scale=people["Other"]['Plot']["image_scale"],
-            numbers_font=people["Other"]['Plot']["numbers_font"],
-            legend_font_size=people["Other"]['Legend']["font"],
-            plot_width=people["Other"]['Plot']['width'],
-            plot_height=people["Other"]["Plot"]["height"],
-            plot_info=people["Other"]['Info']["text"],
-            plot_info_img=people["Other"]["Info"]["image"],
-            plot_info_scale=people["Other"]["Info"]["scale"],
-        )
-
-        roads_fig = InfographicsParser._get_bar_chart_figure(
-            data=roads.copy(),
-            image_path=self.config_base_path.joinpath("images"),
-            title=roads["Other"]["Title"]['text'],
-            title_font_size=roads["Other"]["Title"]["font"],
-            subtitle_font_size=roads["Other"]["Subtitle"]["font"],
-            image_scale=roads["Other"]['Plot']["image_scale"],
-            numbers_font=roads["Other"]['Plot']["numbers_font"],
-            plot_width=roads["Other"]['Plot']['width'],
-            plot_height=roads["Other"]["Plot"]["height"],
-            plot_info=roads["Other"]['Info']["text"],
-            plot_info_img=roads["Other"]["Info"]["image"],
-            plot_info_scale=roads["Other"]["Info"]["scale"],
-        )
+        # Get the bar chart dictionaries from the configuration for roads
+        try:
+            roads = InfographicsParser._get_pies_dictionary(roads_config_path, metrics)
+            roads_fig = InfographicsParser._get_bar_chart_figure(
+                data=roads.copy(),
+                image_path=self.config_base_path.joinpath("images"),
+                title=roads["Other"]["Title"]["text"],
+                title_font_size=roads["Other"]["Title"]["font"],
+                subtitle_font_size=roads["Other"]["Subtitle"]["font"],
+                image_scale=roads["Other"]["Plot"]["image_scale"],
+                numbers_font=roads["Other"]["Plot"]["numbers_font"],
+                plot_width=roads["Other"]["Plot"]["width"],
+                plot_height=roads["Other"]["Plot"]["height"],
+                plot_info=roads["Other"]["Info"]["text"],
+                plot_info_img=roads["Other"]["Info"]["image"],
+                plot_info_scale=roads["Other"]["Info"]["scale"],
+            )
+            return_fig.append(roads_fig)
+        except FileNotFoundError:
+            logging.warning("No roads configuration file found")
 
         # Return the figure
-        return [charts_fig, people_fig, roads_fig]
+        return return_fig
 
     def get_infographics(self) -> Union[List[go.Figure], go.Figure]:
         """Get the infographic for a scenario
