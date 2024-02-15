@@ -62,6 +62,7 @@ class PointsToFootprints(IPointsToFootprints):
 
         # Get type of run
         if "Total Damage" in gdf.columns:
+            run_type = "event"
             # If event save inundation depth
             depths = depths + [col for col in gdf.columns if "Inundation Depth" in col]
             # And all type of damages
@@ -72,6 +73,7 @@ class PointsToFootprints(IPointsToFootprints):
             ]
             dmgs.append("Total Damage")
         elif "Risk (EAD)" in gdf.columns:
+            run_type = "risk"
             # For risk only save total damage per return period and EAD
             dmgs = [col for col in gdf.columns if "Total Damage" in col]
             dmgs.append("Risk (EAD)")
@@ -142,5 +144,33 @@ class PointsToFootprints(IPointsToFootprints):
             # Merge based on "Object ID" column
             extra_footprints = extra_footprints[["Object ID", "geometry"]].merge(points, on="Object ID", how="left")[["Object ID", "geometry"]+agg_cols]
             gdf = pd.concat([gdf, extra_footprints], axis=0)
+        
+        # Calculate normalized damages per type
+        value_cols = gdf.columns[gdf.columns.str.startswith('Max Potential Damage:')].tolist()
+        
+        # Only for event type calculate % damage per type
+        if run_type == "event":
+            dmg_cols = gdf.columns[gdf.columns.str.startswith('Damage:')].tolist()
+            # Do per type
+            for dmg_col in dmg_cols:
+                new_name = dmg_col + " %"
+                name = dmg_col.split("Damage: ")[1]
+                gdf[new_name] = gdf[dmg_col] / gdf["Max Potential Damage: " + name] * 100
+                gdf[new_name] = gdf[new_name].round(2)
+            # Do total
+            gdf["Total Damage %"] = gdf["Total Damage"] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Total Damage %"] = gdf["Total Damage %"].round(2)
+            
+        # Calculate total normalized damage
+        if run_type == "risk":
+            tot_dmg_cols = gdf.columns[gdf.columns.str.startswith('Total Damage')].tolist()
+            for tot_dmg_col in tot_dmg_cols:
+                new_name = tot_dmg_col + " %"
+                gdf[new_name] = gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
+                gdf[new_name] = gdf[new_name].round(2)
+            gdf["Risk (EAD) %"] = gdf["Risk (EAD)"] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2)
+        
+        # Save file
         gdf.to_file(out_path, driver="GPKG")
         return gdf
