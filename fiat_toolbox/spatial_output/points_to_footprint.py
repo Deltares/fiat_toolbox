@@ -159,7 +159,7 @@ class PointsToFootprints(IPointsToFootprints):
                 gdf[new_name] = gdf[new_name].round(2)
             # Do total
             gdf["Total Damage %"] = gdf["Total Damage"] / gdf.loc[:, value_cols].sum(axis=1) * 100
-            gdf["Total Damage %"] = gdf["Total Damage %"].round(2)
+            gdf["Total Damage %"] = gdf["Total Damage %"].round(2).fillna(0)
             
         # Calculate total normalized damage
         if run_type == "risk":
@@ -169,7 +169,7 @@ class PointsToFootprints(IPointsToFootprints):
                 gdf[new_name] = gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
                 gdf[new_name] = gdf[new_name].round(2)
             gdf["Risk (EAD) %"] = gdf["Risk (EAD)"] / gdf.loc[:, value_cols].sum(axis=1) * 100
-            gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2)
+            gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2).fillna(0)
         
         # Save file
         gdf.to_file(out_path, driver="GPKG")
