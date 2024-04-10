@@ -1,3 +1,5 @@
+import base64
+import os
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -78,6 +80,25 @@ class RiskInfographicsParser(IInfographicsParser):
         return metrics
 
     @staticmethod
+    def _encode_image_from_path(image_path: str) -> str:
+        """Encode an image from a path to a base64 string
+
+        Parameters
+        ----------
+        image_path : str
+            The path to the image
+
+        Returns
+        -------
+        str
+            The base64 encoded image string
+        """
+        if os.path.isfile(image_path):
+            with open(image_path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode()
+            return f'data:image/png;base64,{encoded_string}'
+
+    @staticmethod
     def _figures_list_to_html(
         rp_fig: go.Figure,
         metrics: Dict,
@@ -116,8 +137,8 @@ class RiskInfographicsParser(IInfographicsParser):
             file_path.parent.mkdir(parents=True)
 
         # Check if the image_path exists
-        expected_damage_image = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_path, return_image=False)
-        flooded_image = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_path, return_image=False)
+        expected_damage_path = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_path, return_image=False)
+        flooded_path = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_path, return_image=False)
 
         # Div height is the max of the chart heights
         div_height = max(charts['Other']['Expected_Damages']['height'], charts['Other']['Flooded']['height'], charts['Other']['Return_Periods']['plot_height'])
@@ -187,12 +208,12 @@ class RiskInfographicsParser(IInfographicsParser):
                     <div class="container">
                         <div class="inner-div">
                             <h1>{charts['Other']['Expected_Damages']['title']}</h1>
-                            <img src="{str(expected_damage_image)}" alt="Expected Damage" class="img-container1">
+                            <img src="{RiskInfographicsParser._encode_image_from_path(expected_damage_path)}" alt="Expected Damage" class="img-container1">
                             <p1>${'{:,.0f}'.format(metrics['ExpectedAnnualDamages'])}</p1>
                         </div>
                         <div class="inner-div">
                             <h2>{charts['Other']['Flooded']['title']}</h2>
-                            <img src="{str(flooded_image)}" alt="Flooded Homes" class="img-container2">
+                            <img src="{RiskInfographicsParser._encode_image_from_path(flooded_path)}" alt="Flooded Homes" class="img-container2">
                             <p2>{'{:,.0f}'.format(metrics['FloodedHomes'])}</p2>
                         </div>
                         <div class="inner-div chart-container">
