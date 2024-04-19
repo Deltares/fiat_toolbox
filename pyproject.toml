@@ -21,14 +21,15 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "numpy",
-    "pandas",
+    "pandas<2.0",
     "tomli",
     "plotly",
     "parse",
     "delft-fiat",
     "geopandas",
     "duckdb",
-    "validators"
+    "validators",
+    "delft-fiat"
 ]
 dynamic = ["version"]
 

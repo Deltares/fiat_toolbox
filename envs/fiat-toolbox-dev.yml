@@ -7,7 +7,7 @@ dependencies:
   - black
   - ipykernel
   - numpy
-  - pandas <= 2.0.0
+  - pandas < 2.0.0
   - tomli
   - pip
   - pytest # tests
