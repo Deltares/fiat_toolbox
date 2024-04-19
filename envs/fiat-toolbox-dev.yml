@@ -7,7 +7,6 @@ dependencies:
   - black
   - ipykernel
   - numpy
-  - sqlalchemy < 2.0
   - pandas <= 2.0.0
   - tomli
   - pip
