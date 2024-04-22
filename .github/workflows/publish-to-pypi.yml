@@ -81,10 +81,16 @@ jobs:
         run: |
           ls -ltrh
           ls -ltrh dist
-
-      - uses: actions/setup-python@v4
+      
+      - uses: conda-incubator/setup-miniconda@v2
+        name: Setup Miniconda
         with:
+          auto-update-conda: true
           python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install GDAL
+        shell: bash -l {0}
+        run: conda install -c conda-forge gdal
 
       - name: Verify the built dist/wheel is valid
         run: |
