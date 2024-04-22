@@ -42,6 +42,11 @@ jobs:
         name: Install Python
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install GDAL
+        run: |
+          sudo add-apt-repository ppa:ubuntugis/ppa && sudo apt-get update
+          sudo apt-get install gdal-bin libgdal-dev
 
       - name: generate env
         run: |
