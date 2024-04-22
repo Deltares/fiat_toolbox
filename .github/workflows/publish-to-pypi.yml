@@ -21,12 +21,17 @@ env:
 
 name: Build and Upload to PyPI
 on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+    branches:
+      - main
   release:
     types:
       - published
-  push:
-    tags:
-      - v*
   workflow_dispatch:
 
 
