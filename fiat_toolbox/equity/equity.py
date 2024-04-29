@@ -100,20 +100,14 @@ class Equity:
         # Check if data inputs are wether .csv files or pd.DataFrame
         census_table = Equity._check_datatype(census_table)
         damages_table = Equity._check_datatype(damages_table)
-        # Check if damage table format is fiat metrics style
-        if "Show In Metrics Table" in damages_table.iloc[:, 0].tolist():
+        # If the aggregated damages format is the fiat_toolbox one make sure columns are interpreted correctly
+        if "Unnamed:" in damages_table.columns[0]:
             # Use name from input label
             damages_table = damages_table.rename(
                 columns={damages_table.columns[0]: aggregation_label}
             )
             index_name = damages_table.columns[0]
             damages_table = damages_table.set_index(index_name)
-            metrics_to_keep = (
-                damages_table.loc["Show In Metrics Table", :]
-                .map(lambda x: True if x.upper() == "TRUE" else False)
-                .astype(bool)
-            )
-            damages_table = damages_table.loc[:, metrics_to_keep]
 
             # Drop rows containing other variables
             damages_table = damages_table.drop(
@@ -280,6 +274,8 @@ class Equity:
         pd.DataFrame
             ranking results
         """
+        if ead_column not in self.df.columns:
+            raise ValueError(f"Default EAD column '{ead_column}' not present in provided aggregated file. A different column name can be specified using the 'ead_column' argument.")
         self.df["rank_EAD"] = self.df[ead_column].rank(ascending=False).astype(int)
         self.df["rank_EWEAD"] = self.df["EWEAD"].rank(ascending=False).astype(int)
         self.df["rank_EWCEAD"] = self.df["EWCEAD"].rank(ascending=False).astype(int)
