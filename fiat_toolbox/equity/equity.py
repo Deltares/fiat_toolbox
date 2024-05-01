@@ -275,7 +275,7 @@ class Equity:
             ranking results
         """
         if ead_column not in self.df.columns:
-            raise ValueError(f"Default EAD column '{ead_column}' not present in provided aggregated file. A different column name can be specified using the 'ead_column' argument.")
+            raise ValueError(f"EAD column '{ead_column}' not present in provided aggregated file. A different column name can be specified using the 'ead_column' argument.")
         self.df["rank_EAD"] = self.df[ead_column].rank(ascending=False).astype(int)
         self.df["rank_EWEAD"] = self.df["EWEAD"].rank(ascending=False).astype(int)
         self.df["rank_EWCEAD"] = self.df["EWCEAD"].rank(ascending=False).astype(int)
