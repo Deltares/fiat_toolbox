@@ -17,6 +17,7 @@ dependencies:
   - plotly
   - parse
   - seaborn # examples
+  - gdal
   - pip:
     - duckdb
     - git+https://github.com/Deltares/Delft-FIAT.git
