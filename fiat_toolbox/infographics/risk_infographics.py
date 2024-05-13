@@ -145,7 +145,7 @@ class RiskInfographicsParser(IInfographicsParser):
 
         # Write the html to the file
         with open(file_path, "w", encoding="utf-8") as infographics:
-            rp_charts = rp_fig.to_html().split("<body>")[1].split("</body>")[0]
+            rp_charts = rp_fig.to_html(config={'displayModeBar': False}).split("<body>")[1].split("</body>")[0]
 
             infographics.write(
                 f"""
