@@ -11,7 +11,7 @@ _cases = {
         "census_data": "population_income_data.csv",
         "fiat_data": "aggregated_damage_fiat.csv",
         "aggregation_label": "Census_Bg",
-        "percapitalincome_label": "PerCapitaIncomeBG",
+        "percapitaincome_label": "PerCapitaIncomeBG",
         "totalpopulation_label": "TotalPopulationBG",
         "gamma": 1.2,
         "output_file_equity": "aggregated_ewced1.csv",
@@ -22,7 +22,7 @@ _cases = {
         "census_data": "population_income_data.csv",
         "fiat_data": "aggregated_damage_gen.csv",
         "aggregation_label": "Census_Bg",
-        "percapitalincome_label": "PerCapitaIncomeBG",
+        "percapitaincome_label": "PerCapitaIncomeBG",
         "totalpopulation_label": "TotalPopulationBG",
         "gamma": 1.2,
         "output_file_equity": "aggregated_ewced2.csv",
@@ -35,7 +35,7 @@ def test_equity(case):
     census_data = DATASET.joinpath(_cases[case]["census_data"])
     fiat_data = DATASET.joinpath(_cases[case]["fiat_data"])
     aggregation_label = _cases[case]["aggregation_label"]
-    percapitalincome_label = _cases[case]["percapitalincome_label"]
+    percapitaincome_label = _cases[case]["percapitaincome_label"]
     totalpopulation_label = _cases[case]["totalpopulation_label"]
     gamma = _cases[case]["gamma"]
     output_file_equity = DATASET.joinpath(_cases[case]["output_file_equity"])
@@ -45,7 +45,7 @@ def test_equity(case):
             census_data,
             fiat_data,
             aggregation_label,
-            percapitalincome_label,
+            percapitaincome_label,
             totalpopulation_label,
             damage_column_pattern=_cases[case]["damage_column_pattern"],
         )
@@ -55,7 +55,7 @@ def test_equity(case):
             census_data,
             fiat_data,
             aggregation_label,
-            percapitalincome_label,
+            percapitaincome_label,
             totalpopulation_label,
         )    
 

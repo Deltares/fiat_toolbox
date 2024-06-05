@@ -14,7 +14,7 @@ class Equity:
         census_table: Union[str, pd.DataFrame, Path],
         damages_table: Union[str, pd.DataFrame, Path],
         aggregation_label: str,
-        percapitalincome_label: str,
+        percapitaincome_label: str,
         totalpopulation_label: str,
         damage_column_pattern: str = "Total Damage ({rp}Y)",
     ):
@@ -28,7 +28,7 @@ class Equity:
             Damage results
         aggregation_label : str
             column name of aggregation areas
-        percapitalincome_label : str
+        percapitaincome_label : str
             column name of per capita income
         totalpopulation_label : str
             column name of total population
@@ -37,7 +37,7 @@ class Equity:
         self.df = self._merge_tables(census_table, damages_table, aggregation_label)
         self.df0 = self.df.copy()  # Keep copy of original
         self.aggregation_label = aggregation_label
-        self.percapitalincome_label = percapitalincome_label
+        self.percapitaincome_label = percapitaincome_label
         self.totalpopulation_label = totalpopulation_label
         self.damage_column_pattern = damage_column_pattern
 
@@ -123,7 +123,7 @@ class Equity:
     def _calculate_equity_weights(self):
         """Calculates equity weights per aggregation area"""
         # Get population and income per capital data
-        I_PC = self.df[self.percapitalincome_label]  # mean per capita income
+        I_PC = self.df[self.percapitaincome_label]  # mean per capita income
         Pop = self.df[self.totalpopulation_label]  # population
 
         # Calculate aggregated annual income
