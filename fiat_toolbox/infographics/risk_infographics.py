@@ -93,6 +93,8 @@ class RiskInfographicsParser(IInfographicsParser):
         str
             The base64 encoded image string
         """
+        if image_path is None:
+            return
         if os.path.isfile(image_path):
             with open(image_path, "rb") as image_file:
                 encoded_string = base64.b64encode(image_file.read()).decode()
