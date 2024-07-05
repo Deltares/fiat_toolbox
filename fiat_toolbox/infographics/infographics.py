@@ -589,6 +589,8 @@ class InfographicsParser(IInfographicsParser):
             The bar chart dictionary
         **title : str, optional
             The title of the bar chart, by default ""
+        **yaxis_title : str, optional
+            The title of the y axis of the bar chart, by default ""
         **title_font_size : int, optional
             The font size of the title, by default 25
         **subtitle_font_size : int, optional
@@ -618,6 +620,7 @@ class InfographicsParser(IInfographicsParser):
 
         # Get the title and legend configuration with default values
         title = kwargs.get("title", "")
+        yaxis_title = kwargs.get("yaxis_title", "")
         title_font_size = kwargs.get("title_font_size", 25)
         subtitle_font_size = kwargs.get("subtitle_font_size", 20)
         image_scale = kwargs.get("image_scale", 0.2)
@@ -730,7 +733,7 @@ class InfographicsParser(IInfographicsParser):
                     "showticklabels": False,  # Hide x-axis labels
                 },
                 yaxis={
-                    "title": "Miles of interruption",
+                    "title": yaxis_title,
                     "showgrid": False,  # Hide y-axis grid lines
                     "zeroline": False,  # Hide zero line
                     "showticklabels": False,  # Hide y-axis labels
@@ -837,6 +840,7 @@ class InfographicsParser(IInfographicsParser):
                 data=roads.copy(),
                 image_path=self.config_base_path.joinpath("images"),
                 title=roads["Other"]["Title"]["text"],
+                yaxis_title = roads["Other"]["Y_axis_title"]["text"],
                 title_font_size=roads["Other"]["Title"]["font"],
                 subtitle_font_size=roads["Other"]["Subtitle"]["font"],
                 image_scale=roads["Other"]["Plot"]["image_scale"],
