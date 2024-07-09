@@ -109,23 +109,48 @@ class MetricsFileReader(IMetricsFileReader):
         df_metrics = pd.read_csv(self.metrics_file_path, index_col=0)
 
         # If you can't grab the value, transpose the data
-        if 'Value' not in df_metrics.columns:
+        if "Value" not in df_metrics.columns:
             df_metrics = df_metrics.transpose()
-            
-        # Ensure values are interpreted as numbers
-        df_metrics["Value"] = pd.to_numeric(df_metrics["Value"])
 
-        # Remove the desctioption row
-        if not include_description:
-            df_metrics = df_metrics.drop("Description", axis="columns")
+        # If the value is still not one of the columns, the metrics file is aggregated
+        if "Value" not in df_metrics.columns:
+            aggregations = set(df_metrics.columns) - {
+                "Description",
+                "Long Name",
+                "Show In Metrics Table",
+            }
 
-        # Remove the long names row
-        if not include_long_names:
-            df_metrics = df_metrics.drop("Long Name", axis="columns")
+            # Ensure values are interpreted as numbers
+            for aggregation in aggregations:
+                df_metrics[aggregation] = pd.to_numeric(df_metrics[aggregation])
 
-        # Remove the metrics table selection row
-        if not include_metrics_table_selection:
-            df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
+            # Remove the desctioption row
+            if not include_description:
+                df_metrics = df_metrics.drop("Description", axis="columns")
+
+            # Remove the long names row
+            if not include_long_names:
+                df_metrics = df_metrics.drop("Long Name", axis="columns")
+
+            # Remove the metrics table selection row
+            if not include_metrics_table_selection:
+                df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
+
+        else:
+            # Ensure values are interpreted as numbers
+            df_metrics["Value"] = pd.to_numeric(df_metrics["Value"])
+
+            # Remove the desctioption row
+            if not include_description:
+                df_metrics = df_metrics.drop("Description", axis="columns")
+
+            # Remove the long names row
+            if not include_long_names:
+                df_metrics = df_metrics.drop("Long Name", axis="columns")
+
+            # Remove the metrics table selection row
+            if not include_metrics_table_selection:
+                df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
 
         # Return the metric
         return df_metrics

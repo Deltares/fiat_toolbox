@@ -10,6 +10,7 @@ import pandas as pd
 import tomli
 
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
+from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
 
 
 # sql command struct
@@ -229,6 +230,8 @@ class MetricsFileWriter(IMetricsFileWriter):
         if sql_command.groupby:
             # Set the groupby variables as index
             labeled_result = result.set_index(sql_command.groupby.replace("`", ""))
+            # Remove rows without index name
+            labeled_result = labeled_result[labeled_result.index.notna()]
             # Return the metric name and the dictionary
             return labeled_result.columns[0], dict(
                 labeled_result[labeled_result.columns[0]]
@@ -313,6 +316,7 @@ class MetricsFileWriter(IMetricsFileWriter):
         metrics_path: Path,
         write_aggregate: str = None,
         overwrite: bool = False,
+        aggregations: list = None,
     ) -> None:
         """
         Write a metrics dictionary to a metrics file.
@@ -329,7 +333,9 @@ class MetricsFileWriter(IMetricsFileWriter):
         write_aggregate : str
             The name of the aggregation label to write to the metrics file (None for no aggregation label).
         overwrite : bool
-            Whether to overwrite the existing metrics file if it already exists.
+            Whether to overwrite the existing metrics file if it already exists. If False, it appends to the file.
+        aggregations : list
+            A list of aggregation areas. If write_aggregate is None, this is ignored.
 
         Returns
         -------
@@ -341,16 +347,16 @@ class MetricsFileWriter(IMetricsFileWriter):
             aggregate_metrics = metrics[write_aggregate]
 
             # Find the names dynamically
-            names = set()
-            for value in aggregate_metrics.values():
-                names.update(value.keys())
+            if aggregations is None:
+                for value in aggregate_metrics.values():
+                    aggregations.update(value.keys())
 
             # Update all empty metrics with 0
             for key, value in aggregate_metrics.items():
                 if value == {}:
-                    aggregate_metrics[key] = {name: 0 for name in names}
+                    aggregate_metrics[key] = {name: 0 for name in aggregations}
                     continue
-                for name in names:
+                for name in aggregations:
                     if name not in value:
                         aggregate_metrics[key][name] = 0
 
@@ -397,7 +403,14 @@ class MetricsFileWriter(IMetricsFileWriter):
                     )
                     os.remove(metrics_path)
                 else:
-                    return
+                    new_metrics = MetricsFileReader(
+                        metrics_path
+                    ).read_metrics_from_file(
+                        include_long_names=True,
+                        include_description=True,
+                        include_metrics_table_selection=True,
+                    )
+                    metricsFrame = new_metrics.append(metricsFrame)
 
             # Transpose the dataframe
             metricsFrame = metricsFrame.transpose()
@@ -446,7 +459,14 @@ class MetricsFileWriter(IMetricsFileWriter):
                     )
                     os.remove(metrics_path)
                 else:
-                    return
+                    new_metrics = MetricsFileReader(
+                        metrics_path
+                    ).read_metrics_from_file(
+                        include_long_names=True,
+                        include_description=True,
+                        include_metrics_table_selection=True,
+                    )
+                    metricsFrame = new_metrics.append(metricsFrame)
 
             # Write the metrics to a file
             if metrics_path.parent and not metrics_path.parent.exists():
@@ -473,7 +493,7 @@ class MetricsFileWriter(IMetricsFileWriter):
             The name of the aggregation label to write to the metrics file
             (None for no aggregation label, 'all' for all possible ones).
         overwrite : bool
-            Whether to overwrite the existing metrics file if it already exists.
+            Whether to overwrite the existing metrics file if it already exists. If False, it appends to the file.
 
         Returns
         -------
@@ -507,21 +527,16 @@ class MetricsFileWriter(IMetricsFileWriter):
                 new_path = Path(os.path.join(directory, new_filename))
                 return_files[key] = new_path
 
-                # Check if the file already exists and continue if it does
-                if os.path.exists(new_path):
-                    if not overwrite:
-                        continue
-
                 # Write the metrics to a file
                 MetricsFileWriter._write_metrics_file(
-                    metrics, config, new_path, write_aggregate=key, overwrite=overwrite
+                    metrics,
+                    config,
+                    new_path,
+                    write_aggregate=key,
+                    overwrite=overwrite,
+                    aggregations=df_results["Aggregation Label: " + key].unique(),
                 )
         else:
-            # Check if the file already exists and continue if it does
-            if os.path.exists(metrics_path):
-                if not overwrite:
-                    return metrics_path
-
             # Write the metrics to a file
             MetricsFileWriter._write_metrics_file(
                 metrics,
