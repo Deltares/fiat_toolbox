@@ -142,4 +142,4 @@ class ExceedanceProbabilityCalculator:
         result = np.full(len(df), np.nan)
         result[mask] = np.round((1 - np.exp(-T / RP[mask])) * 100, 1)
 
-        return pd.Series(result, name="Exceedance Probability")
+        return pd.Series(result, name="Exceedance Probability", index=df.index)
