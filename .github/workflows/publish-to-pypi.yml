@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
       
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         name: Setup Miniconda
         with:
           auto-update-conda: true
@@ -79,7 +79,7 @@ jobs:
           ls -ltrh
           ls -ltrh dist
       
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         name: Setup Miniconda
         with:
           auto-update-conda: true
