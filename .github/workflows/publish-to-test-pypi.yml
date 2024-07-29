@@ -99,6 +99,7 @@ jobs:
           
 
   upload-to-test-pypi:
+    environment: release
     permissions:
       id-token: write
     needs: test-built-dist
