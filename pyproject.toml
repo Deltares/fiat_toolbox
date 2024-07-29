@@ -29,7 +29,6 @@ dependencies = [
     "geopandas",
     "duckdb",
     "validators",
-    "delft-fiat"
 ]
 dynamic = ["version"]
 
