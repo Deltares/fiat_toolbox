@@ -29,30 +29,31 @@
     
     jobs:
       new-tag: # Install your build env and build your package
-        runs-on: ubuntu-latest
-        steps:
-          - uses: actions/checkout@v3
-            with:
-              fetch-depth: 0
+          runs-on: ubuntu-latest
+          if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+          steps:
+            - uses: actions/checkout@v3
+              with:
+                fetch-depth: 0
+          
+            - name: Update version
+              env:
+                GH_TOKEN: ${{ github.token }}  
+              run: |
+                export CURRENT_VERSION=$(grep "version" fiat_toolbox/__init__.py | cut -d= -f 2 | tr -d "\" ")
+                export CURRENT_MAJOR=$(echo $CURRENT_VERSION | cut -d'.' -f 1)
+                export CURRENT_MINOR=$(echo $CURRENT_VERSION | cut -d'.' -f 2)
+                export CURRENT_PATHCH=$(echo $CURRENT_VERSION | cut -d'.' -f 3)
+                export NEW_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$((CURRENT_PATHCH + 1))"
+
+                git config user.name "GitHub Actions Bot"
+                git config user.email "<>"
+
+                git checkout main 
+                sed -i "s/.*__version__.*/__version__ = \"$NEW_VERSION\"/" fiat_toolbox/__init__.py
+                git add fiat_toolbox
+                git commit -m "Bump version"
+                git push --set-upstream origin
+                git tag "v$NEW_VERSION"
+                git push origin tag "v$NEW_VERSION"
         
-          - name: Update version
-            env:
-              GH_TOKEN: ${{ github.token }}  
-            run: |
-              export CURRENT_VERSION=$(grep "version" fiat_toolbox/__init__.py | cut -d= -f 2 | tr -d "\" ")
-              export CURRENT_MAJOR=$(echo $CURRENT_VERSION | cut -d'.' -f 1)
-              export CURRENT_MINOR=$(echo $CURRENT_VERSION | cut -d'.' -f 2)
-              export CURRENT_PATHCH=$(echo $CURRENT_VERSION | cut -d'.' -f 3)
-              export NEW_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$((CURRENT_PATHCH + 1))"
-
-              git config user.name "GitHub Actions Bot"
-              git config user.email "<>"
-
-              git checkout main 
-              sed -i "s/.*__version__.*/__version__ = \"$NEW_VERSION\"/" fiat_toolbox/__init__.py
-              git add fiat_toolbox
-              git commit -m "Bump version"
-              git push --set-upstream origin
-              git tag "v$NEW_VERSION"
-              git push origin tag "v$NEW_VERSION"
-      
