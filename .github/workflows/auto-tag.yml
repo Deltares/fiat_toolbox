@@ -1,0 +1,59 @@
+# This is a basic workflow to help you get started with uploading to pypi automatically
+# https://packaging.python.org/tutorials/packaging-projects/
+# 
+# Before running this workflow in your repository, you will need to set up Secrets in your repository settings:
+# - Log in to your (test)PyPI account, go to your account -> your_project -> Publishing
+# - Fill in the required fields
+# - Create an API token for the repository and this workflow
+
+# - Go to your repository on GitHub, click on the "Settings" tab, and then "Secrets"
+# - Add a new secret with the name PYPI_TOKEN and the value is your pypi token
+# - Add a new secret with the name PYPI_TEST_TOKEN and the value is your test pypi token
+# Then, define the name of your package and the python version you want to use in the env block below.
+
+# This workflow will then automatically build and upload your package to PyPI/TestPypi:
+# - When a new commit is pushed to main, it will build and upload to TestPyPI to catch errors early
+# - When a new release is created, it will build and upload to the real PyPI
+---
+    env:
+      PACKAGE_NAME: "fiat_toolbox"
+      PYTHON_VERSION: "3.10"
+    
+    name: Update version on main
+    on:
+      pull_request:
+        branches:
+          - main
+      workflow_dispatch:
+    
+    
+    jobs:
+      new-tag: # Install your build env and build your package
+          runs-on: ubuntu-latest
+          if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+          steps:
+            - uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+          
+            - name: Update version
+              env:
+                GH_TOKEN: ${{ github.token }}  
+              run: |
+                export CURRENT_VERSION=$(grep "version" fiat_toolbox/__init__.py | cut -d= -f 2 | tr -d "\" ")
+                export CURRENT_MAJOR=$(echo $CURRENT_VERSION | cut -d'.' -f 1)
+                export CURRENT_MINOR=$(echo $CURRENT_VERSION | cut -d'.' -f 2)
+                export CURRENT_PATHCH=$(echo $CURRENT_VERSION | cut -d'.' -f 3)
+                export NEW_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$((CURRENT_PATHCH + 1))"
+
+                git config user.name "GitHub Actions Bot"
+                git config user.email "<>"
+
+                git checkout main 
+                sed -i "s/.*__version__.*/__version__ = \"$NEW_VERSION\"/" fiat_toolbox/__init__.py
+                git add fiat_toolbox
+                git commit -m "Bump version"
+                git push --set-upstream origin
+                git tag "v$NEW_VERSION"
+                git push origin tag "v$NEW_VERSION"
+        
