@@ -2,11 +2,10 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Union
 
-import plotly.graph_objects as go
 import tomli
 import validators
 from PIL import Image
-from plotly.graph_objects import Figure
+from plotly.graph_objects import Figure, Pie, Bar
 from plotly.subplots import make_subplots
 
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
@@ -440,7 +439,7 @@ class InfographicsParser(IInfographicsParser):
 
         Returns
         -------
-            go.Figure
+            Figure
                 The pie chart figure
         """
 
@@ -479,7 +478,7 @@ class InfographicsParser(IInfographicsParser):
         # Add the pie chart to the figure
         for idx, (key, value) in enumerate(data.items()):
             # Create single pie chart
-            trace = go.Pie(
+            trace = Pie(
                 values=value["Values"],
                 labels=value["Labels"],
                 hole=0.6,
@@ -614,7 +613,7 @@ class InfographicsParser(IInfographicsParser):
 
         Returns
         -------
-        go.Figure
+        Figure
             The bar chart figure
         """
 
@@ -653,7 +652,7 @@ class InfographicsParser(IInfographicsParser):
             ):
                 # Add bar to the figure
                 fig.add_trace(
-                    go.Bar(
+                    Bar(
                         x=[label],
                         y=[int(value)],
                         marker={
@@ -760,12 +759,12 @@ class InfographicsParser(IInfographicsParser):
 
     def _get_infographics(
         self,
-    ) -> go.Figure:
+    ) -> Figure:
         """Get the infographic for a scenario
 
         Returns
         -------
-        go.Figure
+        Figure
             The infographic for the scenario
 
         """
@@ -858,12 +857,12 @@ class InfographicsParser(IInfographicsParser):
         # Return the figure
         return return_fig
 
-    def get_infographics(self) -> Union[List[go.Figure], go.Figure]:
+    def get_infographics(self) -> Union[List[Figure], Figure]:
         """Get the infographic for a scenario
 
         Returns
         -------
-        Union[List[go.Figure], go.Figure]
+        Union[List[Figure], Figure]
             The infographic for the scenario as a list of figures or a single figure
         """
 

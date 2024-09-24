@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, Union
 
-import plotly.graph_objects as go
+from plotly.graph_objects import Figure
 
 from fiat_toolbox.infographics.infographics import InfographicsParser
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
@@ -102,7 +102,7 @@ class RiskInfographicsParser(IInfographicsParser):
 
     @staticmethod
     def _figures_list_to_html(
-        rp_fig: go.Figure,
+        rp_fig: Figure,
         metrics: Dict,
         charts: Dict,
         file_path: Union[str, Path] = "infographics.html",
@@ -112,7 +112,7 @@ class RiskInfographicsParser(IInfographicsParser):
 
         Parameters
         ----------
-            rp_fig : go.Figure
+            rp_fig : Figure
                 The plotly figure consisting of the pie charts for multiple return periods
             metrics : Dict
                 The impact metrics for the scenario
@@ -229,12 +229,12 @@ class RiskInfographicsParser(IInfographicsParser):
 
     def _get_infographics(
         self,
-    ) -> Union[Dict, Dict, go.Figure]:
+    ) -> Union[Dict, Dict, Figure]:
         """Get the infographic for a scenario
 
         Returns
         -------
-        go.Figure
+        Figure
             The infographic for the scenario
 
         """
@@ -278,12 +278,12 @@ class RiskInfographicsParser(IInfographicsParser):
         # Return the figure
         return metrics, charts, charts_fig
 
-    def get_infographics(self) -> Union[List[go.Figure], go.Figure]:
+    def get_infographics(self) -> Union[List[Figure], Figure]:
         """Get the infographic for a scenario
 
         Returns
         -------
-        Union[List[go.Figure], go.Figure]
+        Union[List[Figure], Figure]
             The infographic for the scenario as a list of figures or a single figure
         """
 

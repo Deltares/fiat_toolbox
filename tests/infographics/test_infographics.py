@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
-import plotly.graph_objects as go
+from plotly.graph_objects import Figure
 
 from fiat_toolbox.infographics.infographics import InfographicsParser
 
@@ -394,7 +394,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
 
         mock_path_exists.side_effect = exists_side_effect
         mock_to_html.return_value = "<body>some_figure</body>"
-        figs = [go.Figure(), go.Figure(), go.Figure()]
+        figs = [Figure(), Figure(), Figure()]
 
         # Act
         parser = InfographicsParser(
@@ -569,7 +569,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         # Arrange
         figure_path = "some_figure.html"
         mock_path_exists.return_value = True
-        figs = [go.Figure(), go.Figure(), go.Figure()]
+        figs = [Figure(), Figure(), Figure()]
 
         # Act
         parser = InfographicsParser(
@@ -600,7 +600,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
                 return True
 
         mock_path_exists.side_effect = exists_side_effect
-        figs = [go.Figure(), go.Figure(), go.Figure()]
+        figs = [Figure(), Figure(), Figure()]
 
         # Act
         parser = InfographicsParser(
