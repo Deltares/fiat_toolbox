@@ -1,5 +1,4 @@
 import base64
-import os
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -93,12 +92,14 @@ class RiskInfographicsParser(IInfographicsParser):
         str
             The base64 encoded image string
         """
-        if image_path is None:
+        print("RiskInfographicsParser._encode_image_from_path", image_path)
+        if not Path.exists(image_path):
+            print(f"Image file not found at {image_path}")
             return
-        if os.path.isfile(image_path):
-            with open(image_path, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode()
-            return f'data:image/png;base64,{encoded_string}'
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+        
+        return f'data:image/png;base64,{encoded_string}'
 
     @staticmethod
     def _figures_list_to_html(
@@ -106,7 +107,7 @@ class RiskInfographicsParser(IInfographicsParser):
         metrics: Dict,
         charts: Dict,
         file_path: Union[str, Path] = "infographics.html",
-        image_path: Union[str, Path] = None,
+        image_folder_path: Union[str, Path] = None,
     ):
         """Save a list of plotly figures in an HTML file
 
@@ -121,7 +122,7 @@ class RiskInfographicsParser(IInfographicsParser):
             image_path : Union[str, Path], optional
                 Path to the image folder, by default None
         """
-
+        print("_figures_list_to_html", rp_fig, metrics, charts, file_path, image_folder_path)
         # Convert the file_path to a Path object
         if isinstance(file_path, str):
             file_path = Path(file_path)
@@ -139,8 +140,8 @@ class RiskInfographicsParser(IInfographicsParser):
             file_path.parent.mkdir(parents=True)
 
         # Check if the image_path exists
-        expected_damage_path = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_path, return_image=False)
-        flooded_path = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_path, return_image=False)
+        expected_damage_path = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_folder_path, return_image=False)
+        flooded_path = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_folder_path, return_image=False)
 
         # Div height is the max of the chart heights
         div_height = max(charts['Other']['Expected_Damages']['height'], charts['Other']['Flooded']['height'], charts['Other']['Return_Periods']['plot_height'])

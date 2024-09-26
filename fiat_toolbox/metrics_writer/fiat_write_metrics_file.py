@@ -348,8 +348,9 @@ class MetricsFileWriter(IMetricsFileWriter):
 
             # Find the names dynamically
             if aggregations is None:
+                aggregations = list()
                 for value in aggregate_metrics.values():
-                    aggregations.update(value.keys())
+                    aggregations.extend(value.keys())
 
             # Update all empty metrics with 0
             for key, value in aggregate_metrics.items():

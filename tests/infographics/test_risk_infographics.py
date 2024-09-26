@@ -94,14 +94,15 @@ class TestRiskInfographicsParserGetMetrics(unittest.TestCase):
 class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Image.open")
-    @patch("fiat_toolbox.infographics.risk_infographics.go.Figure.to_html")
+    @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
+    @patch("fiat_toolbox.infographics.risk_infographics.Figure.to_html")
     @patch("builtins.open")
-    def test_figure_to_html(self, mock_open, mock_to_html, mock_open_image, mock_path_exists):
+    def test_figure_to_html(self, mock_open, mock_to_html, mock_open_image, mock_path_exists, mock_path_exists_risk):
         # Arrange
         figure_path = Path("parent/some_figure.html")
         mock_file = mock_open.return_value.__enter__.return_value
         mock_open_image.return_value = "some_image"
-
+        
         def exists_side_effect(path):
             if ".html" in str(path):
                 # In case of the html file, we want it to not exist
@@ -110,6 +111,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                 return True
 
         mock_path_exists.side_effect = exists_side_effect
+        mock_path_exists_risk.side_effect = exists_side_effect
         mock_to_html.return_value = "<body>some_figure</body>"
         figs = Figure()
 
@@ -156,7 +158,9 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
             config_base_path="DontCare",
             output_base_path="DontCare",
         )
-        parser._figures_list_to_html(figs, metrics, charts, figure_path)
+
+        # print(figs, metrics, charts, figure_path, sep="\n")
+        parser._figures_list_to_html(rp_fig=figs, metrics=metrics, charts=charts, file_path=figure_path)
 
         # Assert
         expected_html = """
@@ -234,7 +238,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                 </body>
                 </html>
                 """
-
+        self.maxDiff = 10000
         # Tabs and spaces are removed to make the comparison easier
         self.assertEqual(
             mock_file.write.call_args[0][0].replace(" ", ""),
@@ -253,7 +257,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
 
     @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Image.open")
-    @patch("fiat_toolbox.infographics.risk_infographics.go.Figure.to_html")
+    @patch("fiat_toolbox.infographics.risk_infographics.Figure.to_html")
     @patch("builtins.open")
     def test_figure_to_html_no_figures(self, mock_open, mock_to_html, mock_open_image, mock_path_exists):
         # Arrange

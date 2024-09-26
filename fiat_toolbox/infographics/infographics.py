@@ -310,7 +310,7 @@ class InfographicsParser(IInfographicsParser):
             Union[str, Image, None]
                 The image source or None if the image source is not a url or a local path
         """
-
+        print("InfographicsParser._check_image_source", img, image_folder_path, return_image)
         # Check if the image is a url. If so, add the image to the pie chart
         if validators.url(img):
             # Add the pie chart image

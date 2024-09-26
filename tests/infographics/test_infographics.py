@@ -378,7 +378,7 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
 
 class TestInfographicsParserChartsFigure(unittest.TestCase):
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    @patch("fiat_toolbox.infographics.infographics.go.Figure.to_html")
+    @patch("fiat_toolbox.infographics.infographics.Figure.to_html")
     @patch("builtins.open")
     def test_figure_to_html(self, mock_open, mock_to_html, mock_path_exists):
         # Arrange
@@ -470,7 +470,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
         )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    @patch("fiat_toolbox.infographics.infographics.go.Figure.to_html")
+    @patch("fiat_toolbox.infographics.infographics.Figure.to_html")
     @patch("builtins.open")
     def test_figure_to_html_no_figures(self, mock_open, mock_to_html, mock_path_exists):
         # Arrange
