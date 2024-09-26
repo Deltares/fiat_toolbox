@@ -5,7 +5,7 @@ from typing import Dict, List, Union
 import tomli
 import validators
 from PIL import Image
-from plotly.graph_objects import Figure, Pie, Bar
+from plotly.graph_objects import Bar, Figure, Pie
 from plotly.subplots import make_subplots
 
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
