@@ -1,4 +1,5 @@
 import base64
+import logging
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -13,6 +14,7 @@ from fiat_toolbox.metrics_writer.fiat_read_metrics_file import (
 
 class RiskInfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
+    logger: logging.Logger = logging.getLogger(__name__),
 
     def __init__(
         self,
@@ -20,6 +22,7 @@ class RiskInfographicsParser(IInfographicsParser):
         metrics_full_path: Union[Path, str],
         config_base_path: Union[Path, str],
         output_base_path: Union[Path, str],
+        logger: logging.Logger = logging.getLogger(__name__),
     ) -> None:
         """Initialize the InfographicsParser
 
@@ -52,6 +55,8 @@ class RiskInfographicsParser(IInfographicsParser):
         if isinstance(output_base_path, str):
             output_base_path = Path(output_base_path)
         self.output_base_path = output_base_path
+        self.logger = logger
+
 
     def _get_impact_metrics(self) -> Dict:
         """Get the impact metrics for a scenario
@@ -92,9 +97,8 @@ class RiskInfographicsParser(IInfographicsParser):
         str
             The base64 encoded image string
         """
-        print("RiskInfographicsParser._encode_image_from_path", image_path)
         if not Path.exists(image_path):
-            print(f"Image file not found at {image_path}")
+            RiskInfographicsParser.logger.error(f"Image not found at {image_path}")
             return
         with open(image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
@@ -122,7 +126,6 @@ class RiskInfographicsParser(IInfographicsParser):
             image_path : Union[str, Path], optional
                 Path to the image folder, by default None
         """
-        print("_figures_list_to_html", rp_fig, metrics, charts, file_path, image_folder_path)
         # Convert the file_path to a Path object
         if isinstance(file_path, str):
             file_path = Path(file_path)
@@ -147,7 +150,7 @@ class RiskInfographicsParser(IInfographicsParser):
         div_height = max(charts['Other']['Expected_Damages']['height'], charts['Other']['Flooded']['height'], charts['Other']['Return_Periods']['plot_height'])
 
         # Write the html to the file
-        with open(file_path, "w", encoding="utf-8") as infographics:
+        with open(file_path, mode="w", encoding="utf-8") as infographics:
             rp_charts = rp_fig.to_html(config={'displayModeBar': False}).split("<body>")[1].split("</body>")[0]
 
             infographics.write(
@@ -310,7 +313,7 @@ class RiskInfographicsParser(IInfographicsParser):
 
         # Check if the infographic already exists. If so, return the path
         if Path.exists(infographic_html):
-            # TODO: Print logging message
+            RiskInfographicsParser.logger.info(f"Infographic already exists, skipping creation. Path: {infographic_html}")
             return str(infographic_html)
 
         # Get the infographic

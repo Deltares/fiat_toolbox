@@ -11,8 +11,6 @@ from plotly.subplots import make_subplots
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
 
-logging.basicConfig(level=logging.INFO)
-
 
 class InfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
@@ -23,6 +21,7 @@ class InfographicsParser(IInfographicsParser):
         metrics_full_path: Union[Path, str],
         config_base_path: Union[Path, str],
         output_base_path: Union[Path, str],
+        logger: logging.Logger = logging.getLogger(__name__),
     ) -> None:
         """Initialize the InfographicsParser
 
@@ -55,6 +54,8 @@ class InfographicsParser(IInfographicsParser):
         if isinstance(output_base_path, str):
             output_base_path = Path(output_base_path)
         self.output_base_path = output_base_path
+
+        self.logger = logger
 
     def _get_impact_metrics(self) -> Dict:
         """Get the impact metrics for a scenario
@@ -310,7 +311,6 @@ class InfographicsParser(IInfographicsParser):
             Union[str, Image, None]
                 The image source or None if the image source is not a url or a local path
         """
-        print("InfographicsParser._check_image_source", img, image_folder_path, return_image)
         # Check if the image is a url. If so, add the image to the pie chart
         if validators.url(img):
             # Add the pie chart image
@@ -803,7 +803,7 @@ class InfographicsParser(IInfographicsParser):
             )
             return_fig.append(charts_fig)
         except FileNotFoundError:
-            logging.warning("No charts configuration file found")
+            self.logger.warning("No charts configuration file found")
 
         # Get the pie chart dictionaries from the configuration for people
         try:
@@ -830,7 +830,7 @@ class InfographicsParser(IInfographicsParser):
             )
             return_fig.append(people_fig)
         except FileNotFoundError:
-            logging.warning("No people configuration file found")
+            self.logger.warning("No people configuration file found")
 
         # Get the bar chart dictionaries from the configuration for roads
         try:
@@ -852,7 +852,7 @@ class InfographicsParser(IInfographicsParser):
             )
             return_fig.append(roads_fig)
         except FileNotFoundError:
-            logging.warning("No roads configuration file found")
+            self.logger.warning("No roads configuration file found")
 
         # Return the figure
         return return_fig

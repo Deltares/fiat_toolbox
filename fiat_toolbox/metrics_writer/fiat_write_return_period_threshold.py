@@ -1,10 +1,13 @@
+import logging
+
 import numpy as np
 import pandas as pd
 
 
 class ExceedanceProbabilityCalculator:
-    def __init__(self, column_prefix):
+    def __init__(self, column_prefix, logger: logging.Logger = logging.getLogger(__name__)):
         self.column_prefix = column_prefix
+        self.logger = logger
 
     def append_probability(
         self, df: pd.DataFrame, threshold: float, T: float

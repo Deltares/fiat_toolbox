@@ -25,10 +25,12 @@ class sql_struct:
     groupby: str
 
 
+
 class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
-
-    def __init__(self, config_file: Union[str, Path]):
+    logger: logging.Logger = logging.getLogger(__name__)
+    
+    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__)):
         """
         Initialize the class.
 
@@ -46,6 +48,7 @@ class MetricsFileWriter(IMetricsFileWriter):
             raise FileNotFoundError(f"Config file '{config_file}' not found.")
 
         self.config_file = config_file
+        self.logger = logger
 
     def _read_metrics_file(
         self, include_aggregates: bool
@@ -348,7 +351,7 @@ class MetricsFileWriter(IMetricsFileWriter):
 
             # Find the names dynamically
             if aggregations is None:
-                aggregations = list()
+                aggregations = []
                 for value in aggregate_metrics.values():
                     aggregations.extend(value.keys())
 
@@ -399,7 +402,7 @@ class MetricsFileWriter(IMetricsFileWriter):
             # Check if the file already exists
             if os.path.exists(metrics_path):
                 if overwrite:
-                    logging.warning(
+                    MetricsFileWriter.logger.warning(
                         f"Metrics file '{metrics_path}' already exists. Overwriting..."
                     )
                     os.remove(metrics_path)

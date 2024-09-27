@@ -248,7 +248,6 @@ class TestExceedanceProbabilityCalculator(unittest.TestCase):
         # Act
         result = calculator.calculate(df, threshold=0.2, T=30)
 
-        print(result)
         # Assert
         expected = pd.DataFrame({"Exceedance Probability": [np.nan, 69.9, 95.0]})
         pd.testing.assert_frame_equal(result, expected)
