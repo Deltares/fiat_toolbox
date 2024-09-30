@@ -25,7 +25,6 @@ dependencies = [
     "tomli",
     "plotly",
     "parse",
-    "delft-fiat",
     "geopandas",
     "duckdb",
     "validators",

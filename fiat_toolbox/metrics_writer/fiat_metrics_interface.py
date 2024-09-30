@@ -1,11 +1,17 @@
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Union
 
 import pandas as pd
 
 
 class IMetricsFileWriter(ABC):
     """Interface for writing metrics to a file."""
+    logger: logging.Logger
+
+    @abstractmethod
+    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__)): ...
 
     @abstractmethod
     def parse_metrics_to_file(
@@ -35,6 +41,11 @@ class IMetricsFileWriter(ABC):
 
 class IMetricsFileReader(ABC):
     """Interface for reading metrics from a file."""
+    logger: logging.Logger
+
+    @abstractmethod
+    def __init__(self, metrics_file_path: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__)): ...
+
 
     @abstractmethod
     def read_metrics_from_file(self, **kwargs) -> pd.Series:

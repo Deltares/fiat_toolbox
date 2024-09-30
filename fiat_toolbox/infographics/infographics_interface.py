@@ -1,8 +1,22 @@
+import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Union
 
 
 class IInfographicsParser(ABC):
     """Interface for creating the infographic"""
+    logger: logging.Logger
+    
+    @abstractmethod
+    def __init__(
+        self,
+        scenario_name: str,
+        metrics_full_path: Union[Path, str],
+        config_base_path: Union[Path, str],
+        output_base_path: Union[Path, str],
+        logger: logging.Logger = logging.getLogger(__name__),
+    ) -> None: ...
 
     @abstractmethod
     def get_infographics(self) -> str:

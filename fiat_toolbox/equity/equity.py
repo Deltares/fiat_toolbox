@@ -5,7 +5,8 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import parse
-from fiat.models.calc import calc_rp_coef
+
+from fiat_toolbox.equity.fiat_functions import calc_rp_coef
 
 
 class Equity:

@@ -1,9 +1,9 @@
 import base64
-import os
+import logging
 from pathlib import Path
 from typing import Dict, List, Union
 
-import plotly.graph_objects as go
+from plotly.graph_objects import Figure
 
 from fiat_toolbox.infographics.infographics import InfographicsParser
 from fiat_toolbox.infographics.infographics_interface import IInfographicsParser
@@ -14,6 +14,7 @@ from fiat_toolbox.metrics_writer.fiat_read_metrics_file import (
 
 class RiskInfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
+    logger: logging.Logger = logging.getLogger(__name__),
 
     def __init__(
         self,
@@ -21,6 +22,7 @@ class RiskInfographicsParser(IInfographicsParser):
         metrics_full_path: Union[Path, str],
         config_base_path: Union[Path, str],
         output_base_path: Union[Path, str],
+        logger: logging.Logger = logging.getLogger(__name__),
     ) -> None:
         """Initialize the InfographicsParser
 
@@ -53,6 +55,8 @@ class RiskInfographicsParser(IInfographicsParser):
         if isinstance(output_base_path, str):
             output_base_path = Path(output_base_path)
         self.output_base_path = output_base_path
+        self.logger = logger
+
 
     def _get_impact_metrics(self) -> Dict:
         """Get the impact metrics for a scenario
@@ -93,26 +97,27 @@ class RiskInfographicsParser(IInfographicsParser):
         str
             The base64 encoded image string
         """
-        if image_path is None:
+        if not Path.exists(image_path):
+            RiskInfographicsParser.logger.error(f"Image not found at {image_path}")
             return
-        if os.path.isfile(image_path):
-            with open(image_path, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode()
-            return f'data:image/png;base64,{encoded_string}'
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+        
+        return f'data:image/png;base64,{encoded_string}'
 
     @staticmethod
     def _figures_list_to_html(
-        rp_fig: go.Figure,
+        rp_fig: Figure,
         metrics: Dict,
         charts: Dict,
         file_path: Union[str, Path] = "infographics.html",
-        image_path: Union[str, Path] = None,
+        image_folder_path: Union[str, Path] = None,
     ):
         """Save a list of plotly figures in an HTML file
 
         Parameters
         ----------
-            rp_fig : go.Figure
+            rp_fig : Figure
                 The plotly figure consisting of the pie charts for multiple return periods
             metrics : Dict
                 The impact metrics for the scenario
@@ -121,7 +126,6 @@ class RiskInfographicsParser(IInfographicsParser):
             image_path : Union[str, Path], optional
                 Path to the image folder, by default None
         """
-
         # Convert the file_path to a Path object
         if isinstance(file_path, str):
             file_path = Path(file_path)
@@ -139,14 +143,14 @@ class RiskInfographicsParser(IInfographicsParser):
             file_path.parent.mkdir(parents=True)
 
         # Check if the image_path exists
-        expected_damage_path = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_path, return_image=False)
-        flooded_path = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_path, return_image=False)
+        expected_damage_path = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_folder_path, return_image=False)
+        flooded_path = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_folder_path, return_image=False)
 
         # Div height is the max of the chart heights
         div_height = max(charts['Other']['Expected_Damages']['height'], charts['Other']['Flooded']['height'], charts['Other']['Return_Periods']['plot_height'])
 
         # Write the html to the file
-        with open(file_path, "w", encoding="utf-8") as infographics:
+        with open(file_path, mode="w", encoding="utf-8") as infographics:
             rp_charts = rp_fig.to_html(config={'displayModeBar': False}).split("<body>")[1].split("</body>")[0]
 
             infographics.write(
@@ -229,12 +233,12 @@ class RiskInfographicsParser(IInfographicsParser):
 
     def _get_infographics(
         self,
-    ) -> Union[Dict, Dict, go.Figure]:
+    ) -> Union[Dict, Dict, Figure]:
         """Get the infographic for a scenario
 
         Returns
         -------
-        go.Figure
+        Figure
             The infographic for the scenario
 
         """
@@ -278,12 +282,12 @@ class RiskInfographicsParser(IInfographicsParser):
         # Return the figure
         return metrics, charts, charts_fig
 
-    def get_infographics(self) -> Union[List[go.Figure], go.Figure]:
+    def get_infographics(self) -> Union[List[Figure], Figure]:
         """Get the infographic for a scenario
 
         Returns
         -------
-        Union[List[go.Figure], go.Figure]
+        Union[List[Figure], Figure]
             The infographic for the scenario as a list of figures or a single figure
         """
 
@@ -309,7 +313,7 @@ class RiskInfographicsParser(IInfographicsParser):
 
         # Check if the infographic already exists. If so, return the path
         if Path.exists(infographic_html):
-            # TODO: Print logging message
+            RiskInfographicsParser.logger.info(f"Infographic already exists, skipping creation. Path: {infographic_html}")
             return str(infographic_html)
 
         # Get the infographic
