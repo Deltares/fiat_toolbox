@@ -98,7 +98,7 @@ class RiskInfographicsParser(IInfographicsParser):
             The base64 encoded image string
         """
         path = Path(image_path)
-        if not path.exists():
+        if not Path.exists(path):
             RiskInfographicsParser.logger.error(f"Image not found at {path}")
             return
         with open(path, "rb") as image_file:
