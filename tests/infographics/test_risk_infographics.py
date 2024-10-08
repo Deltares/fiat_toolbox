@@ -99,8 +99,8 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
         # Assert
         expected_encoded_string = f'data:image/png;base64,{base64.b64encode(self.money_bin).decode()}'
         assert encoded_image == expected_encoded_string
-        mock_open.assert_called_once_with(self.money_path, "rb")
-        mock_path_exists.assert_called_once_with(self.money_path)
+        mock_open.assert_called_once_with(Path(self.money_path), "rb")
+        mock_path_exists.assert_called_once_with(Path(self.money_path))
 
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
