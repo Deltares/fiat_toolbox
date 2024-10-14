@@ -44,7 +44,7 @@ class MetricsFileReader(IMetricsFileReader):
         self.metrics_file_path = metrics_file_path
         self.logger = logger
 
-    def read_aggregated_metric_from_file(self, metric: str) -> pd.Series:
+    def read_aggregated_metric_from_file(self, metric: str) -> pd.DataFrame:
         """Reads metrics from a file. These metrics are aggregated metrics.
 
         Parameters:
@@ -76,7 +76,7 @@ class MetricsFileReader(IMetricsFileReader):
         # Return the metric
         return df_metrics[metric]
 
-    def read_metrics_from_file(self, **kwargs) -> pd.Series:
+    def read_metrics_from_file(self, **kwargs) -> pd.DataFrame:
         """
         Reads metrics from a file.
 

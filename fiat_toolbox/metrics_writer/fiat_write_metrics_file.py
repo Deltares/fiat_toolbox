@@ -414,7 +414,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         include_description=True,
                         include_metrics_table_selection=True,
                     )
-                    metricsFrame = new_metrics.append(metricsFrame)
+                    metricsFrame = pd.concat([new_metrics, metricsFrame])
 
             # Transpose the dataframe
             metricsFrame = metricsFrame.transpose()
@@ -470,7 +470,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         include_description=True,
                         include_metrics_table_selection=True,
                     )
-                    metricsFrame = new_metrics.append(metricsFrame)
+                    metricsFrame = pd.concat([new_metrics, metricsFrame])
 
             # Write the metrics to a file
             if metrics_path.parent and not metrics_path.parent.exists():
