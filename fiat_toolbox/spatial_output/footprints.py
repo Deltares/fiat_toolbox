@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import geopandas as gpd
+import pandas as pd
 import numpy as np
 import pandas as pd
 import shapely.geometry as geom
@@ -137,36 +138,42 @@ class Footprints:
         self.field_name = field_name
         
     def aggregate(self, 
-                  objects: gpd.GeoDataFrame, 
+                  objects: Union[gpd.GeoDataFrame, pd.DataFrame], 
                   field_name: Optional[str] = None, 
                   drop_no_footprints: Optional[bool] = False, 
                   no_footprints_shape: str = "triangle", 
                   no_footprints_diameter: float = 10.
                   ):
         """
-        Aggregates spatial data by merging building footprints with associated objects.
+        Aggregate objects based on a specified field name that connects to the footprints unique id. If objects has 
+        spatial information, it can be used for objects without footprint connections to make standard shape footprints.
         Parameters:
         -----------
-        objects : gpd.GeoDataFrame
-            GeoDataFrame containing the objects to be aggregated with building footprints.
+        objects : Union[gpd.GeoDataFrame, pd.DataFrame]
+            The spatial objects to be aggregated. Can be a GeoDataFrame or DataFrame.
         field_name : Optional[str], default=None
-            The column name to use for merging. If None, uses self.field_name.
+            The field name to merge and aggregate objects on. If not provided, it defaults to the instance's field_name.
         drop_no_footprints : Optional[bool], default=False
-            If True, drops objects without footprints. If False, assigns a default shape to objects without footprints.
+            If True, objects without footprints will be dropped. If False, they will be assigned a default shape.
         no_footprints_shape : str, default="triangle"
-            The shape to assign to objects without footprints if drop_no_footprints is False. Options are "triangle", "circle", etc.
+            The shape to assign to objects without footprints. Options include "triangle", "circle", etc.
         no_footprints_diameter : float, default=10.0
-            The diameter of the shape to assign to objects without footprints if drop_no_footprints is False.
+            The diameter of the shape to assign to objects without footprints.
+        Raises:
+        -------
+        AttributeError
+            If the specified field_name is not found in the columns of the provided objects.
         Returns:
         --------
         None
-            The aggregated results are stored in self.aggregated_results as a GeoDataFrame.
-        """
-        
+            The aggregated results are stored in the instance's `aggregated_results` attribute.
+        """        
         # Merge based on "field_name" column
-        if field_name is None:
+        if field_name is None: # if field_name is not provided assume it is the same as the footprints one
             field_name = self.field_name
-        gdf = self.footprints.merge(objects.drop(columns="geometry"), on=field_name, how="outer")
+        if field_name not in objects.columns:
+            raise AttributeError(f"'{field_name}' not found columns of the provided objects.")
+        gdf = self.footprints.merge(objects.drop(columns="geometry", errors="ignore"), on=field_name, how="outer")
 
         # Remove the building footprints without any object attached
         gdf = gdf.loc[~gdf[Fiat.object_id].isna()]
@@ -239,14 +246,15 @@ class Footprints:
         extra_footprints = []
         
         # If point object don't have a footprint reference assume a shape
-        if not drop_no_footprints:
+        if not drop_no_footprints and "geometry" in objects.columns:
             no_footprint_objects = self._no_footprint_points_to_polygons(objects, no_footprints_shape, no_footprints_diameter)
             no_footprint_objects = no_footprint_objects[["Object ID", "geometry"] + agg_cols].to_crs(gdf.crs)
             extra_footprints.append(no_footprint_objects)
         
         # Add objects which are already described by a polygon
-        footprint_objects = self._find_footprint_objects(objects)[["Object ID", "geometry"] + agg_cols].to_crs(gdf.crs)
-        extra_footprints.append(footprint_objects)
+        if "geometry" in objects.columns:
+            footprint_objects = self._find_footprint_objects(objects)[["Object ID", "geometry"] + agg_cols].to_crs(gdf.crs)
+            extra_footprints.append(footprint_objects)
         
         # Combine
         gdf = pd.concat([gdf] + extra_footprints, axis=0)
@@ -346,6 +354,7 @@ class Footprints:
             damage_columns.append(Fiat.total_damage)
         elif Fiat.risk_ead in gdf.columns:
             self.run_type = "risk"
+            depth_columns = []
             # For risk only save total damage per return period and EAD
             damage_columns = [col for col in gdf.columns if Fiat.total_damage in col]
             damage_columns.append(Fiat.risk_ead)
