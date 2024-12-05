@@ -4,8 +4,8 @@ import geopandas as gpd
 import pandas as pd
 import pytest
 
-from fiat_toolbox.spatial_output.points_to_footprint import PointsToFootprints
-
+from fiat_toolbox.spatial_output.footprints import Footprints
+from fiat_toolbox.spatial_output.footprints import Fiat
 file_path = Path(__file__).parent.resolve()
 
 
@@ -20,12 +20,19 @@ def test_write_footprints_event():
 
     # Define output name
     outpath = file_path / "building_footprints_event.gpkg"
-    out = PointsToFootprints.write_footprint_file(footprints, results, outpath)
-
-    out_example = out["Total Damage"][out["Object ID"] == "1393_1394"].to_numpy()[0]
+    
+    # Aggregate results
+    footprints = Footprints(footprints)
+    footprints.aggregate(results)
+    footprints.calc_normalized_damages()
+    footprints.write(outpath)
+    
+    out = footprints.aggregated_results
+    
+    out_example = out[Fiat.total_damage][out[Fiat.object_id] == "1393_1394"].to_numpy()[0]
     in_example = (
-        results["Total Damage"][results["Object ID"] == 1393].to_numpy()[0]
-        + results["Total Damage"][results["Object ID"] == 1394].to_numpy()[0]
+        results[Fiat.total_damage][results[Fiat.object_id] == 1393].to_numpy()[0]
+        + results[Fiat.total_damage][results[Fiat.object_id] == 1394].to_numpy()[0]
     )
     assert out_example == in_example
     # Delete created files
@@ -43,12 +50,20 @@ def test_write_footprints_risk():
 
     # Define output name
     outpath = file_path / "building_footprints_risk.gpkg"
-    out = PointsToFootprints.write_footprint_file(footprints, results, outpath)
+    
+    # Aggregate results
+    footprints = Footprints(footprints)
+    footprints.aggregate(results)
+    footprints.calc_normalized_damages()
+    footprints.write(outpath)
+    
+    out = footprints.aggregated_results
 
-    out_example = out["Risk (EAD)"][out["Object ID"] == "1393_1394"].to_numpy()[0]
+
+    out_example = out[Fiat.risk_ead][out[Fiat.object_id] == "1393_1394"].to_numpy()[0]
     in_example = (
-        results["Risk (EAD)"][results["Object ID"] == 1393].to_numpy()[0]
-        + results["Risk (EAD)"][results["Object ID"] == 1394].to_numpy()[0]
+        results[Fiat.risk_ead][results[Fiat.object_id] == 1393].to_numpy()[0]
+        + results[Fiat.risk_ead][results[Fiat.object_id] == 1394].to_numpy()[0]
     )
     assert out_example == in_example
     # Delete created files
@@ -63,8 +78,8 @@ def test_error_handling():
 
     footprints = gpd.read_file(footprints_path)
     results = pd.read_csv(results_path)
-    del results["Risk (EAD)"]
-    # Define output name
-    outpath = file_path / "building_footprints_risk.gpkg"
+    del results[Fiat.risk_ead]
+
     with pytest.raises(ValueError):
-        PointsToFootprints.write_footprint_file(footprints, results, outpath)
+        footprints = Footprints(footprints)
+        footprints.aggregate(results)
