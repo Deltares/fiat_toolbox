@@ -58,7 +58,7 @@ jobs:
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then
             TAG_NAME=${GITHUB_REF#refs/tags/}
-            NEW_VERSION=$(echo $TAG_NAME | awk -F'-' '{print $1}')
+            NEW_VERSION=$(echo $TAG_NAME | sed 's/^v//' | awk -F'-' '{print $1}')
             echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
             echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
             echo "Version is $NEW_VERSION"
