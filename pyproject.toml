@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "numpy",
-    "pandas<2.0",
+    "pandas",
     "tomli",
     "plotly",
     "parse",

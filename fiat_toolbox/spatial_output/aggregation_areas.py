@@ -101,6 +101,8 @@ class AggregationAreas(IAggregationAreas):
         joined = gdf_aggr_areas.join(df, on=id_name)
 
         # Save file
+        out_path = Path(out_path).resolve()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         if file_format == "geopackage":
             AggregationAreas._check_extension(out_path, ".gpkg")
             joined.to_file(out_path, driver="GPKG")
