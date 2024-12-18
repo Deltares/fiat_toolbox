@@ -16,12 +16,11 @@ name: release
 # Checklist for using this workflow up for a new project:
 
 #  1. In github settings:
-#     - Create an environment called `release` (GH_ENV_NAME) 
+#     - Create an environment called `release`
 #     - Setup the permissions (https://github.com/<ORGANIZATION>/<REPO_NAME>/settings/environments)
 #     - Add the following variables:
 #        - PACKAGE_NAME: the name of your package on pypi
 #        - PYTHON_VERSION: the version of Python you want to use
-#        - ENV_NAME: the name name of the environment
 
 #  2. On PyPi:
 #      - Create the project and add a trusted publisher (https://pypi.org/manage/project/<PACKAGE_NAME>/settings/publishing/ or https://pypi.org/manage/account/publishing if the project is not on pypi yet)
@@ -126,7 +125,7 @@ jobs:
     needs: [setup_and_build, details]
     runs-on: ubuntu-latest
     environment:
-      name: ${{ env.ENV_NAME }}
+      name: release
 
     permissions:
       id-token: write
