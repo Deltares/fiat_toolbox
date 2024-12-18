@@ -37,11 +37,6 @@ on:
       - v[0-9]+\.[0-9]+\.[0-9]+
       # https://peps.python.org/pep-0440/
 
-env:
-  PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
-  PYTHON_VERSION: ${{ env.PYTHON_VERSION }}
-  ENV_NAME: ${{ env.ENV_NAME }}
-
 jobs:
   details:
     runs-on: ubuntu-latest
@@ -72,7 +67,7 @@ jobs:
     steps:
       - name: Fetch information from PyPI
         run: |
-          response=$(curl -s https://pypi.org/pypi/${{ env.PYTHON_VERSION }}/json || echo "{}")
+          response=$(curl -s https://pypi.org/pypi/${{ env.PACKAGE_NAME }}/json || echo "{}")
           latest_previous_version=$(echo $response | jq --raw-output "select(.releases != null) | .releases | keys_unsorted[]" | sort -V | tail -n 1)
           if [ -z "$latest_previous_version" ]; then
             echo "Package not found on PyPI."
@@ -102,7 +97,7 @@ jobs:
         with:
           auto-update-conda: true
           activate-environment: publish
-          python-version: $PYTHON_VERSION
+          python-version: ${{ env.PYTHON_VERSION }}
           channels: conda-forge
 
       - name: Install Build tools
