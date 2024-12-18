@@ -127,6 +127,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ env.ENV_NAME }}
+
     permissions:
       id-token: write
     steps:
