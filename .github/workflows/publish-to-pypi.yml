@@ -16,19 +16,17 @@ name: release
 # Checklist for using this workflow up for a new project:
 
 #  1. In github settings:
-#       - Create an environment called `release` (GH_ENV_NAME) and setup the permissions (https://github.com/<ORGANIZATION>/<REPO_NAME>/settings/environments)
+#     - Create an environment called `release` (GH_ENV_NAME) 
+#     - Setup the permissions (https://github.com/<ORGANIZATION>/<REPO_NAME>/settings/environments)
+#     - Add the following variables:
+#        - PACKAGE_NAME: the name of your package on pypi
+#        - PYTHON_VERSION: the version of Python you want to use
+#        - ENV_NAME: the name name of the environment
 
 #  2. On PyPi:
 #      - Create the project and add a trusted publisher (https://pypi.org/manage/project/<PACKAGE_NAME>/settings/publishing/ or https://pypi.org/manage/account/publishing if the project is not on pypi yet)
 #      - Ensure the publisher is configured to use:
-#          - environment name: `release` (can be changed, but should be the one created in the github settings)
 #          - the filename of this workflow yml (in this case: publish-to-pypi.yml)
-
-#  3. In this file:
-#      - In the `env` section (~L45):
-#        - Update the name of your package (PACKAGE_NAME)
-#        - Update the version of Python you want to use (PYTHON_VERSION)
-#        - Update the name name of the environment you created in github settings (GH_ENV_NAME)
 
 #     - In the `setup_and_build` job:
 #        - Update the the shell commands to install your package
@@ -38,10 +36,6 @@ on:
     tags:
       - v[0-9]+\.[0-9]+\.[0-9]+
       # https://peps.python.org/pep-0440/
-env:
-  REPO_RELEASE_ENV_NAME: "release"
-  PACKAGE_NAME: "fiat-toolbox"
-  PYTHON_VERSION: "3.10"
 
 jobs:
   details:
@@ -132,7 +126,8 @@ jobs:
     needs: [setup_and_build, details]
     runs-on: ubuntu-latest
     environment:
-      name: ${{ env.REPO_RELEASE_ENV_NAME }}
+      name: ${{ env.ENV_NAME }}
+
     permissions:
       id-token: write
     steps:
