@@ -102,7 +102,7 @@ jobs:
       - name: Install Build tools
         shell: bash -el {0}
         run: |
-          conda run -n publish pip install --upgrade build pip setuptools
+          conda install -n publish pip setuptools wheel python-build
 
       - name: Install dependencies
         shell: bash -el {0}
@@ -112,7 +112,7 @@ jobs:
 
       - name: Build source and wheel distribution
         run: |
-          conda run -n publish python -m build
+          conda run -n publish python -s -m build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
