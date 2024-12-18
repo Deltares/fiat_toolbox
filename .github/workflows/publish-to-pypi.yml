@@ -39,7 +39,7 @@ on:
       - v[0-9]+\.[0-9]+\.[0-9]+
       # https://peps.python.org/pep-0440/
 env:
-  GH_ENV_NAME: "release"
+  REPO_RELEASE_ENV_NAME: "release"
   PACKAGE_NAME: "fiat-toolbox"
   PYTHON_VERSION: "3.10"
 
@@ -132,7 +132,7 @@ jobs:
     needs: [setup_and_build, details]
     runs-on: ubuntu-latest
     environment:
-      name: ${{ env.GH_ENV_NAME }}
+      name: ${{ env.REPO_RELEASE_ENV_NAME }}
     permissions:
       id-token: write
     steps:
