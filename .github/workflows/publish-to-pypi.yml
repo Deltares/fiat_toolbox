@@ -37,7 +37,7 @@ on:
   push:
     tags:
       # https://peps.python.org/pep-0440/
-      - r"v[0-9]+\.[0-9]+\.[0-9]"
+      - r"v[0-9]+\.[0-9]+\.[0-9]+"
 
 env:
   GH_ENV_NAME: "release"
