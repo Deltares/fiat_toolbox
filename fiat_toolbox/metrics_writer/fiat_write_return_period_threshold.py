@@ -59,7 +59,7 @@ class ExceedanceProbabilityCalculator:
         return_periods = [
             int(col.split("(")[1][:-2])
             for col in df.columns
-            if col.startswith(self.column_prefix)
+            if col.startswith(self.column_prefix) or col.startswith('inun_depth') #NOTE Temporary adjustment to support all Delft FIAT versions
         ]
 
         # Calculate exceedance probability
