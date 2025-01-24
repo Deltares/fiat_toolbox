@@ -117,7 +117,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                         description=metric["description"],
                         select=metric["select"],
                         filter=metric["filter"],
-                        groupby="`Aggregation Label: " + aggregate + "`",
+                        #groupby="`Aggregation Label: " + aggregate + "`",
+                        groupby="`aggregation_label:_" + aggregate + "`",
                     )
 
                     # Check whether the metric name is already in the dictionary
@@ -532,13 +533,21 @@ class MetricsFileWriter(IMetricsFileWriter):
                 return_files[key] = new_path
 
                 # Write the metrics to a file
+                #MetricsFileWriter._write_metrics_file(
+                #    metrics,
+                #    config,
+                #    new_path,
+                #    write_aggregate=key,
+                #    overwrite=overwrite,
+                #    aggregations=df_results["Aggregation Label: " + key].unique(),
+                #)
                 MetricsFileWriter._write_metrics_file(
                     metrics,
                     config,
                     new_path,
                     write_aggregate=key,
                     overwrite=overwrite,
-                    aggregations=df_results["Aggregation Label: " + key].unique(),
+                    aggregations=df_results["aggregation_label:_" + key].unique(),
                 )
         else:
             # Write the metrics to a file
