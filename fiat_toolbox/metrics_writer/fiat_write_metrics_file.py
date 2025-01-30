@@ -118,7 +118,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         select=metric["select"],
                         filter=metric["filter"],
                         #groupby="`Aggregation Label: " + aggregate + "`",
-                        groupby="`aggregation_label:_" + aggregate + "`",
+                        groupby="`aggregation_label:" + aggregate + "`",
                     )
 
                     # Check whether the metric name is already in the dictionary
