@@ -167,7 +167,7 @@ class Footprints:
         gdf[exposure_columns.object_id] = gdf[exposure_columns.object_id].astype(int) # ensure that object ids are interpreted correctly as integers
 
         # Get column names per type
-        columns = self._get_column_names(gdf)
+        columns = self._get_column_names(gdf, exposure_columns)
         
         for col in columns["string"]:
             gdf[col] = gdf[col].astype(str)
