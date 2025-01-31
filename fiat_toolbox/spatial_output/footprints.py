@@ -222,7 +222,9 @@ class Footprints:
         # Drop duplicates
         gdf = gdf.drop_duplicates(subset=[field_name])
         gdf = gdf.reset_index(drop=True)
-        gdf = gdf[[exposure_columns["object_id"], "geometry"] + agg_cols]
+        exposure_keys = ["object_id", "geometry"] + agg_cols
+        exposure_values = [exposure_columns[key] for key in exposure_keys if key in exposure_columns]
+        gdf = gdf[exposure_values]
 
         for col in columns["string"]:
             for ind, val in enumerate(gdf[col]):
@@ -324,7 +326,7 @@ class Footprints:
         
         # Get string columns that will be aggregated
         string_columns = [exposure_columns["primary_object_type"]] +  [
-            col for col in gdf.columns if any(aggregate in col for aggregate in [key for key in exposure_columns if key.startswith("aggregation_label")])]
+            col for col in gdf.columns if [value for key, value in exposure_columns if value in col]] #NOTE Need to get the value of the key to see whether value is in column
 
         # Get type of run and columns
         if exposure_columns["total_damage"] in gdf.columns:
@@ -334,8 +336,8 @@ class Footprints:
             # And all type of damages
             damage_columns = [
                 col for col in gdf.columns 
-                if any(damage in col for damage in exposure_columns if damage.startswith("damage_"))
-                and not any(max_damage in col for max_damage in exposure_columns if max_damage.startswith("max_damage"))
+                if [key for key in exposure_columns if "damage_" in col]
+                and not [key for key in exposure_columns if "max_damage" in col]
                 and not col.startswith("fn_")
             ]
             damage_columns.append(exposure_columns["total_damage"])
@@ -350,7 +352,7 @@ class Footprints:
                 f"The is no {exposure_columns['total_damage']} or {exposure_columns['risk_ead']} column in the results."
             )
         # add the max potential damages
-        pot_damage_columns = [col for col in gdf.columns if any(max_damage in col for max_damage in [key for key in exposure_columns if key.startswith("max_damage_")])]
+        pot_damage_columns = [col for col in gdf.columns if [key for key in exposure_columns if "max_damage_" in col]]
         damage_columns = pot_damage_columns + damage_columns
         
         # create mapping dictionary
