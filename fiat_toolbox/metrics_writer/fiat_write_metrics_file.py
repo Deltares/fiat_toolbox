@@ -30,7 +30,7 @@ class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
     logger: logging.Logger = logging.getLogger(__name__)
     
-    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__)):
+    def __init__(self, config_file: Union[str, Path], aggregation_label: str = "aggregation_label:", logger: logging.Logger = logging.getLogger(__name__)):
         """
         Initialize the class.
 
@@ -49,6 +49,7 @@ class MetricsFileWriter(IMetricsFileWriter):
 
         self.config_file = config_file
         self.logger = logger
+        self.aggregation_label = aggregation_label
 
     def _read_metrics_file(
         self, include_aggregates: bool
@@ -117,8 +118,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         description=metric["description"],
                         select=metric["select"],
                         filter=metric["filter"],
-                        #groupby="`Aggregation Label: " + aggregate + "`",
-                        groupby="`aggregation_label:" + aggregate + "`",
+                        groupby=f"{self.aggregation_label}{aggregate}",
                     )
 
                     # Check whether the metric name is already in the dictionary
