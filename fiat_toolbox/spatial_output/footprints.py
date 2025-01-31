@@ -163,8 +163,8 @@ class Footprints:
         gdf = self.footprints.merge(objects.drop(columns="geometry", errors="ignore"), on=field_name, how="outer")
 
         # Remove the building footprints without any object attached
-        gdf = gdf.loc[~gdf[exposure_columns.object_id].isna()]
-        gdf[exposure_columns.object_id] = gdf[exposure_columns.object_id].astype(int) # ensure that object ids are interpreted correctly as integers
+        gdf = gdf.loc[~gdf[exposure_columns["object_id"]].isna()]
+        gdf[exposure_columns["object_id"]] = gdf[exposure_columns["object_id"]].astype(int) # ensure that object ids are interpreted correctly as integers
 
         # Get column names per type
         columns = self._get_column_names(gdf, exposure_columns)
@@ -180,18 +180,18 @@ class Footprints:
         bffid_object_mapping = {}
         bffid_objectid_mapping = {}
         for bffid in multiple_bffid:
-            all_objects = gdf.loc[gdf[field_name] == bffid, exposure_columns.primary_object_type].to_numpy()
-            all_object_ids = gdf.loc[gdf[field_name] == bffid, exposure_columns.object_id].to_numpy()
+            all_objects = gdf.loc[gdf[field_name] == bffid, exposure_columns["primary_object_type"]].to_numpy()
+            all_object_ids = gdf.loc[gdf[field_name] == bffid, exposure_columns["object_id"]].to_numpy()
             bffid_object_mapping.update(
                 {bffid: "_".join(mode(all_objects))}
             )
             bffid_objectid_mapping.update(
                 {bffid: "_".join([str(x) for x in all_object_ids])}
             )
-        gdf.loc[gdf[field_name].isin(multiple_bffid), exposure_columns.primary_object_type] = gdf[field_name].map(
+        gdf.loc[gdf[field_name].isin(multiple_bffid), exposure_columns["primary_object_type"]] = gdf[field_name].map(
             bffid_object_mapping
         )
-        gdf.loc[gdf[field_name].isin(multiple_bffid), exposure_columns.object_id] = gdf[field_name].map(
+        gdf.loc[gdf[field_name].isin(multiple_bffid), exposure_columns["object_id"]] = gdf[field_name].map(
             bffid_objectid_mapping
         )
 
@@ -268,29 +268,29 @@ class Footprints:
         """
         gdf = self.aggregated_results
         # Calculate normalized damages per type
-        value_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns.max_potential_damage)].tolist()
+        value_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns["max_potential_damage"])].tolist()
         
         # Only for event type calculate % damage per type
         if self.run_type == "event":
-            dmg_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns.damage)].tolist()
+            dmg_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns["damage"])].tolist()
             # Do per type
             for dmg_col in dmg_cols:
                 new_name = dmg_col + " %"
-                name = dmg_col.split(exposure_columns.damage)[1]
-                gdf[new_name] = gdf[dmg_col] / gdf[exposure_columns.max_potential_damage + name] * 100
+                name = dmg_col.split(exposure_columns["damage"])[1]
+                gdf[new_name] = gdf[dmg_col] / gdf[exposure_columns["max_potential_damage"] + name] * 100
                 gdf[new_name] = gdf[new_name].round(2)
             
             # Do total
-            gdf["Total Damage %"] = gdf[exposure_columns.total_damage] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Total Damage %"] = gdf[exposure_columns["total_damage"]] / gdf.loc[:, value_cols].sum(axis=1) * 100
             gdf["Total Damage %"] = gdf["Total Damage %"].round(2).fillna(0)
             
         elif self.run_type == "risk":
-            tot_dmg_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns.total_damage)].tolist()
+            tot_dmg_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns["total_damage"])].tolist()
             for tot_dmg_col in tot_dmg_cols:
                 new_name = tot_dmg_col + " %"
                 gdf[new_name] = gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
                 gdf[new_name] = gdf[new_name].round(2)
-            gdf["Risk (EAD) %"] = gdf[exposure_columns.risk_ead] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Risk (EAD) %"] = gdf[exposure_columns["risk_ead"]] / gdf.loc[:, value_cols].sum(axis=1) * 100
             gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2).fillna(0)
         
         self.aggregated_results = gdf
@@ -323,34 +323,32 @@ class Footprints:
         """
         
         # Get string columns that will be aggregated
-        string_columns = [exposure_columns.primary_object_type] + [
-            col for col in gdf.columns if exposure_columns.aggregation_label in col
-        ]
+        string_columns = [exposure_columns["primary_object_type"]] + [
+            col for col in gdf.columns if [key for key in exposure_columns if key.startswith("aggregation_label")]]
 
         # Get type of run and columns
-        if exposure_columns.total_damage in gdf.columns:
+        if exposure_columns["total_damage"] in gdf.columns:
             self.run_type = "event"
             # If event save inundation depth
-            depth_columns = [col for col in gdf.columns if exposure_columns.inundation_depth in col]
+            depth_columns = [col for col in gdf.columns if exposure_columns["inundation_depth"] in col]
             # And all type of damages
             damage_columns = [
                 col
                 for col in gdf.columns
-                if exposure_columns.damage in col and exposure_columns.max_potential_damage not in col
-            ]
-            damage_columns.append(exposure_columns.total_damage)
-        elif exposure_columns.risk_ead in gdf.columns:
+                if exposure_columns["damage"] in col and not [key for key in exposure_columns if key.startswith("max_damage")]]
+            damage_columns.append(exposure_columns["total_damage"])
+        elif exposure_columns["risk_ead"] in gdf.columns:
             self.run_type = "risk"
             depth_columns = []
             # For risk only save total damage per return period and EAD
-            damage_columns = [col for col in gdf.columns if exposure_columns.total_damage in col]
-            damage_columns.append(exposure_columns.risk_ead)
+            damage_columns = [col for col in gdf.columns if exposure_columns["total_damage"] in col]
+            damage_columns.append(exposure_columns["risk_ead"])
         else:
             raise ValueError(
-                f"The is no {exposure_columns.total_damage} or {exposure_columns.risk_ead} column in the results."
+                f"The is no {exposure_columns['total_damage']} or {exposure_columns['risk_ead']} column in the results."
             )
         # add the max potential damages
-        pot_damage_columns = [col for col in gdf.columns if exposure_columns.max_potential_damage in col]
+        pot_damage_columns = [col for col in gdf.columns if exposure_columns["max_potential_damage"] in col]
         damage_columns = pot_damage_columns + damage_columns
         
         # create mapping dictionary
