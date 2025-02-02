@@ -269,16 +269,22 @@ class Footprints:
         """
         gdf = self.aggregated_results
         # Calculate normalized damages per type
-        value_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns["max_potential_damage"])].tolist()
+        value_cols =[
+                col for col in gdf.columns 
+                if any(value == col for key, value in exposure_columns.items() if key.startswith("max_pot_damage_"))
+            ]
         
         # Only for event type calculate % damage per type
         if self.run_type == "event":
-            dmg_cols = gdf.columns[gdf.columns.str.startswith(exposure_columns["damage"])].tolist()
+            dmg_cols = [
+                col for col in gdf.columns 
+                if any(value == col for key, value in exposure_columns.items() if key.startswith("damage_"))
+            ]
             # Do per type
             for dmg_col in dmg_cols:
                 new_name = dmg_col + " %"
-                name = dmg_col.split(exposure_columns["damage"])[1]
-                gdf[new_name] = gdf[dmg_col] / gdf[exposure_columns["max_potential_damage"] + name] * 100
+                max_damage_key = [key for key,value in exposure_columns.items() if value == dmg_col][0]
+                gdf[new_name] = gdf[dmg_col] / gdf[exposure_columns[max_damage_key]] * 100
                 gdf[new_name] = gdf[new_name].round(2)
             
             # Do total
@@ -349,8 +355,9 @@ class Footprints:
                 f"The is no {exposure_columns['total_damage']} or {exposure_columns['risk_ead']} column in the results."
             )
         # add the max potential damages
-        pot_damage_columns = [col for col in gdf.columns 
-                              if [value for key, value in exposure_columns.items() if value in col and "max_damage" in key]]
+        pot_damage_columns = [
+                col for col in gdf.columns 
+                if any(value == col for key, value in exposure_columns.items() if key.startswith("max_pot_damage"))]
         damage_columns = pot_damage_columns + damage_columns
         
         # create mapping dictionary
