@@ -222,9 +222,8 @@ class Footprints:
         # Drop duplicates
         gdf = gdf.drop_duplicates(subset=[field_name])
         gdf = gdf.reset_index(drop=True)
-        exposure_keys = ["object_id", "geometry"] + agg_cols
-        exposure_values = [exposure_columns[key] for key in exposure_keys if key in exposure_columns]
-        gdf = gdf[exposure_values]
+        exposure = [exposure_columns["object_id"], "geometry"] + agg_cols
+        gdf = gdf[exposure]
 
         for col in columns["string"]:
             for ind, val in enumerate(gdf[col]):
@@ -237,12 +236,12 @@ class Footprints:
         # If point object don't have a footprint reference assume a shape
         if not drop_no_footprints and "geometry" in objects.columns:
             no_footprint_objects = self._no_footprint_points_to_polygons(objects, no_footprints_shape, no_footprints_diameter)
-            no_footprint_objects = no_footprint_objects[["Object ID", "geometry"] + agg_cols].to_crs(gdf.crs)
+            no_footprint_objects = no_footprint_objects[[exposure_columns["object_id"], "geometry"] + agg_cols].to_crs(gdf.crs)
             extra_footprints.append(no_footprint_objects)
         
         # Add objects which are already described by a polygon
         if "geometry" in objects.columns:
-            footprint_objects = self._find_footprint_objects(objects)[["Object ID", "geometry"] + agg_cols].to_crs(gdf.crs)
+            footprint_objects = self._find_footprint_objects(objects)[[exposure_columns["object_id"], "geometry"] + agg_cols].to_crs(gdf.crs)
             extra_footprints.append(footprint_objects)
         
         # Combine
