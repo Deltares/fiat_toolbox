@@ -326,7 +326,7 @@ class Footprints:
         
         # Get string columns that will be aggregated
         string_columns = [exposure_columns["primary_object_type"]] +  [
-            col for col in gdf.columns if [value for key, value in exposure_columns if value in col]] #NOTE Need to get the value of the key to see whether value is in column
+            col for col in gdf.columns if [value for key, value in exposure_columns.items() if value in col and "aggr_label_default" in key]]
 
         # Get type of run and columns
         if exposure_columns["total_damage"] in gdf.columns:
@@ -336,9 +336,7 @@ class Footprints:
             # And all type of damages
             damage_columns = [
                 col for col in gdf.columns 
-                if [key for key in exposure_columns if "damage_" in col]
-                and not [key for key in exposure_columns if "max_damage" in col]
-                and not col.startswith("fn_")
+                if any(value == col for key, value in exposure_columns.items() if key.startswith("damage_"))
             ]
             damage_columns.append(exposure_columns["total_damage"])
         elif exposure_columns["risk_ead"] in gdf.columns:
@@ -352,7 +350,8 @@ class Footprints:
                 f"The is no {exposure_columns['total_damage']} or {exposure_columns['risk_ead']} column in the results."
             )
         # add the max potential damages
-        pot_damage_columns = [col for col in gdf.columns if [key for key in exposure_columns if "max_damage_" in col]]
+        pot_damage_columns = [col for col in gdf.columns 
+                              if [value for key, value in exposure_columns.items() if value in col and "max_damage" in key]]
         damage_columns = pot_damage_columns + damage_columns
         
         # create mapping dictionary
