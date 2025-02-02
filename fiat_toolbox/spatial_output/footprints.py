@@ -283,7 +283,8 @@ class Footprints:
             # Do per type
             for dmg_col in dmg_cols:
                 new_name = dmg_col + " %"
-                max_damage_key = [key for key,value in exposure_columns.items() if value == dmg_col][0]
+                max_damage_col = [key for key,value in exposure_columns.items() if dmg_col in value]
+                max_damage_key = [key for key in max_damage_col if "max_pot" in key][0]
                 gdf[new_name] = gdf[dmg_col] / gdf[exposure_columns[max_damage_key]] * 100
                 gdf[new_name] = gdf[new_name].round(2)
             
