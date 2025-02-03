@@ -10,7 +10,7 @@ class ExceedanceProbabilityCalculator:
         self.logger = logger
 
     def append_probability(
-        self, df: pd.DataFrame, threshold: float, T: float
+        self, df: pd.DataFrame, threshold: float, T: float, inun_depth: str
     ) -> pd.DataFrame:
         """Append exceedance probability to dataframe.
 
@@ -33,11 +33,11 @@ class ExceedanceProbabilityCalculator:
         result = df.copy()
 
         # Calculate exceedance probability
-        result["Exceedance Probability"] = self.calculate(df, threshold, T)
+        result["Exceedance Probability"] = self.calculate(df, threshold, T, inun_depth)
 
         return result
 
-    def calculate(self, df: pd.DataFrame, threshold: float, T: float) -> pd.DataFrame:
+    def calculate(self, df: pd.DataFrame, threshold: float, T: float, inun_depth: str) -> pd.DataFrame:
         """Calculate exceedance probability.
 
         Parameters
@@ -56,7 +56,7 @@ class ExceedanceProbabilityCalculator:
         """
 
         # Extract return periods from column names
-        if "inun_depth" in self.column_prefix: #NOTE support DELFT FIAT v.2
+        if inun_depth in self.column_prefix: 
             return_periods = [
             int(col.split("_")[2][:-3])
             for col in df.columns
