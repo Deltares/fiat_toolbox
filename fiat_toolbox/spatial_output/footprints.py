@@ -297,7 +297,7 @@ class Footprints:
                 new_name = tot_dmg_col + " %"
                 gdf[new_name] = gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
                 gdf[new_name] = gdf[new_name].round(2)
-            gdf["Risk (EAD) %"] = gdf[exposure_columns["risk_ead"]] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Risk (EAD) %"] = gdf[exposure_columns["ead_damage"]] / gdf.loc[:, value_cols].sum(axis=1) * 100
             gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2).fillna(0)
         
         self.aggregated_results = gdf
@@ -326,7 +326,7 @@ class Footprints:
             - 'depth': Columns related to inundation depth (only if total damage is present).
             - 'damage': Columns related to damage, including potential damage and total damage.
         Raises:
-        ValueError: If neither 'total_damage' nor 'risk_ead' columns are present in the GeoDataFrame.
+        ValueError: If neither 'total_damage' nor 'ead_damage' columns are present in the GeoDataFrame.
         """
         
         # Get string columns that will be aggregated
@@ -344,15 +344,15 @@ class Footprints:
                 if any(value == col for key, value in exposure_columns.items() if key.startswith("damage_"))
             ]
             damage_columns.append(exposure_columns["total_damage"])
-        elif exposure_columns["risk_ead"] in gdf.columns:
+        elif exposure_columns["ead_damage"] in gdf.columns:
             self.run_type = "risk"
             depth_columns = []
             # For risk only save total damage per return period and EAD
             damage_columns = [col for col in gdf.columns if exposure_columns["total_damage"] in col]
-            damage_columns.append(exposure_columns["risk_ead"])
+            damage_columns.append(exposure_columns["ead_damage"])
         else:
             raise ValueError(
-                f"The is no {exposure_columns['total_damage']} or {exposure_columns['risk_ead']} column in the results."
+                f"The is no {exposure_columns['total_damage']} or {exposure_columns['ead_damage']} column in the results."
             )
         # add the max potential damages
         pot_damage_columns = [
