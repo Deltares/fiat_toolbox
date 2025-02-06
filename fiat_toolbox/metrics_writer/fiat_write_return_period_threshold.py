@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+import re
 
 
 class ExceedanceProbabilityCalculator:
@@ -56,18 +57,10 @@ class ExceedanceProbabilityCalculator:
         """
 
         # Extract return periods from column names
-        if "inun_depth" in self.column_prefix:
-            return_periods = [
-            int(col.split("_")[2][:-3])
-            for col in df.columns
+        return_periods = [re.findall(r'\d+', col) for col in df.columns
             if col.startswith(self.column_prefix)
         ]
-        else:
-            return_periods = [
-                int(col.split("(")[1][:-2])
-                for col in df.columns
-                if col.startswith(self.column_prefix)
-            ]
+        return_periods = [int(rp[0]) if len(rp) > 1 else int(rp) for rp in return_periods]
 
         # Calculate exceedance probability
         return self._calculate(df, return_periods, threshold, T).to_frame()
