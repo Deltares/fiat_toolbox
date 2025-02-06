@@ -30,7 +30,7 @@ class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
     logger: logging.Logger = logging.getLogger(__name__)
     
-    def __init__(self, config_file: Union[str, Path], aggregation_label: str = "aggregation_label:", logger: logging.Logger = logging.getLogger(__name__)):
+    def __init__(self, config_file: Union[str, Path], aggregation_prefix: str = "aggregation_label:", logger: logging.Logger = logging.getLogger(__name__)):
         """
         Initialize the class.
 
@@ -49,7 +49,7 @@ class MetricsFileWriter(IMetricsFileWriter):
 
         self.config_file = config_file
         self.logger = logger
-        self.aggregation_label = aggregation_label
+        self.aggregation_prefix = aggregation_prefix
 
     def _read_metrics_file(
         self, include_aggregates: bool
@@ -118,7 +118,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         description=metric["description"],
                         select=metric["select"],
                         filter=metric["filter"],
-                        groupby=f"`{self.aggregation_label}{aggregate}`",
+                        groupby=f"`{self.aggregation_prefix}{aggregate}`",
                     )
 
                     # Check whether the metric name is already in the dictionary
@@ -539,7 +539,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                     new_path,
                     write_aggregate=key,
                     overwrite=overwrite,
-                    aggregations=df_results[f"{self.aggregation_label}{key}"].unique(),
+                    aggregations=df_results[f"{self.aggregation_prefix}{key}"].unique(),
                 )
         else:
             # Write the metrics to a file
