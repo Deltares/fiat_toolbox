@@ -124,7 +124,7 @@ jobs:
           conda run -n publish python -s -m build
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
