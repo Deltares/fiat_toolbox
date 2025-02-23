@@ -4,7 +4,12 @@ from packaging import version
 from pydantic import BaseModel
 
 class FiatColumns(BaseModel):
-    """Object with mapping of FIAT attributes to columns names."""
+    """
+    Model defining the FIAT column types and their naming format.
+    All attributes are strings that can be:
+    - static: with a standard name, e.g. 'object_id'
+    - dynamic: with wildcard parts, e.g. 'max_damage_{name}' or 'damage_{name}_{years}y'
+    """
     object_id: str
     object_name: str
     primary_object_type: str
@@ -16,8 +21,11 @@ class FiatColumns(BaseModel):
     max_potential_damage: str 
     aggregation_label: str 
     inundation_depth: str 
+    inundation_depth_rp: str 
     damage: str 
+    damage_rp: str 
     total_damage: str 
+    total_damage_rp: str 
     risk_ead: str
     segment_length: str # TODO should this be here since it is not a FIAT attribute?
 
@@ -45,12 +53,15 @@ def get_fiat_columns(fiat_version:str="0.2"):
         extraction_method = "extract_method",
         ground_floor_height = "ground_flht",
         ground_elevation = "ground_elevtn",
-        damage_function = "fn_damage_",
-        max_potential_damage = "max_damage_",
-        aggregation_label = "aggregation_label:",
+        damage_function = "fn_damage_{name}",
+        max_potential_damage = "max_damage_{name}",
+        aggregation_label = "aggregation_label:{name}",
         inundation_depth = "inun_depth",
-        damage = "damage_",
+        inundation_depth_rp = "inun_depth_{years}y",
+        damage = "damage_{name}",
+        damage_rp = "damage_{name}_{years}y",
         total_damage = "total_damage",
+        total_damage_rp = "total_damage_{years}y",
         risk_ead = "ead_damage",
         segment_length = "segment_length")
     # Columns for version 0.1.0rc2
@@ -61,14 +72,17 @@ def get_fiat_columns(fiat_version:str="0.2"):
         primary_object_type = "Primary Object Type",
         secondary_object_type = "Secondary Object Type",
         extraction_method = "Extraction Method",
-        ground_floor_height = "Ground Flood Height",
+        ground_floor_height = "Ground Floor Height",
         ground_elevation = "Ground Elevation",
-        damage_function = "Damage Function: ",
-        max_potential_damage = "Max Potential Damage: ",
-        aggregation_label = "Aggregation Label: ",
+        damage_function = "Damage Function: {name}",
+        max_potential_damage = "Max Potential Damage: {name}",
+        aggregation_label = "Aggregation Label: {name}",
         inundation_depth = "Inundation Depth",
-        damage = "Damage: ",
+        inundation_depth_rp = "Inundation Depth ({years}Y)",
+        damage = "Damage: {name}",
+        damage_rp = "Damage: {name} ({years}Y)",
         total_damage = "Total Damage",
+        total_damage_rp = "Total Damage ({years}Y)",
         risk_ead = "Risk (EAD)",
         segment_length = "Segment Length")
     else:
