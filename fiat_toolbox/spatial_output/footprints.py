@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import shapely.geometry as geom
 import math
-from fiat_toolbox import FiatColumns
+from fiat_toolbox import FiatColumns, get_fiat_columns
 
 def generate_polygon(point, shape_type, diameter):
     """
@@ -95,7 +95,8 @@ class Footprints:
     def __init__(self, 
                  footprints: gpd.GeoDataFrame,
                  field_name: Optional[str] = "BF_FID",
-                 fiat_version: Optional[str] = "0.2"
+                 fiat_columns: Optional[FiatColumns] = None,
+                 fiat_version: Optional[str] = "0.2",
                  ):
         """
         Initialize the Footprints object.
@@ -124,7 +125,10 @@ class Footprints:
         footprints = footprints.set_index(field_name)
         self.footprints = footprints
         self.field_name = field_name
-        self.fiat_columns = FiatColumns(fiat_version=fiat_version)
+        if fiat_columns is None:
+            self.fiat_columns = get_fiat_columns(fiat_version=fiat_version)
+        else:
+            self.fiat_columns = fiat_columns
         
     def aggregate(self, 
                   objects: Union[gpd.GeoDataFrame, pd.DataFrame], 
@@ -293,7 +297,7 @@ class Footprints:
                 new_name = tot_dmg_col + " %"
                 gdf[new_name] = gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
                 gdf[new_name] = gdf[new_name].round(2)
-            gdf["Risk (EAD) %"] = gdf[self.fiat_columns.ead_damage] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Risk (EAD) %"] = gdf[self.fiat_columns.risk_ead] / gdf.loc[:, value_cols].sum(axis=1) * 100
             gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2).fillna(0)
         
         self.aggregated_results = gdf
@@ -337,18 +341,18 @@ class Footprints:
             damage_columns = [
                 col
                 for col in gdf.columns
-                if self.fiat_columns.damage in col and self.fiat_columns.max_potential_damage not in col and self.fiat_columns.fn_damage not in col
+                if self.fiat_columns.damage in col and self.fiat_columns.max_potential_damage not in col and self.fiat_columns.damage_function not in col
             ]
             damage_columns.append(self.fiat_columns.total_damage)
-        elif self.fiat_columns.ead_damage in gdf.columns:
+        elif self.fiat_columns.risk_ead in gdf.columns:
             self.run_type = "risk"
             depth_columns = []
             # For risk only save total damage per return period and EAD
             damage_columns = [col for col in gdf.columns if self.fiat_columns.total_damage in col]
-            damage_columns.append(self.fiat_columns.ead_damage)
+            damage_columns.append(self.fiat_columns.risk_ead)
         else:
             raise ValueError(
-                f"The is no {self.fiat_columns.total_damage} or {self.fiat_columns.ead_damage} column in the results."
+                f"The is no {self.fiat_columns.total_damage} or {self.fiat_columns.risk_ead} column in the results."
             )
         # add the max potential damages
         pot_damage_columns = [col for col in gdf.columns if self.fiat_columns.max_potential_damage in col]
