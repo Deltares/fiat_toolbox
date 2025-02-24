@@ -89,4 +89,3 @@ def get_fiat_columns(fiat_version:str="0.2"):
         raise ValueError(f"Unsupported version: {fiat_version}")
     
     return fiat_columns
- 
