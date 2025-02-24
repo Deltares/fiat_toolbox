@@ -100,18 +100,20 @@ class Footprints:
                  ):
         """
         Initialize the Footprints object.
-
-        Parameters
-        ----------
+        Parameters:
+        -----------
         footprints : gpd.GeoDataFrame
-            A GeoDataFrame containing the spatial footprints.
+            A GeoDataFrame containing the footprint geometries.
         field_name : Optional[str], default "BF_FID"
-            The name of the field to be used as the index. Must be present in the columns of the GeoDataFrame and contain unique values.
-
-        Raises
-        ------
+            The name of the field to be used as the index. Must be present in the footprints columns.
+        fiat_columns : Optional[FiatColumns], default None
+            An object containing the column naming format. If None, the default format for the specified fiat_version will be used.
+        fiat_version : Optional[str], default "0.2"
+            The version of the FIAT format to use for column naming.
+        Raises:
+        -------
         AttributeError
-            If the specified field_name is not in the columns of the GeoDataFrame.
+            If the specified field_name is not present in the footprints columns.
         ValueError
             If the values in the specified field_name are not unique.
         """
@@ -125,6 +127,7 @@ class Footprints:
         footprints = footprints.set_index(field_name)
         self.footprints = footprints
         self.field_name = field_name
+        # Get column naming format
         if fiat_columns is None:
             self.fiat_columns = get_fiat_columns(fiat_version=fiat_version)
         else:
