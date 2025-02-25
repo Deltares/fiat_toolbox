@@ -39,7 +39,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ]
@@ -68,7 +68,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
-                filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                 groupby="",
             ),
         }
@@ -100,7 +100,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ]
@@ -129,7 +129,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
-                filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                 groupby="",
             ),
         }
@@ -162,7 +162,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ],
@@ -184,7 +184,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
-                    groupby="`Aggregation Label: Subbasin`",
+                    groupby="`aggregation_label:Subbasin`",
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
@@ -192,8 +192,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
-                    filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
-                    groupby="`Aggregation Label: Subbasin`",
+                    filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
+                    groupby="`aggregation_label:Subbasin`",
                 ),
             },
             "Tax Use": {
@@ -204,7 +204,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
-                    groupby="`Aggregation Label: Tax Use`",
+                    groupby="`aggregation_label:Tax Use`",
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
@@ -212,8 +212,8 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
-                    filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
-                    groupby="`Aggregation Label: Tax Use`",
+                    filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
+                    groupby="`aggregation_label:Tax Use`",
                 ),
             },
         }
@@ -312,7 +312,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     "description": "Total of the damage event for only single families",
                     "show_in_metrics_table": True,
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ]
@@ -382,7 +382,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     "description": "Total of the damage event for only single families",
                     "show_in_metrics_table": True,
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ],
@@ -450,7 +450,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                 {
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ],
@@ -499,7 +499,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ],
@@ -548,7 +548,7 @@ class TestReadMetricsConfigFile(unittest.TestCase):
                     "show_in_metrics_table": True,
                     "description": "Total of the damage event for only single families",
                     "select": "SUM(`Total Damage Event`)",
-                    "filter": "`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                    "filter": "`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                     "groupby": "",
                 },
             ],
@@ -631,7 +631,7 @@ class TestCreateSingleMetric(unittest.TestCase):
         df_results = pd.DataFrame(
             {
                 "Object ID": [1, 2, 3, 4, 5],
-                "Aggregation Label: Tax Use": [
+                "aggregation_label:Tax Use": [
                     "SINGLE FAMILY",
                     "SINGLE FAMILY",
                     "VACANT RESIDENTIAL",
@@ -648,7 +648,7 @@ class TestCreateSingleMetric(unittest.TestCase):
             description="Total of the damage event",
             select="SUM(`Total Damage Event`)",
             filter="",
-            groupby="`Aggregation Label: Tax Use`",
+            groupby="`aggregation_label:Tax Use`",
         )
 
         # Act
@@ -740,7 +740,7 @@ class TestCreateMetricsDict(unittest.TestCase):
         df_results = pd.DataFrame(
             {
                 "Object ID": [1, 2, 3, 4, 5],
-                "Aggregation Label: Tax Use": [
+                "aggregation_label:Tax Use": [
                     "SINGLE FAMILY",
                     "SINGLE FAMILY",
                     "VACANT RESIDENTIAL",
@@ -768,7 +768,7 @@ class TestCreateMetricsDict(unittest.TestCase):
                 description="Aggregate of the damage event",
                 select="SUM(`Total Damage Event`)",
                 filter="",
-                groupby="`Aggregation Label: Tax Use`",
+                groupby="`aggregation_label:Tax Use`",
             ),
         }
 
@@ -818,21 +818,21 @@ class TestParseMetrics(unittest.TestCase):
                 show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
-                filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                 groupby="",
             ),
         }
         df_results = pd.DataFrame(
             {
                 "Object ID": [1, 2, 3, 4, 5],
-                "Aggregation Label: Tax Use": [
+                "aggregation_label:Tax Use": [
                     "SINGLE FAMILY",
                     "SINGLE FAMILY",
                     "VACANT RESIDENTIAL",
                     "VACANT COMMERCIAL",
                     "VACANT COMMERCIAL",
                 ],
-                "Aggregation Label: Subbasin": [
+                "aggregation_label:Subbasin": [
                     "OAKFOREST",
                     "OAKFOREST",
                     "OAKFOREST",
@@ -871,7 +871,7 @@ class TestParseMetrics(unittest.TestCase):
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
-                    groupby="`Aggregation Label: Subbasin`",
+                    groupby="`aggregation_label:Subbasin`",
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
@@ -879,8 +879,8 @@ class TestParseMetrics(unittest.TestCase):
                     show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
-                    filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
-                    groupby="`Aggregation Label: Subbasin`",
+                    filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
+                    groupby="`aggregation_label:Subbasin`",
                 ),
             },
             "Tax Use": {
@@ -891,7 +891,7 @@ class TestParseMetrics(unittest.TestCase):
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
-                    groupby="`Aggregation Label: Tax Use`",
+                    groupby="`aggregation_label:Tax Use`",
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
@@ -899,22 +899,22 @@ class TestParseMetrics(unittest.TestCase):
                     show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
-                    filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
-                    groupby="`Aggregation Label: Tax Use`",
+                    filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
+                    groupby="`aggregation_label:Tax Use`",
                 ),
             },
         }
         df_results = pd.DataFrame(
             {
                 "Object ID": [1, 2, 3, 4, 5],
-                "Aggregation Label: Tax Use": [
+                "aggregation_label:Tax Use": [
                     "SINGLE FAMILY",
                     "SINGLE FAMILY",
                     "VACANT RESIDENTIAL",
                     "VACANT COMMERCIAL",
                     "VACANT COMMERCIAL",
                 ],
-                "Aggregation Label: Subbasin": [
+                "aggregation_label:Subbasin": [
                     "OAKFOREST",
                     "OAKFOREST",
                     "OAKFOREST",
@@ -971,7 +971,7 @@ class TestMetricsFileWriter(unittest.TestCase):
                 show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
-                filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                 groupby="",
             ),
         }
@@ -1023,7 +1023,7 @@ class TestMetricsFileWriter(unittest.TestCase):
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
-                    groupby="`Aggregation Label: Subbasin`",
+                    groupby="`aggregation_label:Subbasin`",
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
@@ -1031,8 +1031,8 @@ class TestMetricsFileWriter(unittest.TestCase):
                     show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
-                    filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
-                    groupby="`Aggregation Label: Subbasin`",
+                    filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
+                    groupby="`aggregation_label:Subbasin`",
                 ),
             },
             "Tax Use": {
@@ -1043,7 +1043,7 @@ class TestMetricsFileWriter(unittest.TestCase):
                     description="Total of the damage event",
                     select="SUM(`Total Damage Event`)",
                     filter="`Object ID` > 2",
-                    groupby="`Aggregation Label: Tax Use`",
+                    groupby="`aggregation_label:Tax Use`",
                 ),
                 "Single Family Damage Sum": sql_struct(
                     name="Single Family Damage Sum",
@@ -1051,8 +1051,8 @@ class TestMetricsFileWriter(unittest.TestCase):
                     show_in_metrics_table=True,
                     description="Total of the damage event for only single families",
                     select="SUM(`Total Damage Event`)",
-                    filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
-                    groupby="`Aggregation Label: Tax Use`",
+                    filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
+                    groupby="`aggregation_label:Tax Use`",
                 ),
             },
         }
@@ -1113,7 +1113,7 @@ class TestMetricsFileWriter(unittest.TestCase):
                 show_in_metrics_table=True,
                 description="Total of the damage event for only single families",
                 select="SUM(`Total Damage Event`)",
-                filter="`Aggregation Label: Tax Use` == 'SINGLE FAMILY'",
+                filter="`aggregation_label:Tax Use` == 'SINGLE FAMILY'",
                 groupby="",
             ),
         }
