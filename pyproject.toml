@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fiat_toolbox"
-description = "A software package support ystem which can be used to assess the benefits and costs of flood resilience measures"
+description = "A collection of modules for post-processing Delft-FIAT output."
 readme = "README.md"
 authors = [
     { name = "Frederique de Groen", email = "Frederique.deGroen@deltares.nl" },
@@ -28,6 +28,7 @@ dependencies = [
     "geopandas",
     "duckdb",
     "validators",
+    "pydantic"
 ]
 dynamic = ["version"]
 

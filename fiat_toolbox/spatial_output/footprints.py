@@ -10,20 +10,7 @@ import numpy as np
 import pandas as pd
 import shapely.geometry as geom
 import math
-
-class Fiat:
-    """
-    Object with mapping of FIAT attributes to columns names
-    """
-    object_id = "Object ID"
-    primary_object_type = "Primary Object Type"
-    max_potential_damage = "Max Potential Damage: "
-    aggregation_label = "Aggregation Label: "
-    inundation_depth = "Inundation Depth"
-    damage = "Damage: "
-    total_damage = "Total Damage"
-    risk_ead = "Risk (EAD)"
-
+from fiat_toolbox import FiatColumns, get_fiat_columns
 
 def generate_polygon(point, shape_type, diameter):
     """
@@ -107,22 +94,26 @@ class Footprints:
 
     def __init__(self, 
                  footprints: gpd.GeoDataFrame,
-                 field_name: Optional[str] = "BF_FID"
+                 field_name: Optional[str] = "BF_FID",
+                 fiat_columns: Optional[FiatColumns] = None,
+                 fiat_version: Optional[str] = "0.2",
                  ):
         """
         Initialize the Footprints object.
-
-        Parameters
-        ----------
+        Parameters:
+        -----------
         footprints : gpd.GeoDataFrame
-            A GeoDataFrame containing the spatial footprints.
+            A GeoDataFrame containing the footprint geometries.
         field_name : Optional[str], default "BF_FID"
-            The name of the field to be used as the index. Must be present in the columns of the GeoDataFrame and contain unique values.
-
-        Raises
-        ------
+            The name of the field to be used as the index. Must be present in the footprints columns.
+        fiat_columns : Optional[FiatColumns], default None
+            An object containing the column naming format. If None, the default format for the specified fiat_version will be used.
+        fiat_version : Optional[str], default "0.2"
+            The version of the FIAT format to use for column naming.
+        Raises:
+        -------
         AttributeError
-            If the specified field_name is not in the columns of the GeoDataFrame.
+            If the specified field_name is not present in the footprints columns.
         ValueError
             If the values in the specified field_name are not unique.
         """
@@ -136,6 +127,11 @@ class Footprints:
         footprints = footprints.set_index(field_name)
         self.footprints = footprints
         self.field_name = field_name
+        # Get column naming format
+        if fiat_columns is None:
+            self.fiat_columns = get_fiat_columns(fiat_version=fiat_version)
+        else:
+            self.fiat_columns = fiat_columns
         
     def aggregate(self, 
                   objects: Union[gpd.GeoDataFrame, pd.DataFrame], 
@@ -176,8 +172,8 @@ class Footprints:
         gdf = self.footprints.merge(objects.drop(columns="geometry", errors="ignore"), on=field_name, how="outer")
 
         # Remove the building footprints without any object attached
-        gdf = gdf.loc[~gdf[Fiat.object_id].isna()]
-        gdf[Fiat.object_id] = gdf[Fiat.object_id].astype(int) # ensure that object ids are interpreted correctly as integers
+        gdf = gdf.loc[~gdf[self.fiat_columns.object_id].isna()]
+        gdf[self.fiat_columns.object_id] = gdf[self.fiat_columns.object_id].astype(int) # ensure that object ids are interpreted correctly as integers
 
         # Get column names per type
         columns = self._get_column_names(gdf)
@@ -193,18 +189,18 @@ class Footprints:
         bffid_object_mapping = {}
         bffid_objectid_mapping = {}
         for bffid in multiple_bffid:
-            all_objects = gdf.loc[gdf[field_name] == bffid, Fiat.primary_object_type].to_numpy()
-            all_object_ids = gdf.loc[gdf[field_name] == bffid, Fiat.object_id].to_numpy()
+            all_objects = gdf.loc[gdf[field_name] == bffid, self.fiat_columns.primary_object_type].to_numpy()
+            all_object_ids = gdf.loc[gdf[field_name] == bffid, self.fiat_columns.object_id].to_numpy()
             bffid_object_mapping.update(
                 {bffid: "_".join(mode(all_objects))}
             )
             bffid_objectid_mapping.update(
                 {bffid: "_".join([str(x) for x in all_object_ids])}
             )
-        gdf.loc[gdf[field_name].isin(multiple_bffid), Fiat.primary_object_type] = gdf[field_name].map(
+        gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.primary_object_type] = gdf[field_name].map(
             bffid_object_mapping
         )
-        gdf.loc[gdf[field_name].isin(multiple_bffid), Fiat.object_id] = gdf[field_name].map(
+        gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.object_id] = gdf[field_name].map(
             bffid_objectid_mapping
         )
 
@@ -235,7 +231,8 @@ class Footprints:
         # Drop duplicates
         gdf = gdf.drop_duplicates(subset=[field_name])
         gdf = gdf.reset_index(drop=True)
-        gdf = gdf[[Fiat.object_id, "geometry"] + agg_cols]
+        exposure = [self.fiat_columns.object_id, "geometry"] + agg_cols
+        gdf = gdf[exposure]
 
         for col in columns["string"]:
             for ind, val in enumerate(gdf[col]):
@@ -248,12 +245,12 @@ class Footprints:
         # If point object don't have a footprint reference assume a shape
         if not drop_no_footprints and "geometry" in objects.columns:
             no_footprint_objects = self._no_footprint_points_to_polygons(objects, no_footprints_shape, no_footprints_diameter)
-            no_footprint_objects = no_footprint_objects[["Object ID", "geometry"] + agg_cols].to_crs(gdf.crs)
+            no_footprint_objects = no_footprint_objects[[self.fiat_columns.object_id, "geometry"] + agg_cols].to_crs(gdf.crs)
             extra_footprints.append(no_footprint_objects)
         
         # Add objects which are already described by a polygon
         if "geometry" in objects.columns:
-            footprint_objects = self._find_footprint_objects(objects)[["Object ID", "geometry"] + agg_cols].to_crs(gdf.crs)
+            footprint_objects = self._find_footprint_objects(objects)[[self.fiat_columns.object_id, "geometry"] + agg_cols].to_crs(gdf.crs)
             extra_footprints.append(footprint_objects)
         
         # Combine
@@ -281,29 +278,29 @@ class Footprints:
         """
         gdf = self.aggregated_results
         # Calculate normalized damages per type
-        value_cols = gdf.columns[gdf.columns.str.startswith(Fiat.max_potential_damage)].tolist()
+        value_cols = gdf.columns[gdf.columns.str.startswith(self.fiat_columns.max_potential_damage)].tolist()
         
         # Only for event type calculate % damage per type
         if self.run_type == "event":
-            dmg_cols = gdf.columns[gdf.columns.str.startswith(Fiat.damage)].tolist()
+            dmg_cols = gdf.columns[gdf.columns.str.startswith(self.fiat_columns.damage)].tolist()
             # Do per type
             for dmg_col in dmg_cols:
                 new_name = dmg_col + " %"
-                name = dmg_col.split(Fiat.damage)[1]
-                gdf[new_name] = gdf[dmg_col] / gdf[Fiat.max_potential_damage + name] * 100
+                name = dmg_col.split(self.fiat_columns.damage)[1]
+                gdf[new_name] = gdf[dmg_col] / gdf[self.fiat_columns.max_potential_damage + name] * 100
                 gdf[new_name] = gdf[new_name].round(2)
             
             # Do total
-            gdf["Total Damage %"] = gdf[Fiat.total_damage] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Total Damage %"] = gdf[self.fiat_columns.total_damage] / gdf.loc[:, value_cols].sum(axis=1) * 100
             gdf["Total Damage %"] = gdf["Total Damage %"].round(2).fillna(0)
             
         elif self.run_type == "risk":
-            tot_dmg_cols = gdf.columns[gdf.columns.str.startswith(Fiat.total_damage)].tolist()
+            tot_dmg_cols = gdf.columns[gdf.columns.str.startswith(self.fiat_columns.total_damage)].tolist()
             for tot_dmg_col in tot_dmg_cols:
                 new_name = tot_dmg_col + " %"
                 gdf[new_name] = gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
                 gdf[new_name] = gdf[new_name].round(2)
-            gdf["Risk (EAD) %"] = gdf[Fiat.risk_ead] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Risk (EAD) %"] = gdf[self.fiat_columns.risk_ead] / gdf.loc[:, value_cols].sum(axis=1) * 100
             gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2).fillna(0)
         
         self.aggregated_results = gdf
@@ -332,38 +329,36 @@ class Footprints:
             - 'depth': Columns related to inundation depth (only if total damage is present).
             - 'damage': Columns related to damage, including potential damage and total damage.
         Raises:
-        ValueError: If neither 'total_damage' nor 'risk_ead' columns are present in the GeoDataFrame.
+        ValueError: If neither 'total_damage' nor 'ead_damage' columns are present in the GeoDataFrame.
         """
         
         # Get string columns that will be aggregated
-        string_columns = [Fiat.primary_object_type] + [
-            col for col in gdf.columns if Fiat.aggregation_label in col
-        ]
+        string_columns = [self.fiat_columns.primary_object_type] +  [col for col in gdf.columns if self.fiat_columns.aggregation_label in col]
 
         # Get type of run and columns
-        if Fiat.total_damage in gdf.columns:
+        if self.fiat_columns.total_damage in gdf.columns:
             self.run_type = "event"
             # If event save inundation depth
-            depth_columns = [col for col in gdf.columns if Fiat.inundation_depth in col]
+            depth_columns = [col for col in gdf.columns if self.fiat_columns.inundation_depth in col]
             # And all type of damages
             damage_columns = [
                 col
                 for col in gdf.columns
-                if Fiat.damage in col and Fiat.max_potential_damage not in col
+                if self.fiat_columns.damage in col and self.fiat_columns.max_potential_damage not in col and self.fiat_columns.damage_function not in col
             ]
-            damage_columns.append(Fiat.total_damage)
-        elif Fiat.risk_ead in gdf.columns:
+            damage_columns.append(self.fiat_columns.total_damage)
+        elif self.fiat_columns.risk_ead in gdf.columns:
             self.run_type = "risk"
             depth_columns = []
             # For risk only save total damage per return period and EAD
-            damage_columns = [col for col in gdf.columns if Fiat.total_damage in col]
-            damage_columns.append(Fiat.risk_ead)
+            damage_columns = [col for col in gdf.columns if self.fiat_columns.total_damage in col]
+            damage_columns.append(self.fiat_columns.risk_ead)
         else:
             raise ValueError(
-                f"The is no {Fiat.total_damage} or {Fiat.risk_ead} column in the results."
+                f"The is no {self.fiat_columns.total_damage} or {self.fiat_columns.risk_ead} column in the results."
             )
         # add the max potential damages
-        pot_damage_columns = [col for col in gdf.columns if Fiat.max_potential_damage in col]
+        pot_damage_columns = [col for col in gdf.columns if self.fiat_columns.max_potential_damage in col]
         damage_columns = pot_damage_columns + damage_columns
         
         # create mapping dictionary
@@ -392,7 +387,7 @@ class Footprints:
                       and a geometry type of "Polygon").
         """
         buildings_with_footprint = objects[
-            (objects[self.field_name].isna()) & (objects.geometry.type == "Polygon")
+            (objects[self.field_name].isna()) & (objects.geometry.type.isin(["Polygon", "MultiPolygon"]))
         ]
         return buildings_with_footprint
     
