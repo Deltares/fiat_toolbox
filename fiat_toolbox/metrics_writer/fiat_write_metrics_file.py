@@ -3,7 +3,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Optional
 
 import duckdb
 import pandas as pd
@@ -11,7 +11,6 @@ import tomli
 
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
-
 
 # sql command struct
 @dataclass
@@ -30,7 +29,7 @@ class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
     logger: logging.Logger = logging.getLogger(__name__)
     
-    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__)):
+    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__), aggregation_prefix: str = "aggregation_label:"):
         """
         Initialize the class.
 
@@ -49,7 +48,8 @@ class MetricsFileWriter(IMetricsFileWriter):
 
         self.config_file = config_file
         self.logger = logger
-
+        self.aggregation_prefix = aggregation_prefix
+        
     def _read_metrics_file(
         self, include_aggregates: bool
     ) -> Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]:
@@ -117,7 +117,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         description=metric["description"],
                         select=metric["select"],
                         filter=metric["filter"],
-                        groupby="`Aggregation Label: " + aggregate + "`",
+                        groupby=f"`{self.aggregation_prefix}{aggregate}`",
                     )
 
                     # Check whether the metric name is already in the dictionary
@@ -538,7 +538,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                     new_path,
                     write_aggregate=key,
                     overwrite=overwrite,
-                    aggregations=df_results["Aggregation Label: " + key].unique(),
+                    aggregations=df_results[f"{self.aggregation_prefix}{key}"].unique(),
                 )
         else:
             # Write the metrics to a file
