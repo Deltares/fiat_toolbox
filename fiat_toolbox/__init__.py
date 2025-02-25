@@ -31,7 +31,7 @@ class FiatColumns(BaseModel):
     risk_ead: str
     segment_length: str # TODO should this be here since it is not a FIAT attribute?
 
-def get_fiat_columns(fiat_version:str="0.2"):
+def get_fiat_columns(fiat_version:str="0.2") -> FiatColumns:
     """
     Returns the column mappings for different versions of  FIAT.
     Parameters:
