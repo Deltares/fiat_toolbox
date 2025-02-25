@@ -1,4 +1,10 @@
+import os
 import re
+from pathlib import Path
+import shutil
+import toml
+import pandas as pd
+from fiat_toolbox import get_fiat_columns
 
 def _compile_pattern(pattern):
     """
@@ -52,3 +58,46 @@ def replace_pattern(string, pattern, replacement):
             replacement = replacement.replace(f'{{{placeholder}}}', match.group(placeholder))
         return replacement
     return string
+
+def convert_fiat(path_in:os.PathLike, path_out:os.PathLike, version_in:str="0.1.0rc2", version_out:str="0.2.1"):
+    """
+    Converts FIAT data from one version to another by copying the input directory to the output directory,
+    updating the settings file, and renaming columns in the exposure CSV file according to the specified versions.
+    Args:
+        path_in (os.PathLike): The input directory containing the FIAT data to be converted.
+        path_out (os.PathLike): The output directory where the converted FIAT data will be saved.
+        version_in (str, optional): The version of the input FIAT data. Defaults to "0.1.0rc2".
+        version_out (str, optional): The version of the output FIAT data. Defaults to "0.2.1".
+    Raises:
+        FileNotFoundError: If the settings file or exposure CSV file is not found in the input directory.
+        KeyError: If the expected keys are not found in the settings file.
+    """
+    path_in, path_out = Path(path_in), Path(path_out)
+    if path_out.exists():
+        shutil.rmtree(path_out)
+    shutil.copytree(path_in, path_out)
+    
+    settings_path = path_out.joinpath("settings.toml")
+    
+    with open(settings_path, 'r') as file:
+        settings = toml.load(file)
+    
+    exposure_csv_path = settings_path.parent.joinpath(settings["exposure"]["csv"]["file"])
+    exposure_csv = pd.read_csv(exposure_csv_path)
+    
+    format_in = get_fiat_columns(fiat_version=version_in)
+    format_out = get_fiat_columns(fiat_version=version_out)
+    
+    name_translation = {}
+    for col in exposure_csv.columns:  # iterate through output columns
+        for field in list(format_out.model_fields):  # check for each field
+            fiat_col = getattr(format_in , field)
+            if matches_pattern(col, fiat_col):
+                impact_col = getattr(format_out, field)
+                new_col = replace_pattern(col, fiat_col, impact_col)
+                name_translation[col] = new_col  # save mapping
+
+    # Rename exposure csv
+    exposure_csv = exposure_csv.rename(columns=name_translation)
+    exposure_csv.to_csv(exposure_csv_path, index=False)
+    
