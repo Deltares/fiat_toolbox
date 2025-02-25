@@ -22,6 +22,8 @@ class FiatColumns(BaseModel):
     aggregation_label: str 
     inundation_depth: str 
     inundation_depth_rp: str 
+    reduction_factor: str
+    reduction_factor_rp: str
     damage: str 
     damage_rp: str 
     total_damage: str 
@@ -58,6 +60,8 @@ def get_fiat_columns(fiat_version:str="0.2"):
         aggregation_label = "aggregation_label:{name}",
         inundation_depth = "inun_depth",
         inundation_depth_rp = "inun_depth_{years}y",
+        reduction_factor = "red_fact",
+        reduction_factor_rp = "red_fact_{years}y",
         damage = "damage_{name}",
         damage_rp = "damage_{name}_{years}y",
         total_damage = "total_damage",
@@ -79,6 +83,8 @@ def get_fiat_columns(fiat_version:str="0.2"):
         aggregation_label = "Aggregation Label: {name}",
         inundation_depth = "Inundation Depth",
         inundation_depth_rp = "Inundation Depth ({years}Y)",
+        reduction_factor = "Reduction Factor",
+        reduction_factor_rp = "Reduction Factor ({years}Y)",
         damage = "Damage: {name}",
         damage_rp = "Damage: {name} ({years}Y)",
         total_damage = "Total Damage",
