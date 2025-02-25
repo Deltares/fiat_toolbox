@@ -7,11 +7,10 @@ name = "fiat_toolbox"
 description = "A collection of modules for post-processing Delft-FIAT output."
 readme = "README.md"
 authors = [
-    { name = "Frederique de Groen", email = "Frederique.deGroen@deltares.nl" },
-    { name = "Daley Adrichem", email = "Daley.Adrichem@deltares.nl" },
-    { name = "Panos Athanasiou", email = "Panos.Athanasiou@deltares.nl" },
-    { name = "Sarwan Peiter", email = "Sarwan.Peiter@deltares.nl" },
-    {name = "Mario Fuentes Monjaraz", email = "mario.fuentesmonjaraz@deltares.nl"},
+    {name = "Panos Athanasiou", email = "Panos.Athanasiou@deltares.nl"},
+    {name = "Luuk Blom", email = "Luuk.Blom@deltares.nl"},
+    {name = "Sarah Rautenbach", email = "sarah.rautenbach@deltares.nl"},
+    {name = "Daley Adrichem", email = "Daley.Adrichem@deltares.nl"},
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
