@@ -11,6 +11,9 @@ import tomli
 
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
+from fiat_toolbox import get_fiat_columns
+
+_AGGR_LABEL_FMT = get_fiat_columns().aggregation_label
 
 # sql command struct
 @dataclass
@@ -29,7 +32,7 @@ class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
     logger: logging.Logger = logging.getLogger(__name__)
     
-    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__), aggregation_label_fmt: str = "aggregation_label:{name}"):
+    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__), aggregation_label_fmt: str = _AGGR_LABEL_FMT):
         """
         Initialize the class.
 
