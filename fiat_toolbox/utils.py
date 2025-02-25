@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import toml
 import pandas as pd
+import geopandas as gpd
 from fiat_toolbox import get_fiat_columns
 
 def _compile_pattern(pattern):
@@ -101,3 +102,13 @@ def convert_fiat(path_in:os.PathLike, path_out:os.PathLike, version_in:str="0.1.
     exposure_csv = exposure_csv.rename(columns=name_translation)
     exposure_csv.to_csv(exposure_csv_path, index=False)
     
+    
+    # Get geoms
+    keys = [key for key in settings["exposure"]["geom"] if "file" in key]
+    geoms_paths = [settings_path.parent.joinpath(settings["exposure"]["geom"][key]) for key in keys]
+    
+    # Rename geoms
+    for geom_path in geoms_paths:
+        geom = gpd.read_file(geom_path)
+        geom = geom.rename(columns=name_translation)
+        geom.to_file(geom_path)
