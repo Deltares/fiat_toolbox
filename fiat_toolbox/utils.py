@@ -38,6 +38,28 @@ def matches_pattern(string, pattern):
     regex, _ = _compile_pattern(pattern)
     return bool(regex.match(string))
 
+def extract_variables(string, pattern):
+    """
+    Extract variables from a string based on a pattern with placeholders.
+    
+    Args:
+        string (str): The input string to be processed.
+        pattern (str): The pattern containing placeholders in the format '{var}'.
+        
+    Returns:
+        dict: A dictionary with the extracted variables and their values.
+              If the pattern does not match the input string, an empty dictionary is returned.
+    """
+    regex, placeholders = _compile_pattern(pattern)
+    
+    # Find the match
+    match = regex.match(string)
+    if match:
+        # Extract the captured groups into a dictionary
+        extracted_vars = {placeholder: match.group(placeholder) for placeholder in placeholders}
+        return extracted_vars
+    return {}
+
 def replace_pattern(string, pattern, replacement):
     """
     Replace placeholders in a string based on a pattern with a replacement string.
