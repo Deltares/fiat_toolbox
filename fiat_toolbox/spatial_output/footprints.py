@@ -11,6 +11,7 @@ import pandas as pd
 import shapely.geometry as geom
 import math
 from fiat_toolbox import FiatColumns, get_fiat_columns
+from fiat_toolbox.utils import matches_pattern, extract_variables
 
 def generate_polygon(point, shape_type, diameter):
     """
@@ -97,6 +98,8 @@ class Footprints:
                  field_name: Optional[str] = "BF_FID",
                  fiat_columns: Optional[FiatColumns] = None,
                  fiat_version: Optional[str] = "0.2",
+                 depth_rounding: Optional[int] = 2,
+                 damage_rounding: Optional[int] = 0,
                  ):
         """
         Initialize the Footprints object.
@@ -132,6 +135,9 @@ class Footprints:
             self.fiat_columns = get_fiat_columns(fiat_version=fiat_version)
         else:
             self.fiat_columns = fiat_columns
+            
+        self.depth_rounding = depth_rounding
+        self.damage_rounding = damage_rounding
         
     def aggregate(self, 
                   objects: Union[gpd.GeoDataFrame, pd.DataFrame], 
@@ -256,6 +262,12 @@ class Footprints:
         # Combine
         gdf = pd.concat([gdf] + extra_footprints, axis=0)
 
+        # Rounding
+        for col in columns["depth"]:
+            gdf[col] = gdf[col].round(self.depth_rounding)
+        for col in columns["damage"]:
+            gdf[col] = gdf[col].round(self.damage_rounding).fillna(0)
+        
         self.aggregated_results = gdf
     
     def calc_normalized_damages(self):
@@ -276,19 +288,19 @@ class Footprints:
         Returns:
             None
         """
-        gdf = self.aggregated_results
+        gdf = self.aggregated_results.copy()
         # Calculate normalized damages per type
-        value_cols = gdf.columns[gdf.columns.str.startswith(self.fiat_columns.max_potential_damage)].tolist()
+        value_cols = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.max_potential_damage)]
         
         # Only for event type calculate % damage per type
         if self.run_type == "event":
-            dmg_cols = gdf.columns[gdf.columns.str.startswith(self.fiat_columns.damage)].tolist()
+            dmg_cols = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.damage)]
             # Do per type
             for dmg_col in dmg_cols:
                 new_name = dmg_col + " %"
-                name = dmg_col.split(self.fiat_columns.damage)[1]
-                gdf[new_name] = gdf[dmg_col] / gdf[self.fiat_columns.max_potential_damage + name] * 100
-                gdf[new_name] = gdf[new_name].round(2)
+                name = extract_variables(dmg_col, self.fiat_columns.damage)["name"]
+                gdf[new_name] = gdf[dmg_col] / gdf[self.fiat_columns.max_potential_damage.format(name=name)] * 100
+                gdf[new_name] = gdf[new_name].round(2).fillna(0)
             
             # Do total
             gdf["Total Damage %"] = gdf[self.fiat_columns.total_damage] / gdf.loc[:, value_cols].sum(axis=1) * 100
@@ -333,7 +345,7 @@ class Footprints:
         """
         
         # Get string columns that will be aggregated
-        string_columns = [self.fiat_columns.primary_object_type] +  [col for col in gdf.columns if self.fiat_columns.aggregation_label in col]
+        string_columns = [self.fiat_columns.primary_object_type] +  [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.aggregation_label)]
 
         # Get type of run and columns
         if self.fiat_columns.total_damage in gdf.columns:
@@ -344,21 +356,21 @@ class Footprints:
             damage_columns = [
                 col
                 for col in gdf.columns
-                if self.fiat_columns.damage in col and self.fiat_columns.max_potential_damage not in col and self.fiat_columns.damage_function not in col
+                if matches_pattern(col, self.fiat_columns.damage) and not matches_pattern(col, self.fiat_columns.max_potential_damage) and not matches_pattern(col, self.fiat_columns.damage_function)
             ]
             damage_columns.append(self.fiat_columns.total_damage)
         elif self.fiat_columns.risk_ead in gdf.columns:
             self.run_type = "risk"
             depth_columns = []
             # For risk only save total damage per return period and EAD
-            damage_columns = [col for col in gdf.columns if self.fiat_columns.total_damage in col]
+            damage_columns = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.total_damage_rp)]
             damage_columns.append(self.fiat_columns.risk_ead)
         else:
             raise ValueError(
                 f"The is no {self.fiat_columns.total_damage} or {self.fiat_columns.risk_ead} column in the results."
             )
         # add the max potential damages
-        pot_damage_columns = [col for col in gdf.columns if self.fiat_columns.max_potential_damage in col]
+        pot_damage_columns = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.max_potential_damage)]
         damage_columns = pot_damage_columns + damage_columns
         
         # create mapping dictionary
