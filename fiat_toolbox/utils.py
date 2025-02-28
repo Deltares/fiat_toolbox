@@ -26,7 +26,7 @@ def _compile_pattern(pattern):
     regex = re.compile(f"^{escaped_pattern}$")
     return regex, placeholders
 
-def matches_pattern(string, pattern):
+def matches_pattern(string:str, pattern:str)->bool:
     """
     Check if a string matches a pattern with placeholders.
     Args:
@@ -38,7 +38,7 @@ def matches_pattern(string, pattern):
     regex, _ = _compile_pattern(pattern)
     return bool(regex.match(string))
 
-def extract_variables(string, pattern):
+def extract_variables(string:str, pattern:str)->dict:
     """
     Extract variables from a string based on a pattern with placeholders.
     
@@ -60,7 +60,7 @@ def extract_variables(string, pattern):
         return extracted_vars
     return {}
 
-def replace_pattern(string, pattern, replacement):
+def replace_pattern(string:str, pattern:str, replacement:str)->str:
     """
     Replace placeholders in a string based on a pattern with a replacement string.
     Args:
