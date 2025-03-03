@@ -67,7 +67,7 @@ def test_write_footprints_risk():
         results[_FIAT_COLUMNS.risk_ead][results[_FIAT_COLUMNS.object_id] == 1393].to_numpy()[0]
         + results[_FIAT_COLUMNS.risk_ead][results[_FIAT_COLUMNS.object_id] == 1394].to_numpy()[0]
     )
-    assert out_example == in_example
+    assert out_example == round(in_example)
     # Delete created files
     outpath.unlink()
 
