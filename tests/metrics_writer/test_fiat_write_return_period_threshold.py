@@ -91,7 +91,9 @@ class TestExceedanceProbabilityCalculator(unittest.TestCase):
         calculator.append_to_file(input_file, output_file, threshold, T)
 
         # Assert
-        self.assertEqual(mock_to_csv.call_args[0][0], 'tests/data/return_period_threshold_output.csv')
+        self.assertEqual(
+            mock_to_csv.call_args[0][0], "tests/data/return_period_threshold_output.csv"
+        )
 
     # The class should be able to handle a dataframe with all NaN values and return a dataframe with NaN values in the exceedance probability column.
     def test_handle_all_nan_values(self):

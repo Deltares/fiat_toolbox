@@ -227,17 +227,26 @@ class InfographicsParser(IInfographicsParser):
         # Write the html to the file
         with open(file_path, "w", encoding="utf-8") as infographics:
             figure1_html = (
-                figs[0].to_html(config={'displayModeBar': False}).split("<body>")[1].split("</body>")[0]
+                figs[0]
+                .to_html(config={"displayModeBar": False})
+                .split("<body>")[1]
+                .split("</body>")[0]
                 if len(figs) > 0
                 else ""
             )
             figure2_html = (
-                figs[1].to_html(config={'displayModeBar': False}).split("<body>")[1].split("</body>")[0]
+                figs[1]
+                .to_html(config={"displayModeBar": False})
+                .split("<body>")[1]
+                .split("</body>")[0]
                 if len(figs) > 1
                 else ""
             )
             figure3_html = (
-                figs[2].to_html(config={'displayModeBar': False}).split("<body>")[1].split("</body>")[0]
+                figs[2]
+                .to_html(config={"displayModeBar": False})
+                .split("<body>")[1]
+                .split("</body>")[0]
                 if len(figs) > 2
                 else ""
             )
@@ -839,7 +848,7 @@ class InfographicsParser(IInfographicsParser):
                 data=roads.copy(),
                 image_path=self.config_base_path.joinpath("images"),
                 title=roads["Other"]["Title"]["text"],
-                yaxis_title = roads["Other"]["Y_axis_title"]["text"],
+                yaxis_title=roads["Other"]["Y_axis_title"]["text"],
                 title_font_size=roads["Other"]["Title"]["font"],
                 subtitle_font_size=roads["Other"]["Subtitle"]["font"],
                 image_scale=roads["Other"]["Plot"]["image_scale"],

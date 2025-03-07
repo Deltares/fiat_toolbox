@@ -1,17 +1,16 @@
-from abc import ABC, abstractmethod
+import math
 from collections import Counter
-from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
 import geopandas as gpd
-import pandas as pd
 import numpy as np
 import pandas as pd
 import shapely.geometry as geom
-import math
+
 from fiat_toolbox import FiatColumns, get_fiat_columns
-from fiat_toolbox.utils import matches_pattern, extract_variables
+from fiat_toolbox.utils import extract_variables, matches_pattern
+
 
 def generate_polygon(point, shape_type, diameter):
     """
@@ -56,7 +55,8 @@ def generate_polygon(point, shape_type, diameter):
         raise ValueError(
             "Invalid shape type. Choose from 'circle', 'square', or 'triangle'."
         )
-    
+
+
 def check_extension(out_path, ext):
     """
     Checks if the file extension of the given path matches the specified extension.
@@ -73,6 +73,7 @@ def check_extension(out_path, ext):
         raise ValueError(
             f"File extention given: '{out_path.suffix}' does not much the file format specified: {ext}."
         )
+
 
 def mode(my_list):
     """
@@ -93,14 +94,15 @@ def mode(my_list):
 
 class Footprints:
 
-    def __init__(self, 
-                 footprints: gpd.GeoDataFrame,
-                 field_name: Optional[str] = "BF_FID",
-                 fiat_columns: Optional[FiatColumns] = None,
-                 fiat_version: Optional[str] = "0.2",
-                 depth_rounding: Optional[int] = 2,
-                 damage_rounding: Optional[int] = 0,
-                 ):
+    def __init__(
+        self,
+        footprints: Optional[gpd.GeoDataFrame] = gpd.GeoDataFrame(),
+        field_name: Optional[str] = None,
+        fiat_columns: Optional[FiatColumns] = None,
+        fiat_version: Optional[str] = "0.2",
+        depth_rounding: Optional[int] = 2,
+        damage_rounding: Optional[int] = 0,
+    ):
         """
         Initialize the Footprints object.
         Parameters:
@@ -121,13 +123,20 @@ class Footprints:
             If the values in the specified field_name are not unique.
         """
         # Check if field name is present
-        if field_name not in footprints.columns:
-            raise AttributeError(f"field_name= '{field_name}' is not in footprints columns.")
-        # Check if indices are unique
-        if not footprints[field_name].is_unique:
-            raise ValueError(f"Values in the field '{field_name}' are not unique.")
-        # Save attributes
-        footprints = footprints.set_index(field_name)
+        if field_name is not None:
+            if field_name not in footprints.columns:
+                raise AttributeError(
+                    f"field_name= '{field_name}' is not in footprints columns."
+                )
+            # Check if indices are unique
+            if not footprints[field_name].is_unique:
+                raise ValueError(f"Values in the field '{field_name}' are not unique.")
+            # Save attributes
+            footprints = footprints.set_index(field_name)
+        if (field_name is None) and (not footprints.empty):
+            raise AttributeError(
+                f"'field_name' attribute needs to be provided to define the unique identifier of the given footprints."
+            )
         self.footprints = footprints
         self.field_name = field_name
         # Get column naming format
@@ -135,19 +144,61 @@ class Footprints:
             self.fiat_columns = get_fiat_columns(fiat_version=fiat_version)
         else:
             self.fiat_columns = fiat_columns
-            
+
         self.depth_rounding = depth_rounding
         self.damage_rounding = damage_rounding
-        
-    def aggregate(self, 
-                  objects: Union[gpd.GeoDataFrame, pd.DataFrame], 
-                  field_name: Optional[str] = None, 
-                  drop_no_footprints: Optional[bool] = False, 
-                  no_footprints_shape: str = "triangle", 
-                  no_footprints_diameter: float = 10.
-                  ):
+
+    def set_point_data(
+        self,
+        objects: Union[gpd.GeoDataFrame, pd.DataFrame],
+        no_footprints_shape: str = "triangle",
+        no_footprints_diameter: float = 10.0,
+    ):
         """
-        Aggregate objects based on a specified field name that connects to the footprints unique id. If objects has 
+        Sets the point data for the given objects, converting points without footprints to polygons.
+
+        Parameters:
+        -----------
+        objects : Union[gpd.GeoDataFrame, pd.DataFrame]
+            The input data containing the objects. It can be a GeoDataFrame or a DataFrame.
+        no_footprints_shape : str, optional
+            The shape to use for objects without footprints. Default is "triangle".
+        no_footprints_diameter : float, optional
+            The diameter to use for the shape of objects without footprints. Default is 10.0.
+
+        Returns:
+        --------
+        None
+        """
+        # Get column names per type
+        columns = self._get_column_names(objects)
+        cols = columns["string"] + columns["depth"] + columns["damage"]
+        # Convert points to shapes
+        no_footprint_objects_with_shape = self._no_footprint_points_to_polygons(
+            objects, no_footprints_shape, no_footprints_diameter
+        )
+        # Filter columns
+        gdf = no_footprint_objects_with_shape[
+            [self.fiat_columns.object_id, "geometry"] + cols
+        ]
+        # Rounding
+        for col in columns["depth"]:
+            gdf[col] = gdf[col].round(self.depth_rounding)
+        for col in columns["damage"]:
+            gdf[col] = gdf[col].round(self.damage_rounding).fillna(0)
+        # Save to object
+        self.results = gdf
+
+    def aggregate(
+        self,
+        objects: Union[gpd.GeoDataFrame, pd.DataFrame],
+        field_name: Optional[str] = None,
+        drop_no_footprints: Optional[bool] = False,
+        no_footprints_shape: str = "triangle",
+        no_footprints_diameter: float = 10.0,
+    ):
+        """
+        Aggregate objects based on a specified field name that connects to the footprints unique id. If objects has
         spatial information, it can be used for objects without footprint connections to make standard shape footprints.
         Parameters:
         -----------
@@ -169,24 +220,34 @@ class Footprints:
         --------
         None
             The aggregated results are stored in the instance's `aggregated_results` attribute.
-        """        
+        """
         # Merge based on "field_name" column
-        if field_name is None: # if field_name is not provided assume it is the same as the footprints one
+        if (
+            field_name is None
+        ):  # if field_name is not provided assume it is the same as the footprints one
             field_name = self.field_name
         if field_name not in objects.columns:
-            raise AttributeError(f"'{field_name}' not found columns of the provided objects.")
-        gdf = self.footprints.merge(objects.drop(columns="geometry", errors="ignore"), on=field_name, how="outer")
+            raise AttributeError(
+                f"'{field_name}' not found columns of the provided objects."
+            )
+        gdf = self.footprints.merge(
+            objects.drop(columns="geometry", errors="ignore"),
+            on=field_name,
+            how="outer",
+        )
 
         # Remove the building footprints without any object attached
         gdf = gdf.loc[~gdf[self.fiat_columns.object_id].isna()]
-        gdf[self.fiat_columns.object_id] = gdf[self.fiat_columns.object_id].astype(int) # ensure that object ids are interpreted correctly as integers
+        gdf[self.fiat_columns.object_id] = gdf[self.fiat_columns.object_id].astype(
+            int
+        )  # ensure that object ids are interpreted correctly as integers
 
         # Get column names per type
         columns = self._get_column_names(gdf)
-        
+
         for col in columns["string"]:
             gdf[col] = gdf[col].astype(str)
-        
+
         # Aggregate objects with the same "field_name"
         count = np.unique(gdf[field_name], return_counts=True)
         multiple_bffid = count[0][count[1] > 1][:-1]
@@ -195,19 +256,21 @@ class Footprints:
         bffid_object_mapping = {}
         bffid_objectid_mapping = {}
         for bffid in multiple_bffid:
-            all_objects = gdf.loc[gdf[field_name] == bffid, self.fiat_columns.primary_object_type].to_numpy()
-            all_object_ids = gdf.loc[gdf[field_name] == bffid, self.fiat_columns.object_id].to_numpy()
-            bffid_object_mapping.update(
-                {bffid: "_".join(mode(all_objects))}
-            )
+            all_objects = gdf.loc[
+                gdf[field_name] == bffid, self.fiat_columns.primary_object_type
+            ].to_numpy()
+            all_object_ids = gdf.loc[
+                gdf[field_name] == bffid, self.fiat_columns.object_id
+            ].to_numpy()
+            bffid_object_mapping.update({bffid: "_".join(mode(all_objects))})
             bffid_objectid_mapping.update(
                 {bffid: "_".join([str(x) for x in all_object_ids])}
             )
-        gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.primary_object_type] = gdf[field_name].map(
-            bffid_object_mapping
-        )
-        gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.object_id] = gdf[field_name].map(
-            bffid_objectid_mapping
+        gdf.loc[
+            gdf[field_name].isin(multiple_bffid), self.fiat_columns.primary_object_type
+        ] = gdf[field_name].map(bffid_object_mapping)
+        gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.object_id] = (
+            gdf[field_name].map(bffid_objectid_mapping)
         )
 
         # Aggregated results using different functions based on type of output
@@ -230,9 +293,9 @@ class Footprints:
         # Replace values in footprints file
         for agg_col in agg_cols:
             bffid_aggcol_mapping = dict(zip(df_groupby.index, df_groupby[agg_col]))
-            gdf.loc[gdf[field_name].isin(multiple_bffid), agg_col] = gdf[field_name].map(
-                bffid_aggcol_mapping
-            )
+            gdf.loc[gdf[field_name].isin(multiple_bffid), agg_col] = gdf[
+                field_name
+            ].map(bffid_aggcol_mapping)
 
         # Drop duplicates
         gdf = gdf.drop_duplicates(subset=[field_name])
@@ -244,21 +307,31 @@ class Footprints:
             for ind, val in enumerate(gdf[col]):
                 if isinstance(val, np.ndarray):
                     gdf.loc[ind, col] = str(val[0])
-        
+
         # Add extra footprints
         extra_footprints = []
-        
+
         # If point object don't have a footprint reference assume a shape
         if not drop_no_footprints and "geometry" in objects.columns:
-            no_footprint_objects = self._no_footprint_points_to_polygons(objects, no_footprints_shape, no_footprints_diameter)
-            no_footprint_objects = no_footprint_objects[[self.fiat_columns.object_id, "geometry"] + agg_cols].to_crs(gdf.crs)
-            extra_footprints.append(no_footprint_objects)
-        
+            no_footprint_objects = objects[
+                (objects[self.field_name].isna()) & (objects.geometry.type == "Point")
+            ]
+            if len(no_footprint_objects) > 1:
+                no_footprint_objects_with_shape = self._no_footprint_points_to_polygons(
+                    no_footprint_objects, no_footprints_shape, no_footprints_diameter
+                )
+                no_footprint_objects_with_shape = no_footprint_objects_with_shape[
+                    [self.fiat_columns.object_id, "geometry"] + agg_cols
+                ].to_crs(gdf.crs)
+                extra_footprints.append(no_footprint_objects_with_shape)
+
         # Add objects which are already described by a polygon
         if "geometry" in objects.columns:
-            footprint_objects = self._find_footprint_objects(objects)[[self.fiat_columns.object_id, "geometry"] + agg_cols].to_crs(gdf.crs)
+            footprint_objects = self._find_footprint_objects(objects)[
+                [self.fiat_columns.object_id, "geometry"] + agg_cols
+            ].to_crs(gdf.crs)
             extra_footprints.append(footprint_objects)
-        
+
         # Combine
         gdf = pd.concat([gdf] + extra_footprints, axis=0)
 
@@ -267,9 +340,9 @@ class Footprints:
             gdf[col] = gdf[col].round(self.depth_rounding)
         for col in columns["damage"]:
             gdf[col] = gdf[col].round(self.damage_rounding).fillna(0)
-        
-        self.aggregated_results = gdf
-    
+
+        self.results = gdf
+
     def calc_normalized_damages(self):
         """
         Calculate normalized damages for the aggregated results.
@@ -288,48 +361,72 @@ class Footprints:
         Returns:
             None
         """
-        gdf = self.aggregated_results.copy()
+        gdf = self.results.copy()
         # Calculate normalized damages per type
-        value_cols = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.max_potential_damage)]
-        
+        value_cols = [
+            col
+            for col in gdf.columns
+            if matches_pattern(col, self.fiat_columns.max_potential_damage)
+        ]
+
         # Only for event type calculate % damage per type
         if self.run_type == "event":
-            dmg_cols = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.damage)]
+            dmg_cols = [
+                col
+                for col in gdf.columns
+                if matches_pattern(col, self.fiat_columns.damage)
+            ]
             # Do per type
             for dmg_col in dmg_cols:
                 new_name = dmg_col + " %"
                 name = extract_variables(dmg_col, self.fiat_columns.damage)["name"]
-                gdf[new_name] = gdf[dmg_col] / gdf[self.fiat_columns.max_potential_damage.format(name=name)] * 100
+                gdf[new_name] = (
+                    gdf[dmg_col]
+                    / gdf[self.fiat_columns.max_potential_damage.format(name=name)]
+                    * 100
+                )
                 gdf[new_name] = gdf[new_name].round(2).fillna(0)
-            
+
             # Do total
-            gdf["Total Damage %"] = gdf[self.fiat_columns.total_damage] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Total Damage %"] = (
+                gdf[self.fiat_columns.total_damage]
+                / gdf.loc[:, value_cols].sum(axis=1)
+                * 100
+            )
             gdf["Total Damage %"] = gdf["Total Damage %"].round(2).fillna(0)
-            
+
         elif self.run_type == "risk":
-            tot_dmg_cols = gdf.columns[gdf.columns.str.startswith(self.fiat_columns.total_damage)].tolist()
+            tot_dmg_cols = gdf.columns[
+                gdf.columns.str.startswith(self.fiat_columns.total_damage)
+            ].tolist()
             for tot_dmg_col in tot_dmg_cols:
                 new_name = tot_dmg_col + " %"
-                gdf[new_name] = gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
+                gdf[new_name] = (
+                    gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
+                )
                 gdf[new_name] = gdf[new_name].round(2)
-            gdf["Risk (EAD) %"] = gdf[self.fiat_columns.risk_ead] / gdf.loc[:, value_cols].sum(axis=1) * 100
+            gdf["Risk (EAD) %"] = (
+                gdf[self.fiat_columns.risk_ead]
+                / gdf.loc[:, value_cols].sum(axis=1)
+                * 100
+            )
             gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2).fillna(0)
-        
+
         self.aggregated_results = gdf
-    
+
     def write(self, output_path: Union[str, Path]):
         """
         Writes the aggregated results to a file.
 
         Parameters:
-        output_path (Union[str, Path]): The path where the output file will be saved. 
+        output_path (Union[str, Path]): The path where the output file will be saved.
                                         It can be a string or a Path object.
 
         Returns:
         None
         """
-        self.aggregated_results.to_file(output_path, driver="GPKG")
-    
+        self.results.to_file(output_path, driver="GPKG")
+
     def _get_column_names(self, gdf):
         """
         Extracts and categorizes column names from a GeoDataFrame based on predefined criteria.
@@ -343,70 +440,89 @@ class Footprints:
         Raises:
         ValueError: If neither 'total_damage' nor 'ead_damage' columns are present in the GeoDataFrame.
         """
-        
+
         # Get string columns that will be aggregated
-        string_columns = [self.fiat_columns.primary_object_type] +  [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.aggregation_label)]
+        string_columns = [self.fiat_columns.primary_object_type] + [
+            col
+            for col in gdf.columns
+            if matches_pattern(col, self.fiat_columns.aggregation_label)
+        ]
 
         # Get type of run and columns
         if self.fiat_columns.total_damage in gdf.columns:
             self.run_type = "event"
             # If event save inundation depth
-            depth_columns = [col for col in gdf.columns if self.fiat_columns.inundation_depth in col]
+            depth_columns = [
+                col for col in gdf.columns if self.fiat_columns.inundation_depth in col
+            ]
             # And all type of damages
             damage_columns = [
                 col
                 for col in gdf.columns
-                if matches_pattern(col, self.fiat_columns.damage) and not matches_pattern(col, self.fiat_columns.max_potential_damage) and not matches_pattern(col, self.fiat_columns.damage_function)
+                if matches_pattern(col, self.fiat_columns.damage)
+                and not matches_pattern(col, self.fiat_columns.max_potential_damage)
+                and not matches_pattern(col, self.fiat_columns.damage_function)
             ]
             damage_columns.append(self.fiat_columns.total_damage)
         elif self.fiat_columns.risk_ead in gdf.columns:
             self.run_type = "risk"
             depth_columns = []
             # For risk only save total damage per return period and EAD
-            damage_columns = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.total_damage_rp)]
+            damage_columns = [
+                col
+                for col in gdf.columns
+                if matches_pattern(col, self.fiat_columns.total_damage_rp)
+            ]
             damage_columns.append(self.fiat_columns.risk_ead)
         else:
             raise ValueError(
                 f"The is no {self.fiat_columns.total_damage} or {self.fiat_columns.risk_ead} column in the results."
             )
         # add the max potential damages
-        pot_damage_columns = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.max_potential_damage)]
+        pot_damage_columns = [
+            col
+            for col in gdf.columns
+            if matches_pattern(col, self.fiat_columns.max_potential_damage)
+        ]
         damage_columns = pot_damage_columns + damage_columns
-        
+
         # create mapping dictionary
-        dict = {"string": string_columns,
-                "depth": depth_columns,
-                "damage": damage_columns,
-                }
-        
+        dict = {
+            "string": string_columns,
+            "depth": depth_columns,
+            "damage": damage_columns,
+        }
+
         return dict
-    
+
     def _find_footprint_objects(self, objects):
         """
         Identifies and returns objects that have a footprint.
 
-        This method filters the input objects to find those that do not have a 
-        value in the specified field (self.field_name) and have a geometry type 
+        This method filters the input objects to find those that do not have a
+        value in the specified field (self.field_name) and have a geometry type
         of "Polygon".
 
         Parameters:
-        objects (GeoDataFrame): A GeoDataFrame containing spatial objects with 
+        objects (GeoDataFrame): A GeoDataFrame containing spatial objects with
                                 geometries and attributes.
 
         Returns:
-        GeoDataFrame: A GeoDataFrame containing objects that have a footprint 
-                      (i.e., objects with missing values in the specified field 
+        GeoDataFrame: A GeoDataFrame containing objects that have a footprint
+                      (i.e., objects with missing values in the specified field
                       and a geometry type of "Polygon").
         """
         buildings_with_footprint = objects[
-            (objects[self.field_name].isna()) & (objects.geometry.type.isin(["Polygon", "MultiPolygon"]))
+            (objects[self.field_name].isna())
+            & (objects.geometry.type.isin(["Polygon", "MultiPolygon"]))
         ]
         return buildings_with_footprint
-    
-    def _no_footprint_points_to_polygons(self, objects, shape, diameter):
+
+    @staticmethod
+    def _no_footprint_points_to_polygons(objects, shape, diameter):
         """
         Converts point geometries of buildings without footprints to polygon geometries.
-        This method identifies buildings that do not have footprint information and converts their point geometries 
+        This method identifies buildings that do not have footprint information and converts their point geometries
         to polygon geometries based on the specified shape and diameter.
         Args:
             objects (GeoDataFrame): A GeoDataFrame containing building geometries and attributes.
@@ -416,23 +532,15 @@ class Footprints:
             GeoDataFrame or None: A GeoDataFrame with updated polygon geometries for buildings without footprints,
                                   or None if there are no such buildings.
         """
-        # Find buildings with no footprint connected
-        buildings_without_footprint = objects[
-            (objects[self.field_name].isna()) & (objects.geometry.type == "Point")
-        ]
-        if len(buildings_without_footprint) > 1:
-            init_crs = buildings_without_footprint.crs
-            buildings_without_footprint = buildings_without_footprint.to_crs(
-                buildings_without_footprint.estimate_utm_crs()
-            )
-            shape_type = shape
-            diameter = diameter
+        init_crs = objects.crs
+        objects = objects.to_crs(objects.estimate_utm_crs())
+        shape_type = shape
+        diameter = diameter
 
-            # Transform points to shapes
-            buildings_without_footprint["geometry"] = buildings_without_footprint[
-                "geometry"
-            ].apply(lambda point: generate_polygon(point, shape_type, diameter))
-            buildings_without_footprint = buildings_without_footprint.to_crs(init_crs)
-            
-        return buildings_without_footprint
-    
+        # Transform points to shapes
+        objects["geometry"] = objects["geometry"].apply(
+            lambda point: generate_polygon(point, shape_type, diameter)
+        )
+        objects = objects.to_crs(init_crs)
+
+        return objects

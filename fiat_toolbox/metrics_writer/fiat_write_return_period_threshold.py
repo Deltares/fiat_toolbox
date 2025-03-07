@@ -1,11 +1,14 @@
 import logging
+import re
 
 import numpy as np
 import pandas as pd
-import re
+
 
 class ExceedanceProbabilityCalculator:
-    def __init__(self, column_prefix, logger: logging.Logger = logging.getLogger(__name__)):
+    def __init__(
+        self, column_prefix, logger: logging.Logger = logging.getLogger(__name__)
+    ):
         self.column_prefix = column_prefix
         self.logger = logger
 
@@ -56,11 +59,15 @@ class ExceedanceProbabilityCalculator:
         """
 
         # Extract return periods from column names
-        return_periods = [re.findall(r'\d+', col) for col in df.columns
+        return_periods = [
+            re.findall(r"\d+", col)
+            for col in df.columns
             if col.startswith(self.column_prefix)
         ]
-        return_periods = [int(rp[0]) if len(rp) > 1 else int(rp[0]) for rp in return_periods]
-        
+        return_periods = [
+            int(rp[0]) if len(rp) > 1 else int(rp[0]) for rp in return_periods
+        ]
+
         # Calculate exceedance probability
         return self._calculate(df, return_periods, threshold, T).to_frame()
 
