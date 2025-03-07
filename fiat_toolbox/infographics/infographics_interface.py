@@ -6,8 +6,9 @@ from typing import Union
 
 class IInfographicsParser(ABC):
     """Interface for creating the infographic"""
+
     logger: logging.Logger
-    
+
     @abstractmethod
     def __init__(
         self,

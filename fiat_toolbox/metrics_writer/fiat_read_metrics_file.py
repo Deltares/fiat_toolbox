@@ -11,7 +11,11 @@ from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileReade
 class MetricsFileReader(IMetricsFileReader):
     """Reads metrics from a file."""
 
-    def __init__(self, metrics_file_path: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__)):
+    def __init__(
+        self,
+        metrics_file_path: Union[str, Path],
+        logger: logging.Logger = logging.getLogger(__name__),
+    ):
         """
         Initializes a new instance of the MetricsFileReader class.
 

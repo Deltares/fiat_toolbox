@@ -213,7 +213,7 @@ class Equity:
         self.df["EWCEAD"] = stacked_layers.dot(
             np.array(calc_rp_coef(return_periods))[:, None]
         )
-    
+
     def calculate_ewead(self):
         """Calculates equity weighted certainty expected annual damages using log linear approach"""
         layers = []
@@ -276,13 +276,24 @@ class Equity:
             ranking results
         """
         if ead_column not in self.df.columns:
-            raise ValueError(f"EAD column '{ead_column}' not present in provided aggregated file. A different column name can be specified using the 'ead_column' argument.")
+            raise ValueError(
+                f"EAD column '{ead_column}' not present in provided aggregated file. A different column name can be specified using the 'ead_column' argument."
+            )
         self.df["rank_EAD"] = self.df[ead_column].rank(ascending=False).astype(int)
         self.df["rank_EWEAD"] = self.df["EWEAD"].rank(ascending=False).astype(int)
         self.df["rank_EWCEAD"] = self.df["EWCEAD"].rank(ascending=False).astype(int)
-        self.df["rank_diff_EWEAD"] = self.df["rank_EWEAD"] - self.df["rank_EAD"]     
+        self.df["rank_diff_EWEAD"] = self.df["rank_EWEAD"] - self.df["rank_EAD"]
         self.df["rank_diff_EWCEAD"] = self.df["rank_EWCEAD"] - self.df["rank_EAD"]
-        return self.df[[self.aggregation_label, "rank_EAD", "rank_EWCEAD", "rank_diff_EWCEAD",  "rank_EWEAD", "rank_diff_EWEAD"]]
+        return self.df[
+            [
+                self.aggregation_label,
+                "rank_EAD",
+                "rank_EWCEAD",
+                "rank_diff_EWCEAD",
+                "rank_EWEAD",
+                "rank_diff_EWEAD",
+            ]
+        ]
 
     def calculate_resilience_index(
         self, ead_column: str = "Risk (EAD)"

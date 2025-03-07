@@ -90,29 +90,37 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
     @patch("builtins.open", new_callable=mock_open)
     def test_encode_image_from_path(self, mock_open, mock_path_exists):
         # Arrange
-        mock_path_exists.return_value = True  
+        mock_path_exists.return_value = True
         mock_open.return_value.read.return_value = self.money_bin
-        
+
         # Act
         encoded_image = RiskInfographicsParser._encode_image_from_path(self.money_path)
-        
+
         # Assert
-        expected_encoded_string = f'data:image/png;base64,{base64.b64encode(self.money_bin).decode()}'
+        expected_encoded_string = (
+            f"data:image/png;base64,{base64.b64encode(self.money_bin).decode()}"
+        )
         assert encoded_image == expected_encoded_string
         mock_open.assert_called_once_with(Path(self.money_path), "rb")
         mock_path_exists.assert_called_once_with(Path(self.money_path))
-
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Image.open")
     @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
     @patch("fiat_toolbox.infographics.risk_infographics.Figure.to_html")
     @patch("builtins.open", new_callable=mock_open)
-    def test_figure_to_html(self, mock_open, mock_to_html, mock_open_image, mock_path_exists, mock_path_exists_infographics):
+    def test_figure_to_html(
+        self,
+        mock_open,
+        mock_to_html,
+        mock_open_image,
+        mock_path_exists,
+        mock_path_exists_infographics,
+    ):
         # Arrange
         figure_path = Path("parent/some_figure.html")
         mock_open_image.return_value = "some_image"
-        
+
         def exists_side_effect(path):
             if ".html" in str(path):
                 # In case of the html file, we want it to not exist
@@ -123,13 +131,13 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
         mock_path_exists_infographics.side_effect = exists_side_effect
         mock_path_exists.side_effect = exists_side_effect
         mock_to_html.return_value = "<body>some_figure</body>"
-        
-        def mock_open_side_effect(file_path, mode='r', encoding=None):
+
+        def mock_open_side_effect(file_path, mode="r", encoding=None):
             file = str(file_path)
-            if 'r' in mode:
-                if 'money.png' in file:
+            if "r" in mode:
+                if "money.png" in file:
                     return io.BytesIO(self.money_bin)
-                elif 'house.png' in file:
+                elif "house.png" in file:
                     return io.BytesIO(self.house_bin)
                     # return mock_open(read_data=house_bin).return_value
             else:
@@ -172,7 +180,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                     "title": "Building damages",
                     "image": "house.png",
                     "scale": 0.125,
-                }
+                },
             }
         }
 
@@ -184,7 +192,9 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
             output_base_path="DontCare",
         )
 
-        parser._figures_list_to_html(rp_fig=figs, metrics=metrics, charts=charts, file_path=figure_path)
+        parser._figures_list_to_html(
+            rp_fig=figs, metrics=metrics, charts=charts, file_path=figure_path
+        )
 
         # Assert
         expected_html = f"""
@@ -269,16 +279,17 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
             expected_html.replace(" ", ""),
         )
         self.assertEqual(mock_file.write.call_count, 1)
-        self.assertEqual(mock_open.call_count, 3) # 2 images and 1 html file
+        self.assertEqual(mock_open.call_count, 3)  # 2 images and 1 html file
         self.assertEqual(mock_to_html.call_count, 1)
         self.assertEqual(mock_path_exists_infographics.call_count, 6)
-        
 
     @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Image.open")
     @patch("fiat_toolbox.infographics.risk_infographics.Figure.to_html")
     @patch("builtins.open")
-    def test_figure_to_html_no_figures(self, mock_open, mock_to_html, mock_open_image, mock_path_exists):
+    def test_figure_to_html_no_figures(
+        self, mock_open, mock_to_html, mock_open_image, mock_path_exists
+    ):
         # Arrange
         figure_path = Path("parent/some_figure.html")
         mock_open_image.return_value = "some_image"
@@ -328,7 +339,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                     "title": "Building damages",
                     "image": "house.png",
                     "scale": 0.125,
-                }
+                },
             }
         }
 

@@ -3,17 +3,18 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Tuple, Union, Optional
+from typing import Dict, Tuple, Union
 
 import duckdb
 import pandas as pd
 import tomli
 
+from fiat_toolbox import get_fiat_columns
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
-from fiat_toolbox import get_fiat_columns
 
 _AGGR_LABEL_FMT = get_fiat_columns().aggregation_label
+
 
 # sql command struct
 @dataclass
@@ -27,12 +28,17 @@ class sql_struct:
     groupby: str
 
 
-
 class MetricsFileWriter(IMetricsFileWriter):
     """Class to parse metrics and write to a file."""
+
     logger: logging.Logger = logging.getLogger(__name__)
-    
-    def __init__(self, config_file: Union[str, Path], logger: logging.Logger = logging.getLogger(__name__), aggregation_label_fmt: str = _AGGR_LABEL_FMT):
+
+    def __init__(
+        self,
+        config_file: Union[str, Path],
+        logger: logging.Logger = logging.getLogger(__name__),
+        aggregation_label_fmt: str = _AGGR_LABEL_FMT,
+    ):
         """
         Initialize the class.
 
@@ -52,7 +58,7 @@ class MetricsFileWriter(IMetricsFileWriter):
         self.config_file = config_file
         self.logger = logger
         self.aggregation_label_fmt = aggregation_label_fmt
-        
+
     def _read_metrics_file(
         self, include_aggregates: bool
     ) -> Union[Dict[str, sql_struct], Dict[str, Dict[str, sql_struct]]]:
@@ -541,7 +547,9 @@ class MetricsFileWriter(IMetricsFileWriter):
                     new_path,
                     write_aggregate=key,
                     overwrite=overwrite,
-                    aggregations=df_results[self.aggregation_label_fmt.format(name=key)].unique(),
+                    aggregations=df_results[
+                        self.aggregation_label_fmt.format(name=key)
+                    ].unique(),
                 )
         else:
             # Write the metrics to a file

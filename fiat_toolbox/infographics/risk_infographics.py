@@ -14,7 +14,8 @@ from fiat_toolbox.metrics_writer.fiat_read_metrics_file import (
 
 class RiskInfographicsParser(IInfographicsParser):
     """Class for creating the infographic"""
-    logger: logging.Logger = logging.getLogger(__name__),
+
+    logger: logging.Logger = (logging.getLogger(__name__),)
 
     def __init__(
         self,
@@ -56,7 +57,6 @@ class RiskInfographicsParser(IInfographicsParser):
             output_base_path = Path(output_base_path)
         self.output_base_path = output_base_path
         self.logger = logger
-
 
     def _get_impact_metrics(self) -> Dict:
         """Get the impact metrics for a scenario
@@ -103,8 +103,8 @@ class RiskInfographicsParser(IInfographicsParser):
             return
         with open(path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
-        
-        return f'data:image/png;base64,{encoded_string}'
+
+        return f"data:image/png;base64,{encoded_string}"
 
     @staticmethod
     def _figures_list_to_html(
@@ -144,15 +144,29 @@ class RiskInfographicsParser(IInfographicsParser):
             file_path.parent.mkdir(parents=True)
 
         # Check if the image_path exists
-        expected_damage_path = InfographicsParser._check_image_source(charts['Other']['Expected_Damages']['image'], image_folder_path, return_image=False)
-        flooded_path = InfographicsParser._check_image_source(charts['Other']['Flooded']['image'], image_folder_path, return_image=False)
+        expected_damage_path = InfographicsParser._check_image_source(
+            charts["Other"]["Expected_Damages"]["image"],
+            image_folder_path,
+            return_image=False,
+        )
+        flooded_path = InfographicsParser._check_image_source(
+            charts["Other"]["Flooded"]["image"], image_folder_path, return_image=False
+        )
 
         # Div height is the max of the chart heights
-        div_height = max(charts['Other']['Expected_Damages']['height'], charts['Other']['Flooded']['height'], charts['Other']['Return_Periods']['plot_height'])
+        div_height = max(
+            charts["Other"]["Expected_Damages"]["height"],
+            charts["Other"]["Flooded"]["height"],
+            charts["Other"]["Return_Periods"]["plot_height"],
+        )
 
         # Write the html to the file
         with open(file_path, mode="w", encoding="utf-8") as infographics:
-            rp_charts = rp_fig.to_html(config={'displayModeBar': False}).split("<body>")[1].split("</body>")[0]
+            rp_charts = (
+                rp_fig.to_html(config={"displayModeBar": False})
+                .split("<body>")[1]
+                .split("</body>")[0]
+            )
 
             infographics.write(
                 f"""
@@ -267,17 +281,17 @@ class RiskInfographicsParser(IInfographicsParser):
             legend_orientation="h",
             yanchor="top",
             y=-0.1,
-            title=charts['Other']['Return_Periods']['title'],
+            title=charts["Other"]["Return_Periods"]["title"],
             image_path=self.config_base_path.joinpath("images"),
-            title_font_size=charts['Other']['Return_Periods']['font_size'],
-            subtitle_font_size=charts['Other']['Return_Periods']['subtitle_font'],
-            image_scale=charts['Other']['Return_Periods']['image_scale'],
-            numbers_font=charts['Other']['Return_Periods']['numbers_font'],
-            legend_font_size=charts['Other']['Return_Periods']['legend_font'],
-            plot_info=charts["Other"]['Info']["text"],
+            title_font_size=charts["Other"]["Return_Periods"]["font_size"],
+            subtitle_font_size=charts["Other"]["Return_Periods"]["subtitle_font"],
+            image_scale=charts["Other"]["Return_Periods"]["image_scale"],
+            numbers_font=charts["Other"]["Return_Periods"]["numbers_font"],
+            legend_font_size=charts["Other"]["Return_Periods"]["legend_font"],
+            plot_info=charts["Other"]["Info"]["text"],
             plot_info_img=charts["Other"]["Info"]["image"],
             plot_info_scale=charts["Other"]["Info"]["scale"],
-            plot_height=charts['Other']['Return_Periods']['plot_height'],
+            plot_height=charts["Other"]["Return_Periods"]["plot_height"],
         )
 
         # Return the figure
@@ -314,14 +328,22 @@ class RiskInfographicsParser(IInfographicsParser):
 
         # Check if the infographic already exists. If so, return the path
         if Path.exists(infographic_html):
-            RiskInfographicsParser.logger.info(f"Infographic already exists, skipping creation. Path: {infographic_html}")
+            RiskInfographicsParser.logger.info(
+                f"Infographic already exists, skipping creation. Path: {infographic_html}"
+            )
             return str(infographic_html)
 
         # Get the infographic
         metrics, charts, infographic = self._get_infographics()
 
         # Convert the infographic to html. The default for using relative image paths is to have an images folder in the same directory as the config files
-        self._figures_list_to_html(infographic, metrics, charts, infographic_html, self.config_base_path.joinpath("images"))
+        self._figures_list_to_html(
+            infographic,
+            metrics,
+            charts,
+            infographic_html,
+            self.config_base_path.joinpath("images"),
+        )
 
         # Return the path to the infographic
         return str(infographic_html)

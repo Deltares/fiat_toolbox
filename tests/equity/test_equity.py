@@ -16,7 +16,7 @@ _cases = {
         "gamma": 1.2,
         "output_file_equity": "aggregated_ewced1.csv",
         "damage_column_pattern": "TotalDamageRP{rp}",
-        "ead_column": "ExpectedAnnualDamages"
+        "ead_column": "ExpectedAnnualDamages",
     },
     "general_output": {
         "census_data": "population_income_data.csv",
@@ -26,7 +26,7 @@ _cases = {
         "totalpopulation_label": "TotalPopulationBG",
         "gamma": 1.2,
         "output_file_equity": "aggregated_ewced2.csv",
-    }
+    },
 }
 
 
@@ -57,7 +57,7 @@ def test_equity(case):
             aggregation_label,
             percapitaincome_label,
             totalpopulation_label,
-        )    
+        )
 
     df_equity = equity.equity_calculation(
         gamma,
