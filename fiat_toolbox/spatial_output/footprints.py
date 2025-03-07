@@ -94,8 +94,8 @@ def mode(my_list):
 class Footprints:
 
     def __init__(self, 
-                 footprints: gpd.GeoDataFrame,
-                 field_name: Optional[str] = "BF_FID",
+                 footprints: Optional[gpd.GeoDataFrame] = gpd.GeoDataFrame(),
+                 field_name: Optional[str] = None,
                  fiat_columns: Optional[FiatColumns] = None,
                  fiat_version: Optional[str] = "0.2",
                  depth_rounding: Optional[int] = 2,
@@ -121,13 +121,15 @@ class Footprints:
             If the values in the specified field_name are not unique.
         """
         # Check if field name is present
-        if field_name not in footprints.columns:
-            raise AttributeError(f"field_name= '{field_name}' is not in footprints columns.")
-        # Check if indices are unique
-        if not footprints[field_name].is_unique:
-            raise ValueError(f"Values in the field '{field_name}' are not unique.")
-        # Save attributes
-        footprints = footprints.set_index(field_name)
+        if field_name is not None:
+            if field_name not in footprints.columns:
+                raise AttributeError(f"field_name= '{field_name}' is not in footprints columns.")
+            # Check if indices are unique
+            if not footprints[field_name].is_unique:
+                raise ValueError(f"Values in the field '{field_name}' are not unique.")
+            # Save attributes
+            footprints = footprints.set_index(field_name)
+            
         self.footprints = footprints
         self.field_name = field_name
         # Get column naming format
@@ -138,7 +140,39 @@ class Footprints:
             
         self.depth_rounding = depth_rounding
         self.damage_rounding = damage_rounding
-        
+    
+    def set_point_data(self, objects: Union[gpd.GeoDataFrame, pd.DataFrame], no_footprints_shape: str = "triangle", no_footprints_diameter: float = 10.):
+        """
+        Sets the point data for the given objects, converting points without footprints to polygons.
+
+        Parameters:
+        -----------
+        objects : Union[gpd.GeoDataFrame, pd.DataFrame]
+            The input data containing the objects. It can be a GeoDataFrame or a DataFrame.
+        no_footprints_shape : str, optional
+            The shape to use for objects without footprints. Default is "triangle".
+        no_footprints_diameter : float, optional
+            The diameter to use for the shape of objects without footprints. Default is 10.0.
+
+        Returns:
+        --------
+        None
+        """
+        # Get column names per type
+        columns = self._get_column_names(objects)
+        cols = columns["string"] + columns["depth"] + columns["damage"]
+        # Convert points to shapes
+        no_footprint_objects_with_shape = self._no_footprint_points_to_polygons(objects, no_footprints_shape, no_footprints_diameter)
+        # Filter columns
+        gdf = no_footprint_objects_with_shape[[self.fiat_columns.object_id, "geometry"] + cols]    
+        # Rounding
+        for col in columns["depth"]:
+            gdf[col] = gdf[col].round(self.depth_rounding)
+        for col in columns["damage"]:
+            gdf[col] = gdf[col].round(self.damage_rounding).fillna(0)
+        # Save to object 
+        self.results = gdf
+    
     def aggregate(self, 
                   objects: Union[gpd.GeoDataFrame, pd.DataFrame], 
                   field_name: Optional[str] = None, 
@@ -250,9 +284,11 @@ class Footprints:
         
         # If point object don't have a footprint reference assume a shape
         if not drop_no_footprints and "geometry" in objects.columns:
-            no_footprint_objects = self._no_footprint_points_to_polygons(objects, no_footprints_shape, no_footprints_diameter)
-            no_footprint_objects = no_footprint_objects[[self.fiat_columns.object_id, "geometry"] + agg_cols].to_crs(gdf.crs)
-            extra_footprints.append(no_footprint_objects)
+            no_footprint_objects = objects[(objects[self.field_name].isna()) & (objects.geometry.type == "Point")]
+            if len(no_footprint_objects) > 1:
+                no_footprint_objects_with_shape = self._no_footprint_points_to_polygons(no_footprint_objects, no_footprints_shape, no_footprints_diameter)
+                no_footprint_objects_with_shape = no_footprint_objects_with_shape[[self.fiat_columns.object_id, "geometry"] + agg_cols].to_crs(gdf.crs)
+                extra_footprints.append(no_footprint_objects_with_shape)
         
         # Add objects which are already described by a polygon
         if "geometry" in objects.columns:
@@ -268,7 +304,7 @@ class Footprints:
         for col in columns["damage"]:
             gdf[col] = gdf[col].round(self.damage_rounding).fillna(0)
         
-        self.aggregated_results = gdf
+        self.results = gdf
     
     def calc_normalized_damages(self):
         """
@@ -288,7 +324,7 @@ class Footprints:
         Returns:
             None
         """
-        gdf = self.aggregated_results.copy()
+        gdf = self.results.copy()
         # Calculate normalized damages per type
         value_cols = [col for col in gdf.columns if matches_pattern(col, self.fiat_columns.max_potential_damage)]
         
@@ -328,7 +364,7 @@ class Footprints:
         Returns:
         None
         """
-        self.aggregated_results.to_file(output_path, driver="GPKG")
+        self.results.to_file(output_path, driver="GPKG")
     
     def _get_column_names(self, gdf):
         """
@@ -403,7 +439,8 @@ class Footprints:
         ]
         return buildings_with_footprint
     
-    def _no_footprint_points_to_polygons(self, objects, shape, diameter):
+    @staticmethod
+    def _no_footprint_points_to_polygons(objects, shape, diameter):
         """
         Converts point geometries of buildings without footprints to polygon geometries.
         This method identifies buildings that do not have footprint information and converts their point geometries 
@@ -416,23 +453,18 @@ class Footprints:
             GeoDataFrame or None: A GeoDataFrame with updated polygon geometries for buildings without footprints,
                                   or None if there are no such buildings.
         """
-        # Find buildings with no footprint connected
-        buildings_without_footprint = objects[
-            (objects[self.field_name].isna()) & (objects.geometry.type == "Point")
-        ]
-        if len(buildings_without_footprint) > 1:
-            init_crs = buildings_without_footprint.crs
-            buildings_without_footprint = buildings_without_footprint.to_crs(
-                buildings_without_footprint.estimate_utm_crs()
-            )
-            shape_type = shape
-            diameter = diameter
+        init_crs = objects.crs
+        objects = objects.to_crs(
+            objects.estimate_utm_crs()
+        )
+        shape_type = shape
+        diameter = diameter
 
-            # Transform points to shapes
-            buildings_without_footprint["geometry"] = buildings_without_footprint[
-                "geometry"
-            ].apply(lambda point: generate_polygon(point, shape_type, diameter))
-            buildings_without_footprint = buildings_without_footprint.to_crs(init_crs)
+        # Transform points to shapes
+        objects["geometry"] = objects[
+            "geometry"
+        ].apply(lambda point: generate_polygon(point, shape_type, diameter))
+        objects = objects.to_crs(init_crs)
             
-        return buildings_without_footprint
+        return objects
     
