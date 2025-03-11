@@ -98,7 +98,7 @@ class Equity:
         pd.DataFrame
             merged dataframe
         """
-        # Check if data inputs are wether .csv files or pd.DataFrame
+        # Check if data inputs are whether .csv files or pd.DataFrame
         census_table = Equity._check_datatype(census_table)
         damages_table = Equity._check_datatype(damages_table)
         # If the aggregated damages format is the fiat_toolbox one make sure columns are interpreted correctly

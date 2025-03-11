@@ -463,13 +463,13 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         with self.assertRaises(KeyError) as context:
             write_class._read_metrics_file(include_aggregates=True)
             self.assertTrue(
-                "Key 'desciption' missing from query." in str(context.exception)
+                "Key 'description' missing from query." in str(context.exception)
             )
 
         with self.assertRaises(KeyError) as context:
             write_class._read_metrics_file(include_aggregates=False)
             self.assertTrue(
-                "Key 'desciption' missing from query." in str(context.exception)
+                "Key 'description' missing from query." in str(context.exception)
             )
 
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.json.load")

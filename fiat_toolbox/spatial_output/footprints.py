@@ -71,7 +71,7 @@ def check_extension(out_path, ext):
     out_path = Path(out_path)
     if out_path.suffix != ext:
         raise ValueError(
-            f"File extention given: '{out_path.suffix}' does not much the file format specified: {ext}."
+            f"File extension given: '{out_path.suffix}' does not much the file format specified: {ext}."
         )
 
 
@@ -93,7 +93,6 @@ def mode(my_list):
 
 
 class Footprints:
-
     def __init__(
         self,
         footprints: Optional[gpd.GeoDataFrame] = gpd.GeoDataFrame(),
@@ -135,7 +134,7 @@ class Footprints:
             footprints = footprints.set_index(field_name)
         if (field_name is None) and (not footprints.empty):
             raise AttributeError(
-                f"'field_name' attribute needs to be provided to define the unique identifier of the given footprints."
+                "'field_name' attribute needs to be provided to define the unique identifier of the given footprints."
             )
         self.footprints = footprints
         self.field_name = field_name

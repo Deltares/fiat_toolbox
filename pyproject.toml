@@ -51,10 +51,6 @@ include = ["fiat_toolbox", "fiat_toolbox.*"]
 [project.urls]
 Source = "https://github.com/Deltares/fiat_toolbox"
 
-[tool.ruff]
-select = ["E", "F", "NPY", "PD", "C4", "I"]
-ignore = ["E501", "PD901"]
-
 [tool.pytest.ini_options]
 addopts = "--cov fiat_toolbox --cov-report xml"
 testpaths = ["tests"]

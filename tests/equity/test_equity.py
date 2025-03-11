@@ -50,7 +50,7 @@ def test_equity(case):
             damage_column_pattern=_cases[case]["damage_column_pattern"],
         )
     else:
-        # Use defalut
+        # Use default
         equity = Equity(
             census_data,
             fiat_data,

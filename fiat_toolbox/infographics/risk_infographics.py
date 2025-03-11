@@ -208,12 +208,12 @@ class RiskInfographicsParser(IInfographicsParser):
                         h1 {{
                             font-size: {charts['Other']['Expected_Damages']['title_font_size']}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
-                            font-weight:normal; 
+                            font-weight:normal;
                         }}
                         h2 {{
                             font-size: {charts['Other']['Flooded']['title_font_size']}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
-                            font-weight:normal; 
+                            font-weight:normal;
                         }}
                         p1 {{
                             font-size: {charts['Other']['Flooded']['numbers_font_size']}px; /* Adjust the font size as needed */

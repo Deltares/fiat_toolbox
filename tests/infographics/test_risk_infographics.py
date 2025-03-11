@@ -236,12 +236,12 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                         h1 {{
                             font-size:  30px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
-                            font-weight:normal; 
+                            font-weight:normal;
                         }}
                         h2 {{
                             font-size: 30px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
-                            font-weight:normal; 
+                            font-weight:normal;
                         }}
                         p1 {{
                             font-size: 15px; /* Adjust the font size as needed */

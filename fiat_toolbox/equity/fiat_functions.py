@@ -68,7 +68,9 @@ def calc_rp_coef(
         (
             b[0]
             if idx == 0
-            else f[idx] + a[idx - 1] if idx == rp_l - 1 else a[idx - 1] + b[idx]
+            else f[idx] + a[idx - 1]
+            if idx == rp_l - 1
+            else a[idx - 1] + b[idx]
         )
         for idx in range(rp_l)
     ]
