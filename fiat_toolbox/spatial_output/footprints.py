@@ -245,68 +245,8 @@ class Footprints:
         # Get column names per type
         columns = self._get_column_names(gdf)
 
-        for col in columns["string"]:
-            gdf[col] = gdf[col].astype(str)
-
-        # Aggregate objects with the same "field_name"
-        count = np.unique(gdf[field_name], return_counts=True)
-        multiple_bffid = count[0][count[1] > 1][:-1]
-
-        # First, combine the Primary Object Type and Object ID
-        bffid_object_mapping = {}
-        bffid_objectid_mapping = {}
-        for bffid in multiple_bffid:
-            all_objects = gdf.loc[
-                gdf[field_name] == bffid, self.fiat_columns.primary_object_type
-            ].to_numpy()
-            all_object_ids = gdf.loc[
-                gdf[field_name] == bffid, self.fiat_columns.object_id
-            ].to_numpy()
-            bffid_object_mapping.update({bffid: "_".join(mode(all_objects))})
-            bffid_objectid_mapping.update(
-                {bffid: "_".join([str(x) for x in all_object_ids])}
-            )
-        gdf.loc[
-            gdf[field_name].isin(multiple_bffid), self.fiat_columns.primary_object_type
-        ] = gdf[field_name].map(bffid_object_mapping)
-        gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.object_id] = (
-            gdf[field_name].map(bffid_objectid_mapping)
-        )
-
-        # Aggregated results using different functions based on type of output
-        mapping = {}
-        for name in columns["string"]:
-            mapping[name] = pd.Series.mode
-        for name in columns["depth"]:
-            mapping[name] = "mean"
-        for name in columns["damage"]:
-            mapping[name] = "sum"
-
-        agg_cols = columns["string"] + columns["depth"] + columns["damage"]
-
-        df_groupby = (
-            gdf.loc[gdf[field_name].isin(multiple_bffid), [field_name] + agg_cols]
-            .groupby(field_name)
-            .agg(mapping)
-        )
-
-        # Replace values in footprints file
-        for agg_col in agg_cols:
-            bffid_aggcol_mapping = dict(zip(df_groupby.index, df_groupby[agg_col]))
-            gdf.loc[gdf[field_name].isin(multiple_bffid), agg_col] = gdf[
-                field_name
-            ].map(bffid_aggcol_mapping)
-
-        # Drop duplicates
-        gdf = gdf.drop_duplicates(subset=[field_name])
-        gdf = gdf.reset_index(drop=True)
-        exposure = [self.fiat_columns.object_id, "geometry"] + agg_cols
-        gdf = gdf[exposure]
-
-        for col in columns["string"]:
-            for ind, val in enumerate(gdf[col]):
-                if isinstance(val, np.ndarray):
-                    gdf.loc[ind, col] = str(val[0])
+        # Perform the aggregation
+        gdf = self._aggregate_objects(gdf, field_name, columns)
 
         # Add extra footprints
         extra_footprints = []
@@ -496,6 +436,96 @@ class Footprints:
         }
 
         return col_dict
+
+    def _aggregate_objects(self, gdf:gpd.GeoDataFrame, field_name:str, columns:dict)-> gpd.GeoDataFrame:
+        """
+        Aggregates objects in a GeoDataFrame based on a specified field and columns.
+        Parameters:
+        -----------
+        gdf : GeoDataFrame
+            The GeoDataFrame containing the objects to be aggregated.
+        field_name : str
+            The name of the field used to aggregate objects.
+        columns : dict
+            A dictionary containing lists of column names categorized by their types.
+            Expected keys are "string", "depth", and "damage".
+        Returns:
+        --------
+        GeoDataFrame
+            A GeoDataFrame with aggregated objects, where duplicates are removed and
+            specified columns are aggregated based on their types.
+        Notes:
+        ------
+        - String columns are aggregated using the mode.
+        - Depth columns are aggregated using the mean.
+        - Damage columns are aggregated using the sum.
+        - The primary object type and object ID are combined for objects with the same field_name.
+        - The function ensures that all string columns are converted to strings before aggregation.
+        """
+        for col in columns["string"]:
+            gdf[col] = gdf[col].astype(str)
+
+        # Aggregate objects with the same "field_name"
+        count = np.unique(gdf[field_name], return_counts=True)
+        multiple_bffid = count[0][count[1] > 1][:-1]
+
+        # First, combine the Primary Object Type and Object ID
+        bffid_object_mapping = {}
+        bffid_objectid_mapping = {}
+        for bffid in multiple_bffid:
+            all_objects = gdf.loc[
+                gdf[field_name] == bffid, self.fiat_columns.primary_object_type
+            ].to_numpy()
+            all_object_ids = gdf.loc[
+                gdf[field_name] == bffid, self.fiat_columns.object_id
+            ].to_numpy()
+            bffid_object_mapping.update({bffid: "_".join(mode(all_objects))})
+            bffid_objectid_mapping.update(
+                {bffid: "_".join([str(x) for x in all_object_ids])}
+            )
+        gdf.loc[
+            gdf[field_name].isin(multiple_bffid), self.fiat_columns.primary_object_type
+        ] = gdf[field_name].map(bffid_object_mapping)
+        gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.object_id] = (
+            gdf[field_name].map(bffid_objectid_mapping)
+        )
+
+        # Aggregated results using different functions based on type of output
+        mapping = {}
+        for name in columns["string"]:
+            mapping[name] = pd.Series.mode
+        for name in columns["depth"]:
+            mapping[name] = "mean"
+        for name in columns["damage"]:
+            mapping[name] = "sum"
+
+        agg_cols = columns["string"] + columns["depth"] + columns["damage"]
+
+        df_groupby = (
+            gdf.loc[gdf[field_name].isin(multiple_bffid), [field_name] + agg_cols]
+            .groupby(field_name)
+            .agg(mapping)
+        )
+
+        # Replace values in footprints file
+        for agg_col in agg_cols:
+            bffid_aggcol_mapping = dict(zip(df_groupby.index, df_groupby[agg_col]))
+            gdf.loc[gdf[field_name].isin(multiple_bffid), agg_col] = gdf[
+                field_name
+            ].map(bffid_aggcol_mapping)
+
+        # Drop duplicates
+        gdf = gdf.drop_duplicates(subset=[field_name])
+        gdf = gdf.reset_index(drop=True)
+        exposure = [self.fiat_columns.object_id, "geometry"] + agg_cols
+        gdf = gdf[exposure]
+
+        for col in columns["string"]:
+            for ind, val in enumerate(gdf[col]):
+                if isinstance(val, np.ndarray):
+                    gdf.loc[ind, col] = str(val[0])
+                    
+        return gdf
 
     def _find_footprint_objects(self, objects):
         """
