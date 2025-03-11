@@ -65,7 +65,7 @@ class Equity:
         """
 
         if isinstance(variable, pd.DataFrame):
-            variable = variable
+            pass
         elif os.path.exists(variable):
             variable = pd.read_csv(variable)
         elif isinstance(variable, str) and variable.endswith(".csv"):

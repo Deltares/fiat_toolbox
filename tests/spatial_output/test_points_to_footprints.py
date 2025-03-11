@@ -96,5 +96,7 @@ def test_error_handling():
     del results[_FIAT_COLUMNS.risk_ead]
 
     with pytest.raises(ValueError):
-        footprints = Footprints(footprints, field_name="BF_FID", fiat_version=_FIAT_VERSION)
+        footprints = Footprints(
+            footprints, field_name="BF_FID", fiat_version=_FIAT_VERSION
+        )
         footprints.aggregate(results)
