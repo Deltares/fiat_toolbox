@@ -244,7 +244,8 @@ class Footprints:
 
         # Get column names per type
         columns = self._get_column_names(gdf)
-
+        agg_cols = columns["string"] + columns["depth"] + columns["damage"]
+        
         # Perform the aggregation
         gdf = self._aggregate_objects(gdf, field_name, columns)
 
@@ -437,7 +438,9 @@ class Footprints:
 
         return col_dict
 
-    def _aggregate_objects(self, gdf:gpd.GeoDataFrame, field_name:str, columns:dict)-> gpd.GeoDataFrame:
+    def _aggregate_objects(
+        self, gdf: gpd.GeoDataFrame, field_name: str, columns: dict
+    ) -> gpd.GeoDataFrame:
         """
         Aggregates objects in a GeoDataFrame based on a specified field and columns.
         Parameters:
@@ -524,7 +527,7 @@ class Footprints:
             for ind, val in enumerate(gdf[col]):
                 if isinstance(val, np.ndarray):
                     gdf.loc[ind, col] = str(val[0])
-                    
+
         return gdf
 
     def _find_footprint_objects(self, objects):
