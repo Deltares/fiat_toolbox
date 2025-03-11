@@ -65,7 +65,7 @@ class ExceedanceProbabilityCalculator:
             if col.startswith(self.column_prefix)
         ]
         return_periods = [
-            int(rp[0]) if len(rp) > 1 else int(rp[0]) for rp in return_periods
+            float(rp[0]) for rp in return_periods
         ]
 
         # Calculate exceedance probability

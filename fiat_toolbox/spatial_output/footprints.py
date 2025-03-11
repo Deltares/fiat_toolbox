@@ -135,7 +135,7 @@ class Footprints:
             footprints = footprints.set_index(field_name)
         if (field_name is None) and (not footprints.empty):
             raise AttributeError(
-                f"'field_name' attribute needs to be provided to define the unique identifier of the given footprints."
+                "'field_name' attribute needs to be provided to define the unique identifier of the given footprints."
             )
         self.footprints = footprints
         self.field_name = field_name
@@ -388,12 +388,13 @@ class Footprints:
                 gdf[new_name] = gdf[new_name].round(2).fillna(0)
 
             # Do total
-            gdf["Total Damage %"] = (
+            tot_dmg_per_name = f"{self.fiat_columns.total_damage} %"
+            gdf[tot_dmg_per_name] = (
                 gdf[self.fiat_columns.total_damage]
                 / gdf.loc[:, value_cols].sum(axis=1)
                 * 100
             )
-            gdf["Total Damage %"] = gdf["Total Damage %"].round(2).fillna(0)
+            gdf[tot_dmg_per_name] = gdf[tot_dmg_per_name].round(2).fillna(0)
 
         elif self.run_type == "risk":
             tot_dmg_cols = gdf.columns[
@@ -405,12 +406,13 @@ class Footprints:
                     gdf[tot_dmg_col] / gdf.loc[:, value_cols].sum(axis=1) * 100
                 )
                 gdf[new_name] = gdf[new_name].round(2)
-            gdf["Risk (EAD) %"] = (
+            risk_ead_per_name = f"{self.fiat_columns.risk_ead} %"
+            gdf[risk_ead_per_name] = (
                 gdf[self.fiat_columns.risk_ead]
                 / gdf.loc[:, value_cols].sum(axis=1)
                 * 100
             )
-            gdf["Risk (EAD) %"] = gdf["Risk (EAD) %"].round(2).fillna(0)
+            gdf[risk_ead_per_name] = gdf[risk_ead_per_name].round(2).fillna(0)
 
         self.aggregated_results = gdf
 
@@ -433,7 +435,7 @@ class Footprints:
         Parameters:
         gdf (GeoDataFrame): The input GeoDataFrame containing the columns to be categorized.
         Returns:
-        dict: A dictionary with keys 'string', 'depth', and 'damage', each containing a list of column names.
+        col_dict: A dictionary with keys 'string', 'depth', and 'damage', each containing a list of column names.
             - 'string': Columns that are strings and will be aggregated.
             - 'depth': Columns related to inundation depth (only if total damage is present).
             - 'damage': Columns related to damage, including potential damage and total damage.
@@ -487,13 +489,13 @@ class Footprints:
         damage_columns = pot_damage_columns + damage_columns
 
         # create mapping dictionary
-        dict = {
+        col_dict = {
             "string": string_columns,
             "depth": depth_columns,
             "damage": damage_columns,
         }
 
-        return dict
+        return col_dict
 
     def _find_footprint_objects(self, objects):
         """
