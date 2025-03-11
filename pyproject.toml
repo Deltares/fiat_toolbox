@@ -22,12 +22,14 @@ dependencies = [
     "numpy",
     "pandas",
     "tomli",
+    "toml",
     "plotly",
     "parse",
     "geopandas",
     "duckdb",
     "validators",
-    "pydantic"
+    "pydantic",
+    "pillow"
 ]
 dynamic = ["version"]
 
