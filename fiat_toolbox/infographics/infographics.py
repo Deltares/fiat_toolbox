@@ -136,32 +136,32 @@ class InfographicsParser(IInfographicsParser):
                 raise KeyError("Categories not found in pie chart configuration file")
 
             # Read the categories configuration
-            categorie_dict = {}
+            category_dict = {}
             for key, value in pie_chart_config["Categories"].items():
-                categorie_dict[value["Name"]] = {}
-                categorie_dict[value["Name"]]["Name"] = value["Name"]
-                categorie_dict[value["Name"]]["Color"] = value["Color"]
+                category_dict[value["Name"]] = {}
+                category_dict[value["Name"]]["Name"] = value["Name"]
+                category_dict[value["Name"]]["Color"] = value["Color"]
                 if "Image" in value:
-                    categorie_dict[value["Name"]]["Image"] = value["Image"]
+                    category_dict[value["Name"]]["Image"] = value["Image"]
 
             # Check if the slices are defined
             if "Slices" not in pie_chart_config:
                 raise KeyError("Slices not found in pie chart configuration file")
 
-            # Read the configuration for the seperate pie slices
+            # Read the configuration for the separate pie slices
             for key, value in pie_chart_config["Slices"].items():
                 pie_dict[value["Chart"]]["Values"].append(
                     float(metrics[value["Query"]])
                 )
                 pie_dict[value["Chart"]]["Labels"].append(value["Category"])
                 pie_dict[value["Chart"]]["Colors"].append(
-                    categorie_dict[value["Category"]]["Color"]
+                    category_dict[value["Category"]]["Color"]
                 )
-                if "Image" in categorie_dict[value["Category"]]:
+                if "Image" in category_dict[value["Category"]]:
                     if "Image" not in pie_dict[value["Chart"]]:
                         pie_dict[value["Chart"]]["Image"] = []
                     pie_dict[value["Chart"]]["Image"].append(
-                        categorie_dict[value["Category"]]["Image"]
+                        category_dict[value["Category"]]["Image"]
                     )
 
             # Check if the "Other" category is defined

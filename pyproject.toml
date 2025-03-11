@@ -22,14 +22,19 @@ dependencies = [
     "numpy",
     "pandas",
     "tomli",
+    "toml",
     "plotly",
     "parse",
     "geopandas",
     "duckdb",
     "validators",
-    "pydantic"
+    "pydantic",
+    "pillow"
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+tests = ["pytest", "pytest-cov"]
 
 [tool.setuptools]
 zip-safe = false
@@ -46,6 +51,6 @@ include = ["fiat_toolbox", "fiat_toolbox.*"]
 [project.urls]
 Source = "https://github.com/Deltares/fiat_toolbox"
 
-[tool.ruff]
-select = ["E", "F", "NPY", "PD", "C4", "I"]
-ignore = ["E501", "PD901"]
+[tool.pytest.ini_options]
+addopts = "--cov fiat_toolbox --cov-report xml"
+testpaths = ["tests"]

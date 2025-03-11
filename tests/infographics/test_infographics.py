@@ -533,14 +533,14 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
                     <body>
                         <div class="container">
                             <div class="top-half">
-                                
+
                             </div>
                             <div class="bottom">
                                 <div class="bottom-left">
-                                    
+
                                 </div>
                                 <div class="bottom-right">
-                                    
+
                                 </div>
                             </div>
                         </div>

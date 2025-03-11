@@ -8,6 +8,6 @@
     },
     "sonarlint.connectedMode.project": {
         "connectionId": "deltares",
-        "projectKey": "Deltares_fiat_toolbox"
+        "projectKey": "deltares_fiat-toolbox"
     }
 }

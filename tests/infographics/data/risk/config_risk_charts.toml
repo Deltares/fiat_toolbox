@@ -92,7 +92,7 @@
     [Other.Expected_Damages]
         title = "Expected annual damages"
         image = "{image_path}/money.png"
-        image_scale = 1.3      
+        image_scale = 1.3
         title_font_size = 25
         numbers_font_size = 20
         height = 300
