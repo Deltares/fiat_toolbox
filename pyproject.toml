@@ -31,6 +31,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+tests = ["pytest"]
+
 [tool.setuptools]
 zip-safe = false
 
