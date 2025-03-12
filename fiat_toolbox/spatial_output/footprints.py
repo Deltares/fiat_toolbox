@@ -485,9 +485,12 @@ class Footprints:
             bffid_objectid_mapping.update(
                 {bffid: "_".join([str(x) for x in all_object_ids])}
             )
+        # Change column type to string
+        gdf[self.fiat_columns.object_id] = gdf[self.fiat_columns.object_id].astype(str)
         gdf.loc[
             gdf[field_name].isin(multiple_bffid), self.fiat_columns.primary_object_type
         ] = gdf[field_name].map(bffid_object_mapping)
+        
         gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.object_id] = (
             gdf[field_name].map(bffid_objectid_mapping)
         )
