@@ -29,7 +29,9 @@ dependencies = [
     "duckdb",
     "validators",
     "pydantic",
-    "pillow"
+    "pillow",
+    "matplotlib",
+    "numpy"
 ]
 dynamic = ["version"]
 
