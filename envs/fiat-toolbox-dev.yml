@@ -5,20 +5,21 @@ channels:
 
 dependencies:
   - black
-  - ipykernel
-  - numpy
-  - pandas < 2.0.0
-  - geopandas
+  - numpy < 2.0
+  - pandas == 2.2.2
+  - geopandas == 1.0.1
   - tomli
-  - pip
   - pytest # tests
   - pytest-cov # tests
   - pytest-benchmark # tests
-  - python>=3.8
+  - python==3.10
   - plotly
   - parse
+  # - gdal
   - pydantic
   - seaborn
-  - jupyter
+  - notebook
+  - scipy==1.15.2
+  - pip
   - pip:
-    - duckdb
+    - duckdb==1.2.1

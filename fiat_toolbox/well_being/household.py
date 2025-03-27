@@ -65,12 +65,29 @@ class Household:
         self.dt = self.t_max / (int(self.t_max / dt) + 1)
         self.t = np.linspace(0, self.t_max, int(self.t_max / self.dt) + 1)
         self.currency = currency
+        self.l = l
         if l is not None:
-            self.l = l
             self.recovery_time = recovery_time(rate=self.l, rebuilt_per=95)
         self.time_series = pd.DataFrame({"time": self.t})
         self.total_losses = pd.Series()
-        
+    
+    def __repr__(self):
+        return (
+            f"Household(\n"
+            f"  v={self.v} (loss ratio),\n"
+            f"  k_str={self.k_str} (total building value),\n"
+            f"  c0={self.c0} (initial consumption level),\n"
+            f"  c_avg={self.c_avg} (average consumption level),\n"
+            f"  l={self.l} (recovery rate),\n"
+            f"  pi={self.pi} (average productivity of capital),\n"
+            f"  eta={self.eta} (elasticity of marginal utility of consumption),\n"
+            f"  rho={self.rho} (discount rate),\n"
+            f"  t_max={self.t_max} (maximum simulation time),\n"
+            f"  dt={self.dt} (time step),\n"
+            f"  currency={self.currency} (currency symbol)\n"
+            f")"
+        )
+
     def calc_loss(self, loss_type: LossType, method: str="trapezoid") -> float:
         """
         Calculate the loss based on the specified loss type and method.

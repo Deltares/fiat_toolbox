@@ -462,7 +462,7 @@ class Loss:
                 raise ValueError("t must have at least 2 points to calculate the integral.")
             f_t = self._fun(self.t, self.l)
             f_t_dis = f_t * np.exp(-rho * self.t)
-            integral = np.trapezoid(f_t_dis, x=self.t, axis=0)
+            integral = np.trapz(f_t_dis, x=self.t, axis=0)
         elif method == "quad":
             integral = np.array([quad(lambda t, li=li: self._fun(t, li) * np.exp(-rho * t), 0, t_max)[0] for li in self.l])
         else:
