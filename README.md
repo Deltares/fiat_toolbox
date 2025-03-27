@@ -4,15 +4,19 @@ This toolbox contains post-processing modules for Delft-FIAT output.
 
 Installation
 ====================
-To use this package, GDAL has to be installed on your system, which is a c++ library.
-A simple way to install GDAL is to use conda. If you do not have conda installed, you can install it by following the instructions on the `conda website <https://docs.conda.io/en/latest/miniconda.html>`_.
-
-After creating and activating your conda environment, you can install GDAL using the following command
-    conda install -c conda-forge gdal
-
-Then, you can install fiat toolbox and its dependencies using pip:
+You can install fiat toolbox and its dependencies using pip:
     pip install fiat-toolbox
 
+Develop
+====================
+To develop in fiat_toolbox you can create a virtual environment using conda and the yml file in the /envs directory:
+    conda env create -f envs/fiat-toolbox-dev.yml
+
+then activate the environment:
+    conda activate fiat_toolbox
+
+and then pip install the package in editable mode:
+    pip install -e .
 
 Modules:
 
@@ -31,3 +35,7 @@ This module contains functions to aggregate point output from FIAT to building f
 equity
 ==================
 This module contains functions to calculate equity weights and equity weighted risk metrics based on socio-economic inputs at an aggregation level.
+
+well_being
+==================
+This module contains functions to estimate household level well-being impacts.

@@ -31,7 +31,8 @@ dependencies = [
     "pydantic",
     "pillow",
     "matplotlib",
-    "numpy"
+    "numpy",
+    "scipy"
 ]
 dynamic = ["version"]
 

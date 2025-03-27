@@ -17,7 +17,6 @@ dependencies:
   - python>=3.8
   - plotly
   - parse
-  - gdal
   - pydantic
   - seaborn
   - jupyter
