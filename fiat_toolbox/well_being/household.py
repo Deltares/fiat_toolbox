@@ -262,8 +262,7 @@ class Household:
         income_losses = IncomeLoss(t=self.t, l=lambdas, v=self.v, k_str=self.k_str, pi=self.pi).total(rho=0, method=method)
         consumption_losses = ConsumptionLoss(t=self.t, l=lambdas, v=self.v, k_str=self.k_str, pi=self.pi).total(rho=0, method=method)
         utility_losses = UtilityLoss(t=self.t, l=lambdas, v=self.v, k_str=self.k_str, pi=self.pi, c0=self.c0, eta=self.eta).total(rho=0, method=method)
-        optimal_lambda = opt_lambda(v=self.v, k_str=self.k_str, c0=self.c0, pi=self.pi, eta=self.eta, lmin=lambdas.min(), lmax=lambdas.max(), t_max=self.t_max, times=self.t, method=method)
-        # optimal_lambda = lambdas[np.nanargmin(utility_losses)]
+        optimal_lambda = opt_lambda(v=self.v, k_str=self.k_str, c0=self.c0, pi=self.pi, eta=self.eta, l_min=lambdas.min(), l_max=lambdas.max(), t_max=self.t_max, times=self.t, method=method)
         
         # Save optimization dataframe
         df = pd.DataFrame({"lambda": lambdas,
