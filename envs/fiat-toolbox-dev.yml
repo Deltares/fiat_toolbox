@@ -8,6 +8,7 @@ dependencies:
   - ipykernel
   - numpy
   - pandas < 2.0.0
+  - geopandas
   - tomli
   - pip
   - pytest # tests
@@ -16,7 +17,6 @@ dependencies:
   - python>=3.8
   - plotly
   - parse
-  - seaborn # examples
   - gdal
   - pydantic
   - seaborn
