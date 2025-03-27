@@ -474,7 +474,8 @@ class Loss:
 class ReconstructionCost(Loss):
     """
     A class to calculate reconstruction cost over time based on recovery rates.
-
+    It includes the total method to calculate the total loss by integrating over time.
+    
     Parameters
     ----------
     t : Union[float, np.ndarray]
@@ -502,7 +503,8 @@ class ReconstructionCost(Loss):
 class IncomeLoss(Loss):
     """
     A class to calculate income loss over time based on recovery rates.
-
+    It includes the total method to calculate the total loss by integrating over time.
+    
     Parameters
     ----------
     t : Union[float, np.ndarray]
@@ -533,7 +535,8 @@ class IncomeLoss(Loss):
 class ConsumptionLoss(Loss):
     """
     A class to calculate consumption loss over time based on recovery rates.
-
+    It includes the total method to calculate the total loss by integrating over time.
+    
     Parameters
     ----------
     t : Union[float, np.ndarray]
@@ -564,7 +567,8 @@ class ConsumptionLoss(Loss):
 class UtilityLoss(Loss):
     """
     A class to calculate utility loss over time based on recovery rates.
-
+    It includes the total method to calculate the total loss by integrating over time.
+    
     Parameters
     ----------
     t : Union[float, np.ndarray]

@@ -71,7 +71,32 @@ class Household:
         self.time_series = pd.DataFrame({"time": self.t})
         self.total_losses = pd.Series()
         
-    def calc_loss(self, loss_type: LossType, method: str="discrete"):
+    def calc_loss(self, loss_type: LossType, method: str="trapezoid") -> float:
+        """
+        Calculate the loss based on the specified loss type and method.
+
+        Parameters
+        ----------
+        loss_type : LossType
+            The type of loss to calculate. Must be one of the following:
+            - LossType.RECONSTRUCTION: Calculates reconstruction cost.
+            - LossType.INCOME: Calculates income loss.
+            - LossType.CONSUMPTION: Calculates consumption loss.
+            - LossType.UTILITY: Calculates utility loss.
+        method : str, optional
+            The numerical method to use for calculating the total loss.
+            Can be either "trapezoid" (default) or "quad"
+
+        Returns
+        -------
+        float
+            The total loss calculated for the specified loss type.
+
+        Raises
+        ------
+        ValueError
+            If an invalid loss type is provided.
+        """
         if loss_type == LossType.RECONSTRUCTION:
             loss = ReconstructionCost(self.t, self.l, self.v, self.k_str)
         elif loss_type == LossType.INCOME:
@@ -88,27 +113,35 @@ class Household:
         
         return self.total_losses[loss_type]
     
-    def get_losses(self, method: str="discrete"):
+    def get_losses(self, method: str="trapezoid") -> pd.Series:
         """
-        Calculate and return the total losses including reconstruction costs, income losses, 
-        consumption losses, and well-being losses over time.
+        Calculate and update various types of losses for the household.
+
+        This method computes losses for each loss type defined in the `LossType` enumeration, 
+        calculates the equivalent consumption loss, and determines the equity-weighted loss. 
+        The results are stored in the `total_losses` attribute.
+
+        Parameters
+        ----------
+        method : str, optional
+            The numerical integration method to use for calculations. 
+            Can be either "trapezoid" (default) or "quad".
 
         Returns
         -------
-        pandas.Series
-            A series containing the total losses for each loss type:
-            - LossType.RECONSTRUCTION: Total reconstruction costs
-            - LossType.INCOME: Total income losses
-            - LossType.CONSUMPTION: Total consumption losses
-            - LossType.UTILITY: Total well-being losses
+        pd.Series
+            A pandas Series containing the following keys:
+            - "Wellbeing Loss": The calculated wellbeing loss.
+            - "Asset Loss": The calculated asset loss.
+            - "Equity Weighted Loss": The calculated equity-weighted loss.
+            - Additional keys corresponding to each `LossType` (e.g., "Reconstruction Costs", "Income Loss").
 
         Notes
         -----
-        This method also updates the following attributes:
-        - self.time_series : pandas.DataFrame
-            A DataFrame containing the time series of losses for each loss type.
-        - self.total_losses : pandas.Series
-            A Series containing the total losses for each loss type.
+        - The `LossType` enumeration is iterated to calculate individual loss types.
+        - The `UtilityLoss` class is used to compute the utility loss.
+        - The `wellbeing_loss` and `equity_weight` functions are used to compute the respective metrics.
+        - The results are stored in the `time_series` DataFrame and `total_losses` Series attributes.
         """
         # Calculate losses for each loss type
         for loss_type in LossType:
@@ -130,11 +163,14 @@ class Household:
     
     def plot_loss(self, loss_type: LossType, ax: Optional[plt.Axes] = None) -> Optional[plt.Figure]:
         """
-        Plot the time series of losses for a given type with the y-axis reversed and a hatch between the zero horizontal line and the plotted line.
+        Plot the time series of losses for a given type.
+
+        This method visualizes the losses over time for a specified loss type. It includes a shaded area under the curve 
+        to represent the total loss and formats the y-axis based on the type of loss being plotted.
 
         Parameters
         ----------
-        type : LossType
+        loss_type : LossType
             The type of loss to plot. Must be one of the values in the LossType enum.
         ax : matplotlib.axes.Axes, optional
             The axes on which to plot. If None, a new figure and axes are created. Default is None.
@@ -147,7 +183,7 @@ class Household:
         Raises
         ------
         ValueError
-            If the losses have not been calculated.
+            If the specified loss type has not been calculated.
         ValueError
             If an invalid loss type is provided.
         """
@@ -234,18 +270,20 @@ class Household:
         if ax is None:
             return fig
     
-    def opt_lambda(self, rec_time_max: Optional[float] = None, rec_time_min: float = 0.3, no_steps: float = 1000, method="discrete") -> None:
+    def opt_lambda(self, rec_time_max: Optional[float] = None, rec_time_min: float = 0.3, no_steps: float = 1000, method="trapezoid") -> None:
         """
         Optimize the reconstruction rate (lambda) to minimize the total well-being loss.
 
         Parameters
         ----------
-        lambda_min : float, optional
-            The minimum value of lambda to consider, by default 0.3.
-        lambda_max : float, optional
-            The maximum value of lambda to consider, by default 10.
-        lambda_step : float, optional
-            The step size for lambda values, by default 0.01.
+        rec_time_max : float, optional
+            The maximum recovery time to consider. If None, the maximum time in the simulation is used.
+        rec_time_min : float, optional
+            The minimum recovery time to consider. Default is 0.3 years.
+        no_steps : float, optional
+            The number of steps to divide the recovery time range into. Default is 1000.
+        method : str, optional
+            The numerical integration method to use for loss calculations. Can be either "trapezoid" (default) or "quad"
 
         Returns
         -------
@@ -339,9 +377,3 @@ class Household:
         axs[1].legend(loc='upper left', bbox_to_anchor=(1, 1))
         
         return fig
-    
-
-def _find_min(x: np.array, y: np.array, method="min"):
-    if method == "min":
-        xmin = x[np.nanargmin(y)]
-    return xmin
