@@ -334,6 +334,8 @@ class Household:
         self.recovery_time = recovery_time(rate=optimal_lambda, rebuilt_per=95)
 
         self.l_opt = df
+        
+        return optimal_lambda
     
     def plot_opt_lambda(self, x_type: Literal["rate", "time"] = "rate") -> plt.Figure:
         """
