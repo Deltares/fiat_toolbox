@@ -74,17 +74,17 @@ class Household:
     def __repr__(self):
         return (
             f"Household(\n"
-            f"  v={self.v} (loss ratio),\n"
-            f"  k_str={self.k_str} (total building value),\n"
-            f"  c0={self.c0} (initial consumption level),\n"
-            f"  c_avg={self.c_avg} (average consumption level),\n"
-            f"  l={self.l} (recovery rate),\n"
-            f"  pi={self.pi} (average productivity of capital),\n"
-            f"  eta={self.eta} (elasticity of marginal utility of consumption),\n"
-            f"  rho={self.rho} (discount rate),\n"
-            f"  t_max={self.t_max} (maximum simulation time),\n"
-            f"  dt={self.dt} (time step),\n"
-            f"  currency={self.currency} (currency symbol)\n"
+            f"  v = {self.v} (loss ratio),\n"
+            f"  k_str = {self.k_str} (total building value),\n"
+            f"  c0 = {self.c0} (initial consumption level),\n"
+            f"  c_avg = {self.c_avg} (average consumption level),\n"
+            f"  l = {self.l} (recovery rate),\n"
+            f"  pi = {self.pi} (average productivity of capital),\n"
+            f"  eta = {self.eta} (elasticity of marginal utility of consumption),\n"
+            f"  rho = {self.rho} (discount rate),\n"
+            f"  t_max = {self.t_max} (maximum simulation time),\n"
+            f"  dt = {self.dt} (time step),\n"
+            f"  currency = {self.currency} (currency symbol)\n"
             f")"
         )
 
