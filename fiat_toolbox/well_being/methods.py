@@ -1,7 +1,7 @@
 from typing import Optional, Union
 import warnings
 import numpy as np
-from scipy.integrate import quad
+from scipy.integrate import quad, IntegrationWarning
 from scipy.optimize import minimize
 
 def utility(consumption: Union[float, np.ndarray], eta: float, normalize: bool = False) -> Union[float, np.ndarray]:
@@ -24,7 +24,7 @@ def utility(consumption: Union[float, np.ndarray], eta: float, normalize: bool =
 
     # Check for zero or negative consumption values and issue a warning
     if np.any(consumption <= 0):
-        warnings.warn("Consumption contains zero or negative values, resulting in NaN utility.", UserWarning, stacklevel=2)
+        # warnings.warn("Consumption contains zero or negative values, resulting in NaN utility.", UserWarning, stacklevel=2)
         consumption = np.where(consumption <= 0, np.nan, consumption)
 
     if eta <= 0:
@@ -464,7 +464,11 @@ class Loss:
             f_t_dis = f_t * np.exp(-rho * self.t)
             integral = np.trapz(f_t_dis, x=self.t, axis=0)
         elif method == "quad":
-            integral = np.array([quad(lambda t, li=li: self._fun(t, li) * np.exp(-rho * t), 0, t_max)[0] for li in self.l])
+            warnings.filterwarnings('ignore', category=IntegrationWarning)
+            integral = np.array([quad(lambda t, li=li: self._fun(t, li) * np.exp(-rho * t), 
+                                      0, 
+                                      t_max,
+                                      )[0] for li in self.l])
         else:
             raise ValueError("method must be either 'trapezoid' or 'quad'.")
 
