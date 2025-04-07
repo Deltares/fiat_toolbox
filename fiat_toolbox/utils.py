@@ -154,4 +154,7 @@ def convert_fiat(
     for geom_path in geoms_paths:
         geom = gpd.read_file(geom_path)
         geom = geom.rename(columns=name_translation)
+        geom_path.unlink()
         geom.to_file(geom_path)
+
+
