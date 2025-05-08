@@ -1,10 +1,14 @@
-from typing import Optional, Union
 import warnings
+from typing import Optional, Union
+
 import numpy as np
-from scipy.integrate import quad
+from scipy.integrate import IntegrationWarning, quad
 from scipy.optimize import minimize
 
-def utility(consumption: Union[float, np.ndarray], eta: float, normalize: bool = False) -> Union[float, np.ndarray]:
+
+def utility(
+    consumption: Union[float, np.ndarray], eta: float, normalize: bool = False
+) -> Union[float, np.ndarray]:
     """
     Calculate the utility of given consumption(s) using a CRRA (Constant Relative Risk Aversion) utility function.
     Parameters
@@ -24,7 +28,7 @@ def utility(consumption: Union[float, np.ndarray], eta: float, normalize: bool =
 
     # Check for zero or negative consumption values and issue a warning
     if np.any(consumption <= 0):
-        warnings.warn("Consumption contains zero or negative values, resulting in NaN utility.", UserWarning, stacklevel=2)
+        # warnings.warn("Consumption contains zero or negative values, resulting in NaN utility.", UserWarning, stacklevel=2)
         consumption = np.where(consumption <= 0, np.nan, consumption)
 
     if eta <= 0:
@@ -32,10 +36,14 @@ def utility(consumption: Union[float, np.ndarray], eta: float, normalize: bool =
 
     if eta == 1:
         # If eta is 1, use the natural log function instead
-        warnings.warn("Utility is calculated with the natural logarithm of the consumption when eta == 1.", UserWarning, stacklevel=2)
+        warnings.warn(
+            "Utility is calculated with the natural logarithm of the consumption when eta == 1.",
+            UserWarning,
+            stacklevel=2,
+        )
         u = np.log(consumption)
     else:
-        u = consumption**(1-eta)/(1-eta)  # Calculate utility
+        u = consumption ** (1 - eta) / (1 - eta)  # Calculate utility
 
     # Normalize utility values if requested
     if normalize and u.size == 1:
@@ -47,7 +55,10 @@ def utility(consumption: Union[float, np.ndarray], eta: float, normalize: bool =
 
     return u if u.size > 1 else u.item()
 
-def recovery_time(rate: Union[float, np.ndarray], rebuilt_per: float = 95) -> Union[float, np.ndarray]:
+
+def recovery_time(
+    rate: Union[float, np.ndarray], rebuilt_per: float = 95
+) -> Union[float, np.ndarray]:
     """
     Calculate the recovery time based on the given rate and percentage rebuilt.
 
@@ -75,13 +86,18 @@ def recovery_time(rate: Union[float, np.ndarray], rebuilt_per: float = 95) -> Un
     if np.any(rate <= 0):
         raise ValueError("Rate must be positive.")
     if not (0 <= rebuilt_per < 100):
-        raise ValueError("rebuilt_per must be a percentage between 0 and 100 (exclusive).")
-    
+        raise ValueError(
+            "rebuilt_per must be a percentage between 0 and 100 (exclusive)."
+        )
+
     T = np.log(1 / (1 - rebuilt_per / 100)) / rate
-    
+
     return T if T.size > 1 else T.item()
 
-def recovery_rate(time: Union[float, np.ndarray], rebuilt_per: float = 95) -> Union[float, np.ndarray]:
+
+def recovery_rate(
+    time: Union[float, np.ndarray], rebuilt_per: float = 95
+) -> Union[float, np.ndarray]:
     """
     Calculate the recovery rate based on the given recovery time and percentage rebuilt.
 
@@ -109,13 +125,18 @@ def recovery_rate(time: Union[float, np.ndarray], rebuilt_per: float = 95) -> Un
     if np.any(time <= 0):
         raise ValueError("Time must be positive.")
     if not (0 <= rebuilt_per < 100):
-        raise ValueError("rebuilt_per must be a percentage between 0 and 100 (exclusive).")
-    
+        raise ValueError(
+            "rebuilt_per must be a percentage between 0 and 100 (exclusive)."
+        )
+
     rate = np.log(1 / (1 - rebuilt_per / 100)) / time
-    
+
     return rate if rate.size > 1 else rate.item()
 
-def reconstruction_cost_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float) -> np.ndarray:
+
+def reconstruction_cost_t(
+    t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float
+) -> np.ndarray:
     """
     Calculate the reconstruction cost over time. This represents a cost rate and not the total cost.
 
@@ -137,10 +158,17 @@ def reconstruction_cost_t(t: Union[float, np.ndarray], l: Union[float, np.ndarra
     """
     # Calculate the reconstruction cost
     cost = l * v * k_str * np.exp(-l * t)
-    
+
     return cost
 
-def income_loss_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float, pi: float) -> np.ndarray:
+
+def income_loss_t(
+    t: Union[float, np.ndarray],
+    l: Union[float, np.ndarray],
+    v: float,
+    k_str: float,
+    pi: float,
+) -> np.ndarray:
     """
     Calculate the income loss over time. This represents a loss rate and not the total loss.
 
@@ -166,7 +194,14 @@ def income_loss_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: f
     loss = pi * v * k_str * np.exp(-l * t)
     return loss
 
-def consumption_loss_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float, pi: float) -> np.ndarray:
+
+def consumption_loss_t(
+    t: Union[float, np.ndarray],
+    l: Union[float, np.ndarray],
+    v: float,
+    k_str: float,
+    pi: float,
+) -> np.ndarray:
     """
     Calculate the consumption loss over time as the sum of income loss and reconstruction cost. This represents a loss rate and not the total loss.
 
@@ -188,10 +223,20 @@ def consumption_loss_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray],
     np.ndarray
         The calculated consumption loss(es) as an nxm matrix where n is the length of t and m is the length of l.
     """
-    cl_t = income_loss_t(t=t, l=l, v=v, k_str=k_str, pi=pi) + reconstruction_cost_t(t=t, l=l, v=v, k_str=k_str)
+    cl_t = income_loss_t(t=t, l=l, v=v, k_str=k_str, pi=pi) + reconstruction_cost_t(
+        t=t, l=l, v=v, k_str=k_str
+    )
     return cl_t
 
-def consumption_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float, pi: float, c0: float) -> np.ndarray:
+
+def consumption_t(
+    t: Union[float, np.ndarray],
+    l: Union[float, np.ndarray],
+    v: float,
+    k_str: float,
+    pi: float,
+    c0: float,
+) -> np.ndarray:
     """
     Calculate the consumption over time. This represents a consumption rate and not the total consumption.
 
@@ -219,7 +264,16 @@ def consumption_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: f
     ct = c0 - cl_t
     return ct
 
-def utility_loss_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float, pi: float, c0: float, eta: float) -> np.ndarray:
+
+def utility_loss_t(
+    t: Union[float, np.ndarray],
+    l: Union[float, np.ndarray],
+    v: float,
+    k_str: float,
+    pi: float,
+    c0: float,
+    eta: float,
+) -> np.ndarray:
     """
     Calculate the utility loss over time. This represents a loss rate and not the total loss.
 
@@ -249,10 +303,11 @@ def utility_loss_t(t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: 
     ul_t = utility(consumption=c0, eta=eta) - utility(consumption=c_t, eta=eta)
     return ul_t
 
+
 def wellbeing_loss(du: Union[float, np.ndarray], c_avg: float, eta: float) -> float:
     """
-    Calculate the wellbeing loss as the equivalent consumption change. 
-    The equivalent consumption change represents the amount by which a household earning an average income 
+    Calculate the wellbeing loss as the equivalent consumption change.
+    The equivalent consumption change represents the amount by which a household earning an average income
     would have to decrease its consumption to experience the same well-being decrease as the considered household.
 
     Parameters
@@ -269,8 +324,9 @@ def wellbeing_loss(du: Union[float, np.ndarray], c_avg: float, eta: float) -> fl
     float
         The equivalent consumption loss.
     """
-    dc_eq = du / (c_avg**(-eta))
+    dc_eq = du / (c_avg ** (-eta))
     return dc_eq
+
 
 def equity_weight(c: float, c_avg: float, eta: float) -> float:
     """
@@ -294,16 +350,16 @@ def equity_weight(c: float, c_avg: float, eta: float) -> float:
 
 
 def opt_lambda(
-    v: float, 
-    k_str: float, 
-    c0: float, 
-    pi: float, 
-    eta: float, 
-    l_min: float = 0.3, 
-    l_max: float = 10, 
-    t_max: Optional[float] = None, 
-    times: Optional[np.ndarray] = None, 
-    method: str = "quad"
+    v: float,
+    k_str: float,
+    c0: float,
+    pi: float,
+    eta: float,
+    l_min: float = 0.3,
+    l_max: float = 10,
+    t_max: Optional[float] = None,
+    times: Optional[np.ndarray] = None,
+    method: str = "quad",
 ) -> float:
     """
     Optimize the recovery rate (lambda) to minimize utility loss.
@@ -331,7 +387,7 @@ def opt_lambda(
     method : str, optional
         The method to use for integration. Can be either "quad" (default) or "trapezoid".
         "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
-        
+
     Returns
     -------
     float
@@ -349,7 +405,7 @@ def opt_lambda(
             raise ValueError("t_max must be provided when using the 'quad' method.")
         times = np.array([0, t_max])
     elif method == "trapezoid" and times is None:
-        raise ValueError("times must be provided when using the 'trapezoid' method.")    
+        raise ValueError("times must be provided when using the 'trapezoid' method.")
 
     def objective(l: float) -> float:
         ut_t = UtilityLoss(times, l, v, k_str, pi, c0, eta)
@@ -357,7 +413,7 @@ def opt_lambda(
         return loss
 
     fun = lambda l: objective(l)
-    res = minimize(fun, l_min, bounds=[(l_min, l_max)], method='Nelder-Mead')
+    res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
     return res.x[0]
 
 
@@ -368,7 +424,7 @@ class Loss:
     Parameters
     ----------
     t : Union[float, np.ndarray], optional
-        Time points provided as a single float or a numpy array. If `t` is None, `t_max` 
+        Time points provided as a single float or a numpy array. If `t` is None, `t_max`
         must be provided.
     l : Union[float, np.ndarray], optional
         Levels provided as a single float or a numpy array. Defaults to None.
@@ -397,14 +453,20 @@ class Loss:
     - Inputs `t` and `l` are converted to at least 1D numpy arrays.
     - If `l` contains more than one element, `t` is reshaped to align with `l` for meshgrid-like behavior.
     """
+
     _fun: callable
 
-    def __init__(self, t: Optional[Union[float, np.ndarray]] = None, l: Optional[Union[float, np.ndarray]] = None, t_max: Optional[float] = None):
+    def __init__(
+        self,
+        t: Optional[Union[float, np.ndarray]] = None,
+        l: Optional[Union[float, np.ndarray]] = None,
+        t_max: Optional[float] = None,
+    ):
         if t is None and t_max is None:
             raise ValueError("Either `t` or `t_max` must be provided.")
         elif t is not None and t_max is not None:
             raise ValueError("Only one of `t` or `t_max` should be provided.")
-        
+
         # Generate time points if only t_max is provided
         if t is None:
             t = np.linspace(0, t_max, 100)  # Default to 100 points
@@ -418,7 +480,7 @@ class Loss:
 
         self.t = t
         self.l = l
-    
+
     @property
     def losses_t(self) -> np.ndarray:
         """
@@ -432,7 +494,9 @@ class Loss:
         f_t = self._fun(self.t, self.l)
         return f_t
 
-    def total(self, rho: float = 0, method: str = "trapezoid") -> Union[float, np.ndarray]:
+    def total(
+        self, rho: float = 0, method: str = "trapezoid"
+    ) -> Union[float, np.ndarray]:
         """
         Calculate the total loss by integrating over time.
 
@@ -459,23 +523,36 @@ class Loss:
         t_max = self.t[-1]
         if method == "trapezoid":
             if self.t.size == 1:
-                raise ValueError("t must have at least 2 points to calculate the integral.")
+                raise ValueError(
+                    "t must have at least 2 points to calculate the integral."
+                )
             f_t = self._fun(self.t, self.l)
             f_t_dis = f_t * np.exp(-rho * self.t)
             integral = np.trapz(f_t_dis, x=self.t, axis=0)
         elif method == "quad":
-            integral = np.array([quad(lambda t, li=li: self._fun(t, li) * np.exp(-rho * t), 0, t_max)[0] for li in self.l])
+            warnings.filterwarnings("ignore", category=IntegrationWarning)
+            integral = np.array(
+                [
+                    quad(
+                        lambda t, li=li: self._fun(t, li) * np.exp(-rho * t),
+                        0,
+                        t_max,
+                    )[0]
+                    for li in self.l
+                ]
+            )
         else:
             raise ValueError("method must be either 'trapezoid' or 'quad'.")
 
         # Ensure the result is always an ndarray or a single float
         return integral if integral.size > 1 else integral.item()
 
+
 class ReconstructionCost(Loss):
     """
     A class to calculate reconstruction cost over time based on recovery rates.
     It includes the total method to calculate the total loss by integrating over time.
-    
+
     Parameters
     ----------
     t : Union[float, np.ndarray]
@@ -496,15 +573,23 @@ class ReconstructionCost(Loss):
     losses_t : np.ndarray
         Property that calculates the reconstruction cost values for all combinations of `t` and `l`.
     """
-    def __init__(self, t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float):
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        l: Union[float, np.ndarray],
+        v: float,
+        k_str: float,
+    ):
         super().__init__(t, l)
         self._fun = lambda t, l: reconstruction_cost_t(t, l, v, k_str)
+
 
 class IncomeLoss(Loss):
     """
     A class to calculate income loss over time based on recovery rates.
     It includes the total method to calculate the total loss by integrating over time.
-    
+
     Parameters
     ----------
     t : Union[float, np.ndarray]
@@ -527,7 +612,15 @@ class IncomeLoss(Loss):
     losses_t : np.ndarray
         Property that calculates the income loss values for all combinations of `t` and `l`.
     """
-    def __init__(self, t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float, pi: float):
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        l: Union[float, np.ndarray],
+        v: float,
+        k_str: float,
+        pi: float,
+    ):
         super().__init__(t, l)
         self._fun = lambda t, l: income_loss_t(t, l, v, k_str, pi)
 
@@ -536,7 +629,7 @@ class ConsumptionLoss(Loss):
     """
     A class to calculate consumption loss over time based on recovery rates.
     It includes the total method to calculate the total loss by integrating over time.
-    
+
     Parameters
     ----------
     t : Union[float, np.ndarray]
@@ -559,7 +652,15 @@ class ConsumptionLoss(Loss):
     losses_t : np.ndarray
         Property that calculates the consumption loss values for all combinations of `t` and `l`.
     """
-    def __init__(self, t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float, pi: float):
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        l: Union[float, np.ndarray],
+        v: float,
+        k_str: float,
+        pi: float,
+    ):
         super().__init__(t, l)
         self._fun = lambda t, l: consumption_loss_t(t, l, v, k_str, pi)
 
@@ -568,7 +669,7 @@ class UtilityLoss(Loss):
     """
     A class to calculate utility loss over time based on recovery rates.
     It includes the total method to calculate the total loss by integrating over time.
-    
+
     Parameters
     ----------
     t : Union[float, np.ndarray]
@@ -595,6 +696,16 @@ class UtilityLoss(Loss):
     losses_t : np.ndarray
         Property that calculates the utility loss values for all combinations of `t` and `l`.
     """
-    def __init__(self, t: Union[float, np.ndarray], l: Union[float, np.ndarray], v: float, k_str: float, pi: float, c0: float, eta: float):
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        l: Union[float, np.ndarray],
+        v: float,
+        k_str: float,
+        pi: float,
+        c0: float,
+        eta: float,
+    ):
         super().__init__(t, l)
         self._fun = lambda t, l: utility_loss_t(t, l, v, k_str, pi, c0, eta)
