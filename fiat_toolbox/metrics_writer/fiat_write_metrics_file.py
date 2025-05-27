@@ -367,7 +367,7 @@ class MetricsFileWriter(IMetricsFileWriter):
             # Update all empty metrics with 0
             for key, value in aggregate_metrics.items():
                 if value == {}:
-                    aggregate_metrics[key] = {name: 0 for name in aggregations}
+                    aggregate_metrics[key] = dict.fromkeys(aggregations, 0)
                     continue
                 for name in aggregations:
                     if name not in value:
@@ -398,6 +398,25 @@ class MetricsFileWriter(IMetricsFileWriter):
                 ],
             )
 
+            # Add the metrics map selector to the dataframe
+            metricsFrame.insert(
+                0,
+                "Show In Metrics Map",
+                [
+                    config[write_aggregate][name].show_in_metrics_map
+                    for name, _ in metricsFrame.iterrows()
+                ],
+            )
+
+            # Add the select function to the dataframe
+            metricsFrame.insert(
+                0,
+                "select",
+                [
+                    config[write_aggregate][name].select
+                    for name, _ in metricsFrame.iterrows()
+                ],
+            )
             # Add the description to the dataframe
             metricsFrame.insert(
                 0,
@@ -422,6 +441,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         include_long_names=True,
                         include_description=True,
                         include_metrics_table_selection=True,
+                        include_metrics_map_selection=True,
                     )
                     metricsFrame = pd.concat([new_metrics, metricsFrame])
 
@@ -478,6 +498,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         include_long_names=True,
                         include_description=True,
                         include_metrics_table_selection=True,
+                        include_metrics_map_selection=True,
                     )
                     metricsFrame = pd.concat([new_metrics, metricsFrame])
 
