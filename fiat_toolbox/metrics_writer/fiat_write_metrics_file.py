@@ -122,8 +122,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                         )
 
                     # Correct metrics name if it is count
-                    if "COUNT" in metric["select"] and "#" not in metric["description"]:
-                        metric["description"] = f"{metric['description']} (#)"
+                    if "COUNT" in metric["select"] and "#" not in metric["long_name"]:
+                        metric["long_name"] = f"{metric['long_name']} (#)"
                     # Create the sql command
                     sql_command = sql_struct(
                         name=metric["name"],
@@ -178,8 +178,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                     )
 
                 # Correct metrics name if it is count
-                if "COUNT" in metric["select"] and "#" not in metric["description"]:
-                    metric["description"] = f"{metric['description']} (#)"
+                if "COUNT" in metric["select"] and "#" not in metric["long_name"]:
+                    metric["long_name"] = f"{metric['long_name']} (#)"
 
                 # Create the sql command
                 sql_command = sql_struct(
