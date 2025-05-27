@@ -189,6 +189,10 @@ class MetricsFileWriter(IMetricsFileWriter):
                 # Add the sql command to the dictionary
                 sql_command_set[metric["name"]] = sql_command
 
+        # Correct metrics name if it is count
+        if "COUNT" in config[name].select and "#" not in config[name].name:
+            config[name].name = f"{config[name].name} (#)"
+
         # Return the sql commands dictionary
         return sql_command_set
 

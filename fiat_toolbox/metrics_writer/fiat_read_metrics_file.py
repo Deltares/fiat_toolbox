@@ -88,6 +88,8 @@ class MetricsFileReader(IMetricsFileReader):
         ----------
         include_long_names : bool
             Include the long names of the metrics.
+        include_metrics_selection : bool
+            Include the metrics selection function.
         include_metrics_table_selection : bool
             Include the metrics table selection.
         include_metrics_map_selection : bool
@@ -108,6 +110,7 @@ class MetricsFileReader(IMetricsFileReader):
 
         # Set the default values
         include_long_names = kwargs.get("include_long_names", False)
+        include_metrics_selection = kwargs.get("include_metrics_selection", False)
         include_metrics_table_selection = kwargs.get(
             "include_metrics_table_selection", False
         )
