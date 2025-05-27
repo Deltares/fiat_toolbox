@@ -61,7 +61,7 @@ class AggregationAreas(IAggregationAreas):
         id_name: Optional[str] = "name",
         file_format: Optional[str] = "geopackage",
     ) -> None:
-        """Saves a geospatial file where the aggregation areas are join with metrics from a metric table.
+        """Saves a geospatial file where the aggregation areas are join with metrics from a metric map.
 
         Parameters
         ----------
@@ -87,14 +87,17 @@ class AggregationAreas(IAggregationAreas):
 
         # Only keep metrics that are supposed to be in the metrics table
         metrics_to_keep = (
-            df_metrics.loc["Show In Metrics Table", :]
+            df_metrics.loc["Show In Metrics Map", :]
             .map(lambda x: True if x == "True" else False)
             .astype(bool)
         )
+
         df = df_metrics.loc[:, metrics_to_keep]
 
         # Drop rows containing other variables
-        df = df.drop(["Description", "Show In Metrics Table", "Long Name"])
+        df = df.drop(
+            ["Description", "Show In Metrics Table", "Show In Metrics Map", "Long Name"]
+        )
         df = df.apply(pd.to_numeric)
 
         # Joins based on provided column name
@@ -114,5 +117,5 @@ class AggregationAreas(IAggregationAreas):
             joined.to_file(out_path, driver="GeoJSON")
         else:
             raise ValueError(
-                f"File format specified: {file_format} not in implemented formats: {*_FORMATS,}."
+                f"File format specified: {file_format} not in implemented formats: {(*_FORMATS,)}."
             )

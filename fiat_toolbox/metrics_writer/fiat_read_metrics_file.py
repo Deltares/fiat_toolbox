@@ -90,6 +90,8 @@ class MetricsFileReader(IMetricsFileReader):
             Include the long names of the metrics.
         include_metrics_table_selection : bool
             Include the metrics table selection.
+        include_metrics_map_selection : bool
+            Include the metrics map selection.
         include_description : bool
             Include the description of the metrics.
 
@@ -109,6 +111,9 @@ class MetricsFileReader(IMetricsFileReader):
         include_metrics_table_selection = kwargs.get(
             "include_metrics_table_selection", False
         )
+        include_metrics_map_selection = kwargs.get(
+            "include_metrics_map_selection", False
+        )
         include_description = kwargs.get("include_description", False)
 
         # Read the metrics from the file
@@ -124,6 +129,7 @@ class MetricsFileReader(IMetricsFileReader):
                 "Description",
                 "Long Name",
                 "Show In Metrics Table",
+                "Show In Metrics Map",
             }
 
             # Ensure values are interpreted as numbers
@@ -142,6 +148,10 @@ class MetricsFileReader(IMetricsFileReader):
             if not include_metrics_table_selection:
                 df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
 
+            # Remove the metrics map selection row
+            if not include_metrics_map_selection:
+                df_metrics = df_metrics.drop("Show In Metrics Map", axis="columns")
+
         else:
             # Ensure values are interpreted as numbers
             df_metrics["Value"] = pd.to_numeric(df_metrics["Value"])
@@ -157,6 +167,10 @@ class MetricsFileReader(IMetricsFileReader):
             # Remove the metrics table selection row
             if not include_metrics_table_selection:
                 df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
+
+            # Remove the metrics map selection row
+            if not include_metrics_map_selection:
+                df_metrics = df_metrics.drop("Show In Metrics Map", axis="columns")
 
         # Return the metric
         return df_metrics
