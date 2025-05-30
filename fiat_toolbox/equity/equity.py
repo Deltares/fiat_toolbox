@@ -112,7 +112,12 @@ class Equity:
 
             # Drop rows containing other variables
             damages_table = damages_table.drop(
-                ["Description", "Show In Metrics Table", "Long Name"]
+                [
+                    "Description",
+                    "Show In Metrics Table",
+                    "Show In Metrics Map",
+                    "Long Name",
+                ]
             )
             damages_table = damages_table.apply(pd.to_numeric)
         # Merge census block groups with fiat output (damages estimations per return period)
