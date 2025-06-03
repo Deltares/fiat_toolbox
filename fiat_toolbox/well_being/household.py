@@ -414,6 +414,7 @@ class Household:
         rec_time_min: float = 0.3,
         no_steps: float = 1000,
         method: str = "trapezoid",
+        eps_rel: float = 0.01,
     ) -> None:
         """
         Optimize the reconstruction rate (lambda) to minimize the total well-being loss.
@@ -428,6 +429,10 @@ class Household:
             The number of steps to divide the recovery time range into. Default is 1000.
         method : str, optional
             The numerical integration method to use for loss calculations. Can be either "trapezoid" (default) or "quad"
+        eps_rel : float, optional
+            Relative tolerance for the optimization. If greater than 0, the function will return
+            the smallest lambda within the relative tolerance of the minimum loss.
+            Default is 0.01.
 
         Returns
         -------
@@ -436,16 +441,20 @@ class Household:
         # Check if the maximum recovery time is provided, else use the maximum time
         if rec_time_max is None:
             rec_time_max = self.t[-1]
+
         # Create array of lambda values to check
         times = np.linspace(rec_time_min, rec_time_max, no_steps)
         lambdas = recovery_rate(times, rebuilt_per=95)
+
         # Calculate losses for each lambda value
         reconstruction_costs = ReconstructionCost(
             t=self.t, l=lambdas, v=self.v, k_str=self.k_str
         ).total(rho=0, method=method)
+
         income_losses = IncomeLoss(
             t=self.t, l=lambdas, v=self.v, k_str=self.k_str, pi=self.pi
         ).total(rho=0, method=method)
+
         consumption_losses = ConsumptionLoss(
             t=self.t, l=lambdas, v=self.v, k_str=self.k_str, pi=self.pi
         ).total(rho=0, method=method)
@@ -459,7 +468,8 @@ class Household:
             eta=self.eta,
             cmin=self.cmin,
         ).total(rho=0, method=method)
-        optimal_lambda = opt_lambda(
+
+        opt = opt_lambda(
             v=self.v,
             k_str=self.k_str,
             c0=self.c0,
@@ -471,7 +481,11 @@ class Household:
             times=self.t,
             method=method,
             cmin=self.cmin,
+            eps_rel=eps_rel,
         )
+
+        optimal_lambda = opt["l_opt"]
+        self.lambda_opt = opt
 
         # Save optimization dataframe
         df = pd.DataFrame(
@@ -525,10 +539,12 @@ class Household:
         if x_type == "rate":
             x = self.l_opt["lambda"]
             val = self.l
+            val_min = self.lambda_opt["l_opt_min"]
             leg = "Reconstruction-rate λ"
         elif x_type == "time":
             x = self.l_opt["recovery_time"]
             val = self.recovery_time
+            val_min = recovery_time(self.lambda_opt["l_opt_min"])
             leg = "Recovery time (years)"
             # axs[0].set_xscale('log')
         axs[1].set_xlabel(leg)
@@ -579,6 +595,27 @@ class Household:
         axs[1].axvline(
             x=val, color="red", linestyle="--", label=f"Optimum value: {val:.2f}"
         )
+        if val_min != val:
+            axs[1].axvline(
+                x=val_min,
+                color="orange",
+                linestyle="--",
+                label=f"Minimum value: {val_min:.2f}",
+            )
+            # Add text below the label for consumption diff
+            # Place the text under the legend (outside the plot area)
+            axs[1].text(
+                1.02,
+                -0.15,
+                f"consumption diff: {self.lambda_opt['C_diff']:.2f} {self.currency}",
+                color="orange",
+                fontsize=10,
+                verticalalignment="top",
+                horizontalalignment="left",
+                rotation=0,
+                transform=axs[1].transAxes,
+            )
+
         ylims = (axs[1].get_ylim()[0], axs[1].get_ylim()[1])
         axs[1].fill_between(
             x, ylims[0], ylims[1], color="steelblue", alpha=0.3, label="Tested range"
