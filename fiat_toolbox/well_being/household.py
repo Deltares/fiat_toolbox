@@ -44,6 +44,7 @@ class Household:
         t_max: Optional[float] = 10,
         dt: Optional[float] = 1 / 52,
         currency: Optional[str] = "$",
+        cmin: Optional[float] = 0.0,
     ) -> None:
         """
         Initialize the WellBeing class with the given parameters.
@@ -55,9 +56,9 @@ class Household:
         k_str : float
             The total building value.
         c0 : float
-            Initial consumption level.
+            Initial consumption rate per year.
         c_avg : float
-            Average consumption level.
+            Average consumption rate per year.
         l : float, optional
             The rate of recovery (per unit time). Default is None.
         pi : float, optional
@@ -72,6 +73,8 @@ class Household:
             Time step for the simulation. Default is 1/52 (weekly).
         currency : str, optional
             Currency symbol for the plots. Default is "$".
+        cmin : float, optional
+            Minimum consumption rate per year. Default is 0.0.
 
         Returns
         -------
@@ -93,6 +96,7 @@ class Household:
             self.recovery_time = recovery_time(rate=self.l, rebuilt_per=95)
         self.time_series = pd.DataFrame({"time": self.t})
         self.total_losses = pd.Series()
+        self.cmin = cmin
 
     def __repr__(self):
         return (
@@ -145,7 +149,14 @@ class Household:
             loss = ConsumptionLoss(self.t, self.l, self.v, self.k_str, self.pi)
         elif loss_type == LossType.UTILITY:
             loss = UtilityLoss(
-                self.t, self.l, self.v, self.k_str, self.pi, self.c0, self.eta
+                self.t,
+                self.l,
+                self.v,
+                self.k_str,
+                self.pi,
+                self.c0,
+                self.eta,
+                self.cmin,
             )
         else:
             raise ValueError(f"Invalid loss type: {loss_type}")
@@ -198,6 +209,7 @@ class Household:
             pi=self.pi,
             c0=self.c0,
             eta=self.eta,
+            cmin=self.cmin,
         )
         du_dis = ut_t.total(rho=self.rho, method=method)
         well_being_loss = wellbeing_loss(du=du_dis, c_avg=self.c_avg, eta=self.eta)
@@ -276,7 +288,9 @@ class Household:
         if not ax_given:
             return fig
 
-    def plot_consumption(self, ax: Optional[plt.Axes] = None) -> Optional[plt.Figure]:
+    def plot_consumption(
+        self, ax: Optional[plt.Axes] = None, plot_cmin=False
+    ) -> Optional[plt.Figure]:
         """
         Plot the consumption losses over time, stacking income losses and reconstruction costs with different hatches and colors.
 
@@ -348,6 +362,17 @@ class Household:
             alpha=0.3,
             label=f"Reconstruction rate: {self.l:.2f}",
         )
+
+        # Plot cmin
+        if plot_cmin:
+            ax.axhline(
+                y=self.cmin,
+                color="black",
+                linestyle="--",
+                alpha=1,
+                label=f"Minimum consumption: {self.cmin:,.0f} {self.currency}",
+            )
+
         # Add text annotation for recovery time
         y_point = self.c0 - self.time_series[LossType.CONSUMPTION].mean()
         ax.text(
@@ -375,7 +400,7 @@ class Household:
 
         # Plot consumption losses
         ax.set_xlabel("Time after disaster (years)")
-        ax.set_ylabel(f"Consumption over time ({self.currency})")
+        ax.set_ylabel(f"Consumption rate ({self.currency}/year)")
         ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{int(x):,}"))
         # Add legend
         ax.legend()
@@ -388,7 +413,7 @@ class Household:
         rec_time_max: Optional[float] = None,
         rec_time_min: float = 0.3,
         no_steps: float = 1000,
-        method="trapezoid",
+        method: str = "trapezoid",
     ) -> None:
         """
         Optimize the reconstruction rate (lambda) to minimize the total well-being loss.
@@ -432,6 +457,7 @@ class Household:
             pi=self.pi,
             c0=self.c0,
             eta=self.eta,
+            cmin=self.cmin,
         ).total(rho=0, method=method)
         optimal_lambda = opt_lambda(
             v=self.v,
@@ -444,6 +470,7 @@ class Household:
             t_max=self.t_max,
             times=self.t,
             method=method,
+            cmin=self.cmin,
         )
 
         # Save optimization dataframe

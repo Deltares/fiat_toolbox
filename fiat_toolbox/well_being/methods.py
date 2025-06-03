@@ -236,6 +236,7 @@ def consumption_t(
     k_str: float,
     pi: float,
     c0: float,
+    cmin: float = 0.0,
 ) -> np.ndarray:
     """
     Calculate the consumption over time. This represents a consumption rate and not the total consumption.
@@ -253,7 +254,9 @@ def consumption_t(
     pi : float
         Average productivity of capital. Can be derived using Penn World Tables.
     c0 : float
-        Initial consumption level.
+        Initial consumption rate per year.
+    cmin : float, optional
+        Minimum consumption rate per year. Default is 0.0.
 
     Returns
     -------
@@ -261,7 +264,7 @@ def consumption_t(
         The calculated consumption(es) as an nxm matrix where n is the length of t and m is the length of l.
     """
     cl_t = consumption_loss_t(t=t, l=l, v=v, k_str=k_str, pi=pi)
-    ct = c0 - cl_t
+    ct = c0 - cmin - cl_t
     return ct
 
 
@@ -273,6 +276,7 @@ def utility_loss_t(
     pi: float,
     c0: float,
     eta: float,
+    cmin: float = 0.0,
 ) -> np.ndarray:
     """
     Calculate the utility loss over time. This represents a loss rate and not the total loss.
@@ -290,17 +294,19 @@ def utility_loss_t(
     pi : float
         Average productivity of capital. Can be derived using Penn World Tables.
     c0 : float
-        Initial consumption level.
+        Initial consumption rate per year.
     eta : float
         The elasticity of marginal utility of consumption.
+    cmin : float, optional
+        Minimum consumption rate per year. Default is 0.0.
 
     Returns
     -------
     np.ndarray
         The calculated utility loss(es) as an nxm matrix where n is the length of t and m is the length of l.
     """
-    c_t = consumption_t(t=t, l=l, v=v, k_str=k_str, pi=pi, c0=c0)
-    ul_t = utility(consumption=c0, eta=eta) - utility(consumption=c_t, eta=eta)
+    c_t = consumption_t(t=t, l=l, v=v, k_str=k_str, pi=pi, c0=c0, cmin=cmin)
+    ul_t = utility(consumption=c0 - cmin, eta=eta) - utility(consumption=c_t, eta=eta)
     return ul_t
 
 
@@ -360,6 +366,7 @@ def opt_lambda(
     t_max: Optional[float] = None,
     times: Optional[np.ndarray] = None,
     method: str = "quad",
+    cmin: float = 0.0,
 ) -> float:
     """
     Optimize the recovery rate (lambda) to minimize utility loss.
@@ -371,7 +378,7 @@ def opt_lambda(
     k_str : float
         The total building structure value.
     c0 : float
-        Initial consumption level.
+        Initial consumption rate per year.
     pi : float
         Average productivity of capital. Can be derived using Penn World Tables.
     eta : float
@@ -387,6 +394,8 @@ def opt_lambda(
     method : str, optional
         The method to use for integration. Can be either "quad" (default) or "trapezoid".
         "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+    cmin : float, optional
+        Minimum consumption rate per year. Default is 0.0.
 
     Returns
     -------
@@ -408,7 +417,7 @@ def opt_lambda(
         raise ValueError("times must be provided when using the 'trapezoid' method.")
 
     def objective(l: float) -> float:
-        ut_t = UtilityLoss(times, l, v, k_str, pi, c0, eta)
+        ut_t = UtilityLoss(times, l, v, k_str, pi, c0, eta, cmin)
         loss = ut_t.total(rho=0, method=method)
         return loss
 
@@ -706,6 +715,7 @@ class UtilityLoss(Loss):
         pi: float,
         c0: float,
         eta: float,
+        cmin: float = 0.0,
     ):
         super().__init__(t, l)
-        self._fun = lambda t, l: utility_loss_t(t, l, v, k_str, pi, c0, eta)
+        self._fun = lambda t, l: utility_loss_t(t, l, v, k_str, pi, c0, eta, cmin)
