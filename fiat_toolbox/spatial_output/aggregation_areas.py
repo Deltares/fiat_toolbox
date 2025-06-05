@@ -85,16 +85,8 @@ class AggregationAreas(IAggregationAreas):
         index_name = df_metrics.columns[0]
         df_metrics = df_metrics.set_index(index_name)
 
-        # Only keep metrics that are supposed to be in the metrics table
-        metrics_to_keep = (
-            df_metrics.loc["Show In Metrics Table", :]
-            .map(lambda x: True if x == "True" else False)
-            .astype(bool)
-        )
-        df = df_metrics.loc[:, metrics_to_keep]
-
         # Drop rows containing other variables
-        df = df.drop(["Description", "Show In Metrics Table", "Long Name"])
+        df = df_metrics.drop(["Description", "Show In Metrics Table", "Long Name"])
         df = df.apply(pd.to_numeric)
 
         # Joins based on provided column name
