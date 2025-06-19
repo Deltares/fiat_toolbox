@@ -15,7 +15,7 @@ def utility(
     ----------
     consumption : Union[float, np.ndarray]
         The consumption value(s) for which to calculate utility. Can be a single float or a numpy array of floats.
-    eta : float, optional
+    eta : float
         The elasticity of the marginal utility of consumption.
     normalize : bool, optional
         If True, normalize the utility values to the range [0, 1], by default False.
@@ -54,6 +54,33 @@ def utility(
         u = (u - min_utility) / (max_utility - min_utility)
 
     return u if u.size > 1 else u.item()
+
+
+def inverse_utility(u: Union[float, np.ndarray], eta: float):
+    """
+    Compute the inverse of the utility function for given utility values and risk aversion parameter.
+
+    Parameters
+    ----------
+    u : float or np.ndarray
+        The utility value(s) to invert. Can be a scalar or a NumPy array.
+    eta : float
+        The elasticity of the marginal utility of consumption.
+
+    Returns
+    -------
+    float or np.ndarray
+        The value(s) corresponding to the inverse utility transformation of `u`, matching the input type.
+
+    Notes
+    -----
+    - For eta == 1, the inverse utility is the exponential function.
+    - For eta != 1, the inverse utility is computed using the CRRA formula.
+    """
+    if eta == 1:
+        return np.exp(u)
+    else:
+        return (u * (1 - eta)) ** (1 / (1 - eta))
 
 
 def recovery_time(
@@ -367,7 +394,8 @@ def opt_lambda(
     times: Optional[np.ndarray] = None,
     method: str = "quad",
     cmin: float = 0.0,
-) -> float:
+    eps_rel: float = 0.0,
+) -> dict:
     """
     Optimize the recovery rate (lambda) to minimize utility loss.
 
@@ -396,6 +424,10 @@ def opt_lambda(
         "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
     cmin : float, optional
         Minimum consumption rate per year. Default is 0.0.
+    eps_rel : float, optional
+        Relative tolerance for the optimization. If greater than 0, the function will return
+        the smallest lambda within the relative tolerance of the minimum loss.
+        Default is 0.0.
 
     Returns
     -------
@@ -423,7 +455,41 @@ def opt_lambda(
 
     fun = lambda l: objective(l)
     res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
-    return res.x[0]
+    l_opt = res.x[0]
+    loss_opt = res.fun
+
+    opt = {
+        "l_opt_min": l_opt,
+        "loss_opt_min": loss_opt,
+        "eps_rel": eps_rel,
+        "l_opt": l_opt,
+        "loss_opt": loss_opt,
+        "C_diff": 0,
+        "T_diff": 0,
+    }
+    # Check if a tolerance is provided
+    if eps_rel > 0:
+        l_grid = np.linspace(l_min, l_max, 1000)
+        losses = np.array([objective(l) for l in l_grid])
+        threshold = loss_opt * (1 + eps_rel)
+        # Find the smallest lambda where the loss is within the threshold
+        valid_indices = np.where(losses <= threshold)[0]
+        if valid_indices.size == 0:
+            raise ValueError(
+                f"No lambda found within the relative tolerance of {eps_rel} from the minimum loss."
+            )
+        ind = valid_indices[-1]
+        l_opt_new = l_grid[ind]
+        loss_opt_new = losses[ind]
+
+        opt["l_opt"] = l_opt_new
+        opt["loss_opt"] = loss_opt_new
+        opt["C_diff"] = inverse_utility(loss_opt_new, eta) - inverse_utility(
+            loss_opt, eta
+        )
+        opt["T_diff"] = recovery_time(l_opt) - recovery_time(l_opt_new)
+
+    return opt
 
 
 class Loss:
