@@ -234,6 +234,10 @@ class MetricsFileWriter(IMetricsFileWriter):
         if sql_command.groupby:
             sql_query += f" GROUP BY {sql_command.groupby}"
 
+        # Register the dataframe as a DuckDB table
+        duckdb.unregister("df_results")
+        duckdb.register("df_results", df_results)
+
         # Execute the query. If the query is invalid, an error PandaSQLException will be raised
         sql_query = sql_query.replace("`", '"')
         result = duckdb.query(sql_query).df()
@@ -367,7 +371,7 @@ class MetricsFileWriter(IMetricsFileWriter):
             # Update all empty metrics with 0
             for key, value in aggregate_metrics.items():
                 if value == {}:
-                    aggregate_metrics[key] = {name: 0 for name in aggregations}
+                    aggregate_metrics[key] = dict.fromkeys(aggregations, 0)
                     continue
                 for name in aggregations:
                     if name not in value:
