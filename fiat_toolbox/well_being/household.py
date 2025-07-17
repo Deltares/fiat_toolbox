@@ -45,6 +45,7 @@ class Household:
         dt: Optional[float] = 1 / 52,
         currency: Optional[str] = "$",
         cmin: Optional[float] = 0.0,
+        recovery_per: Optional[float] = 95.0,
     ) -> None:
         """
         Initialize the WellBeing class with the given parameters.
@@ -75,6 +76,8 @@ class Household:
             Currency symbol for the plots. Default is "$".
         cmin : float, optional
             Minimum consumption rate per year. Default is 0.0.
+        recovery_per : float, optional
+            Percentage (%) of asset rebuilt to consider as "recovered". Default is 95.0.
 
         Returns
         -------
@@ -92,8 +95,11 @@ class Household:
         self.t = np.linspace(0, self.t_max, int(self.t_max / self.dt) + 1)
         self.currency = currency
         self.l = l
+        self.recovery_per = recovery_per
         if l is not None:
-            self.recovery_time = recovery_time(rate=self.l, rebuilt_per=95)
+            self.recovery_time = recovery_time(
+                rate=self.l, rebuilt_per=self.recovery_per
+            )
         self.time_series = pd.DataFrame({"time": self.t})
         self.total_losses = pd.Series()
         self.cmin = cmin
@@ -444,7 +450,7 @@ class Household:
 
         # Create array of lambda values to check
         times = np.linspace(rec_time_min, rec_time_max, no_steps)
-        lambdas = recovery_rate(times, rebuilt_per=95)
+        lambdas = recovery_rate(times, rebuilt_per=self.recovery_per)
 
         # Calculate losses for each lambda value
         reconstruction_costs = ReconstructionCost(
@@ -491,7 +497,9 @@ class Household:
         df = pd.DataFrame(
             {
                 "lambda": lambdas,
-                "recovery_time": recovery_time(rate=lambdas, rebuilt_per=95),
+                "recovery_time": recovery_time(
+                    rate=lambdas, rebuilt_per=self.recovery_per
+                ),
                 LossType.RECONSTRUCTION: reconstruction_costs,
                 LossType.INCOME: income_losses,
                 LossType.CONSUMPTION: consumption_losses,
@@ -503,7 +511,9 @@ class Household:
         self.l = optimal_lambda
 
         # Calculate the recovery time for the optimal lambda
-        self.recovery_time = recovery_time(rate=optimal_lambda, rebuilt_per=95)
+        self.recovery_time = recovery_time(
+            rate=optimal_lambda, rebuilt_per=self.recovery_per
+        )
 
         self.l_opt = df
 
