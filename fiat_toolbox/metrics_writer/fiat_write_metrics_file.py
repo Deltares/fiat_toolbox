@@ -12,17 +12,18 @@ import tomli
 from fiat_toolbox import get_fiat_columns
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
+from pydantic import BaseModel
 
 _AGGR_LABEL_FMT = get_fiat_columns().aggregation_label
 
 
 # sql command struct
-@dataclass
-class sql_struct:
+
+class sql_struct(BaseModel):
     name: str
     long_name: str
-    show_in_metrics_table: bool
-    show_in_metrics_map: bool
+    show_in_metrics_table: bool = True
+    show_in_metrics_map: bool = True
     description: str
     select: str
     filter: str
@@ -104,37 +105,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                     raise ValueError("No queries specified in the metrics file.")
                 # Loop over the metrics
                 for metric in metrics["queries"]:
-                    # Check whether the metric contains all required fields
-                    if all(
-                        key in metrics
-                        for key in [
-                            "name",
-                            "long_name",
-                            "show_in_metrics_table",
-                            "show_in_metrics_map",
-                            "description",
-                            "select",
-                            "filter",
-                        ]
-                    ):
-                        raise ValueError(
-                            f"The metrics file for metric {metric['name']} does not contain all required fields."
-                        )
-
-                    # Correct metrics name if it is count
-                    if "COUNT" in metric["select"] and "#" not in metric["long_name"]:
-                        metric["long_name"] = f"{metric['long_name']} (#)"
                     # Create the sql command
-                    sql_command = sql_struct(
-                        name=metric["name"],
-                        long_name=metric["long_name"],
-                        show_in_metrics_table=metric["show_in_metrics_table"],
-                        show_in_metrics_map=metric["show_in_metrics_map"],
-                        description=metric["description"],
-                        select=metric["select"],
-                        filter=metric["filter"],
-                        groupby=f"`{self.aggregation_label_fmt.format(name=aggregate)}`",
-                    )
+                    sql_command = sql_struct(groupby=f"`{self.aggregation_label_fmt.format(name=aggregate)}`", **metric)
 
                     # Check whether the metric name is already in the dictionary
                     if metric["name"] in aggregate_command:
@@ -160,38 +132,8 @@ class MetricsFileWriter(IMetricsFileWriter):
 
             # Loop over the metrics
             for metric in metrics["queries"]:
-                # Check whether the metric contains all required fields
-                if all(
-                    key in metrics
-                    for key in [
-                        "name",
-                        "long_name",
-                        "show_in_metrics_table",
-                        "show_in_metrics_map",
-                        "description",
-                        "select",
-                        "filter",
-                    ]
-                ):
-                    raise ValueError(
-                        f"The metrics file for metric {metric['name']} does not contain all required fields."
-                    )
-
-                # Correct metrics name if it is count
-                if "COUNT" in metric["select"] and "#" not in metric["long_name"]:
-                    metric["long_name"] = f"{metric['long_name']} (#)"
-
                 # Create the sql command
-                sql_command = sql_struct(
-                    name=metric["name"],
-                    long_name=metric["long_name"],
-                    show_in_metrics_table=metric["show_in_metrics_table"],
-                    show_in_metrics_map=metric["show_in_metrics_map"],
-                    description=metric["description"],
-                    select=metric["select"],
-                    filter=metric["filter"],
-                    groupby="",
-                )
+                sql_command = sql_struct(groupby="", **metric)
 
                 # Check whether the metric name is already in the dictionary
                 if metric["name"] in sql_command_set:
