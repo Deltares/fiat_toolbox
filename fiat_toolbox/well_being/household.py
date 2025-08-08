@@ -19,10 +19,11 @@ from .methods import (
     wellbeing_loss,
 )
 
-
+#TODO Make class a pydantic model
 class LossType(str, Enum):
     RECONSTRUCTION = "Reconstruction Costs"
     INCOME = "Income Loss"
+    
     CONSUMPTION = "Consumption Loss"
     UTILITY = "Utility Loss"
 
@@ -46,6 +47,9 @@ class Household:
         currency: Optional[str] = "$",
         cmin: Optional[float] = 0.0,
         recovery_per: Optional[float] = 95.0,
+        savings: Optional[float] = 0.0,
+        insurance: Optional[float] = 0.0,
+        support: Optional[float]= 0.0,
     ) -> None:
         """
         Initialize the WellBeing class with the given parameters.
@@ -103,6 +107,11 @@ class Household:
         self.time_series = pd.DataFrame({"time": self.t})
         self.total_losses = pd.Series()
         self.cmin = cmin
+        self.savings = savings
+        self.insurance = insurance
+        self.support = support
+        if sum([self.savings, self.insurance, self.support]):
+            self.liquidity = True
 
     def __repr__(self):
         return (
@@ -118,8 +127,12 @@ class Household:
             f"  t_max = {self.t_max} (maximum simulation time),\n"
             f"  dt = {self.dt} (time step),\n"
             f"  currency = {self.currency} (currency symbol)\n"
-            f")"
-        )
+            f"  cmin = {self.cmin} (minimum consumption level),\n"
+            f"  recovery_per = {self.recovery_per} (recovery percentage),\n"
+            f"  savings = {self.savings} (savings),\n"
+            f"  insurance = {self.insurance} (insurance),\n"
+            f"  support = {self.support} (support)\n"
+            f")")
 
     def calc_loss(self, loss_type: LossType, method: str = "trapezoid") -> float:
         """
@@ -152,7 +165,10 @@ class Household:
         elif loss_type == LossType.INCOME:
             loss = IncomeLoss(self.t, self.l, self.v, self.k_str, self.pi)
         elif loss_type == LossType.CONSUMPTION:
-            loss = ConsumptionLoss(self.t, self.l, self.v, self.k_str, self.pi)
+            loss = ConsumptionLoss(self.t, self.l, self.v, self.k_str, self.pi, self.savings, self.insurance, self.support)
+            if self.liquidity:
+                loss_no_liq = ConsumptionLoss(self.t, self.l, self.v, self.k_str, self.pi)
+                self.time_series[f"{loss_type} No Liquidity"] = loss_no_liq.losses_t
         elif loss_type == LossType.UTILITY:
             loss = UtilityLoss(
                 self.t,
@@ -163,6 +179,9 @@ class Household:
                 self.c0,
                 self.eta,
                 self.cmin,
+                self.savings,
+                self.insurance,
+                self.support,
             )
         else:
             raise ValueError(f"Invalid loss type: {loss_type}")
@@ -216,6 +235,9 @@ class Household:
             c0=self.c0,
             eta=self.eta,
             cmin=self.cmin,
+            savings=self.savings,
+            insurance=self.insurance,
+            support=self.support,
         )
         du_dis = ut_t.total(rho=self.rho, method=method)
         well_being_loss = wellbeing_loss(du=du_dis, c_avg=self.c_avg, eta=self.eta)
@@ -340,12 +362,29 @@ class Household:
         label2 = f"Total {LossType.RECONSTRUCTION}: {self.total_losses[LossType.RECONSTRUCTION]:,.0f} {self.currency}"
         ax.fill_between(
             self.time_series["time"],
-            self.c0 - self.time_series[LossType.CONSUMPTION],
+            self.c0 - self.time_series[LossType.INCOME] - self.time_series[LossType.RECONSTRUCTION],
             self.c0 - self.time_series[LossType.INCOME],
-            color=color2,
+            facecolor=color2,
             alpha=0.6,
             label=label2,
+            # linewidth=0.0
         )
+        
+        # If there is liquidity available, plot the consumption losses without liquidity
+        if self.liquidity:
+            label3 = f"Total Liquidity: {self.savings + self.insurance + self.support:,.0f} {self.currency}"
+            # Add hatch by drawing again with no fill color, only hatch
+            ax.fill_between(
+                self.time_series["time"],
+                self.c0 - self.time_series[LossType.CONSUMPTION],
+                self.c0 - self.time_series[f"{LossType.CONSUMPTION} No Liquidity"],
+                facecolor="none",
+                edgecolor="black",
+                hatch="///",
+                linewidth=0.0,
+                label=label3,
+            )
+        
 
         # Plot consumption losses with a dashed line and expand to the left by 4 months
         expanded_time = np.insert(self.time_series["time"], 0, [-1, -0.001])
@@ -453,27 +492,51 @@ class Household:
         lambdas = recovery_rate(times, rebuilt_per=self.recovery_per)
 
         # Calculate losses for each lambda value
-        reconstruction_costs = ReconstructionCost(
-            t=self.t, l=lambdas, v=self.v, k_str=self.k_str
-        ).total(rho=0, method=method)
+        # Initialize arrays to store losses for each lambda
+        reconstruction_costs = []
+        income_losses = []
+        consumption_losses = []
+        utility_losses = []
 
-        income_losses = IncomeLoss(
-            t=self.t, l=lambdas, v=self.v, k_str=self.k_str, pi=self.pi
-        ).total(rho=0, method=method)
+        # Iterate through each lambda value and calculate losses
+        for lmbd in lambdas:
+            reconstruction_costs.append(
+            ReconstructionCost(
+                t=self.t, l=lmbd, v=self.v, k_str=self.k_str,
+            ).total(rho=0, method=method)
+            )
+            income_losses.append(
+            IncomeLoss(
+                t=self.t, l=lmbd, v=self.v, k_str=self.k_str, pi=self.pi,
+            ).total(rho=0, method=method)
+            )
+            consumption_losses.append(
+            ConsumptionLoss(
+                t=self.t, l=lmbd, v=self.v, k_str=self.k_str, pi=self.pi,
+                savings=self.savings, insurance=self.insurance, support=self.support
+            ).total(rho=0, method=method)
+            )
+            utility_losses.append(
+            UtilityLoss(
+                t=self.t,
+                l=lmbd,
+                v=self.v,
+                k_str=self.k_str,
+                pi=self.pi,
+                c0=self.c0,
+                eta=self.eta,
+                cmin=self.cmin,
+                savings=self.savings,
+                insurance=self.insurance,
+                support=self.support,
+            ).total(rho=0, method=method)
+            )
 
-        consumption_losses = ConsumptionLoss(
-            t=self.t, l=lambdas, v=self.v, k_str=self.k_str, pi=self.pi
-        ).total(rho=0, method=method)
-        utility_losses = UtilityLoss(
-            t=self.t,
-            l=lambdas,
-            v=self.v,
-            k_str=self.k_str,
-            pi=self.pi,
-            c0=self.c0,
-            eta=self.eta,
-            cmin=self.cmin,
-        ).total(rho=0, method=method)
+        # Convert lists to numpy arrays for further processing
+        reconstruction_costs = np.array(reconstruction_costs)
+        income_losses = np.array(income_losses)
+        consumption_losses = np.array(consumption_losses)
+        utility_losses = np.array(utility_losses)
 
         opt = opt_lambda(
             v=self.v,
@@ -487,7 +550,7 @@ class Household:
             times=self.t,
             method=method,
             cmin=self.cmin,
-            eps_rel=eps_rel,
+            eps_rel=eps_rel, savings=self.savings, insurance=self.insurance, support=self.support
         )
 
         optimal_lambda = opt["l_opt"]
