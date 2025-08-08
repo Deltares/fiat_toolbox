@@ -105,6 +105,11 @@ class MetricsFileWriter(IMetricsFileWriter):
                     raise ValueError("No queries specified in the metrics file.")
                 # Loop over the metrics
                 for metric in metrics["queries"]:
+                       
+                    # Correct metrics name if it is count
+                    if "COUNT" in metric["select"] and "#" not in metric["description"]:
+                        metric["description"] = f"{metric['description']} (#)"
+
                     # Create the sql command
                     sql_command = sql_struct(groupby=f"`{self.aggregation_label_fmt.format(name=aggregate)}`", **metric)
 
@@ -132,6 +137,9 @@ class MetricsFileWriter(IMetricsFileWriter):
 
             # Loop over the metrics
             for metric in metrics["queries"]:
+                # Correct metrics name if it is count
+                if "COUNT" in metric["select"] and "#" not in metric["description"]:
+                    metric["description"] = f"{metric['description']} (#)"
                 # Create the sql command
                 sql_command = sql_struct(groupby="", **metric)
 
