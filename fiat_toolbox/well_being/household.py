@@ -110,8 +110,10 @@ class Household:
         self.savings = savings
         self.insurance = insurance
         self.support = support
-        if sum([self.savings, self.insurance, self.support]):
+        if sum([self.savings, self.insurance, self.support]) != 0:
             self.liquidity = True
+        else:
+            self.liquidity = False
 
     def __repr__(self):
         return (
