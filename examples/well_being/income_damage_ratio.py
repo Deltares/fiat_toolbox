@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import random
 
-df = pd.read_excel('./examples/well_being/alessia.xlsx')
+df = pd.read_excel('alessia.xlsx')
 
 # we assume relative damage and then get asset values
 df['relativeDamage'] = [random.uniform(0, 0.7) for _ in range(len(df))]
@@ -32,9 +32,10 @@ for i, household in df.iterrows():
         v=household['relativeDamage'],
         k_str=household['assets'],
         c0=household['yearlyIncome'],
-        c_avg=inc_avg
+        c_avg=inc_avg,
+        # cmin=800 * 12,
         )
-    var.opt_lambda()
+    var.opt_lambda(eps_rel=0.0)
     losses[name] = var.get_losses()
     objects[name] = var
     
@@ -46,7 +47,53 @@ df['recoveryTime'] = df['lambda'].apply(recovery_time)
 
 ymax= max(df['ratio'].max(),df['lambda'].max())
 
-fig, ax= plt.subplots(figsize=(5,5))
-sns.scatterplot(ax=ax, data=df, x='ratio', y='lambda')
-ax.set_xlim(left=0, right=ymax)
-ax.set_ylim(bottom=0, top=ymax)
+
+from matplotlib.colors import LogNorm
+
+# plot
+plt.figure()
+sc = plt.scatter(
+    x=df['lambda'],
+    y=df['ratio'],
+    c=df['income'],
+    cmap='viridis',
+    norm=LogNorm(),
+    s=10
+    )
+plt.colorbar(sc, label='Income (euros/month) (log scale)')
+plt.ylabel('Income / Damage')
+plt.xlabel('Recovery Rate (lambda)')
+plt.ylim(0, 1)
+
+# plot
+plt.figure()
+sc = plt.scatter(
+    x=df['recoveryTime'],
+    y=df['ratio'],
+    c=df['income'],
+    cmap='viridis',
+    # norm=LogNorm(),
+    s=10
+    )
+plt.colorbar(sc, label='Income (euros/month)')
+plt.ylabel('Income / Damage')
+plt.xlabel('Recovery Time (years)')
+plt.ylim(0, 1)
+plt.xlim(0, 10.5)
+
+value_counts = df['recoveryTime'].value_counts()
+df_subset = df[df['recoveryTime'] < 2]
+# plot
+plt.figure()
+sc = plt.scatter(
+    x=df_subset['recoveryTime'],
+    y=df_subset['ratio'],
+    c=df_subset['income'],
+    cmap='viridis',
+    norm=LogNorm(),
+    s=10
+    )
+plt.colorbar(sc, label='Income (euros/month) (log scale)')
+plt.ylabel('Income / Damage')
+plt.xlabel('Recovery Time (years)')
+
