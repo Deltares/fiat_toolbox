@@ -157,19 +157,19 @@ class MetricsFileReader(IMetricsFileReader):
             df_metrics["Value"] = pd.to_numeric(df_metrics["Value"])
 
             # Remove the desctioption row
-            if not include_description:
+            if not include_description and "Description" in df_metrics.columns:
                 df_metrics = df_metrics.drop("Description", axis="columns")
 
             # Remove the long names row
-            if not include_long_names:
+            if not include_long_names and "Long Name" in df_metrics.columns:
                 df_metrics = df_metrics.drop("Long Name", axis="columns")
 
             # Remove the metrics table selection row
-            if not include_metrics_table_selection:
+            if not include_metrics_table_selection and "Show In Metrics Table" in df_metrics.columns:
                 df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
 
             # Remove the metrics map selection row
-            if not include_metrics_map_selection:
+            if not include_metrics_map_selection and "Show In Metrics Map" in df_metrics.columns:
                 df_metrics = df_metrics.drop("Show In Metrics Map", axis="columns")
 
         # Return the metric
