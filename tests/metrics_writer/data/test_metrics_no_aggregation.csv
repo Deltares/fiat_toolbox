@@ -1,3 +1,3 @@
-,Description,Show In Metrics Table,Long Name,Value
-Total Damage Sum,Total of the damage event,True,Total Damage Sum,1200
-Single Family Damage Sum,Total of the damage event for only single families,True,Single Family Damage Sum,300
+,Description,Show In Metrics Map,Show In Metrics Table,Long Name,Value
+Total Damage Sum,Total of the damage event,True,True,Total Damage Sum,1200
+Single Family Damage Sum,Total of the damage event for only single families,True,True,Single Family Damage Sum,300

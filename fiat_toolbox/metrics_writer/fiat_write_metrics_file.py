@@ -111,7 +111,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                         metric["description"] = f"{metric['description']} (#)"
 
                     # Create the sql command
-                    sql_command = sql_struct(groupby=f"`{self.aggregation_label_fmt.format(name=aggregate)}`", **metric)
+                    metric["groupby"] = f"`{self.aggregation_label_fmt.format(name=aggregate)}`"
+                    sql_command = sql_struct(**metric)
 
                     # Check whether the metric name is already in the dictionary
                     if metric["name"] in aggregate_command:
@@ -141,7 +142,8 @@ class MetricsFileWriter(IMetricsFileWriter):
                 if "COUNT" in metric["select"] and "#" not in metric["description"]:
                     metric["description"] = f"{metric['description']} (#)"
                 # Create the sql command
-                sql_command = sql_struct(groupby="", **metric)
+                metric["groupby"] = "" 
+                sql_command = sql_struct(**metric)
 
                 # Check whether the metric name is already in the dictionary
                 if metric["name"] in sql_command_set:

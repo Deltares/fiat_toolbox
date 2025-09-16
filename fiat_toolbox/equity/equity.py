@@ -111,14 +111,14 @@ class Equity:
             damages_table = damages_table.set_index(index_name)
 
             # Drop rows containing other variables
-            damages_table = damages_table.drop(
-                [
-                    "Description",
-                    "Show In Metrics Table",
-                    "Show In Metrics Map",
-                    "Long Name",
-                ]
-            )
+            rows_to_drop = [
+                "Description",
+                "Show In Metrics Table",
+                "Show In Metrics Map",
+                "Long Name",
+            ]
+            existing_rows_to_drop = [col for col in rows_to_drop if col in damages_table.index]
+            damages_table = damages_table.drop(existing_rows_to_drop, axis=0)
             damages_table = damages_table.apply(pd.to_numeric)
         # Merge census block groups with fiat output (damages estimations per return period)
         df = damages_table.merge(census_table, on=aggregation_label, how="left")
