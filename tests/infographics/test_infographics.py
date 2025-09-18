@@ -80,7 +80,7 @@ class TestInfographicsParserGetMetrics(unittest.TestCase):
 
 class TestInfographicsParserPiesDictionary(unittest.TestCase):
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.infographics.open")
     @patch("fiat_toolbox.infographics.infographics.tomli.load")
     def test_get_pies_dict(self, mock_tomli_load, mock_open, mock_path_exists):
         # Arrange
@@ -168,7 +168,7 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.infographics.open")
     @patch("fiat_toolbox.infographics.infographics.tomli.load")
     def test_get_pies_dict_no_config(
         self, mock_tomli_load, mock_open, mock_path_exists
@@ -202,7 +202,7 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.infographics.open")
     @patch("fiat_toolbox.infographics.infographics.tomli.load")
     def test_get_pies_dict_no_charts(
         self, mock_tomli_load, mock_open, mock_path_exists
@@ -267,7 +267,7 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.infographics.open")
     @patch("fiat_toolbox.infographics.infographics.tomli.load")
     def test_get_pies_dict_no_categories(
         self, mock_tomli_load, mock_open, mock_path_exists
@@ -333,7 +333,7 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
         )
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.infographics.open")
     @patch("fiat_toolbox.infographics.infographics.tomli.load")
     def test_get_pies_dict_no_slices(
         self, mock_tomli_load, mock_open, mock_path_exists
@@ -379,7 +379,7 @@ class TestInfographicsParserPiesDictionary(unittest.TestCase):
 class TestInfographicsParserChartsFigure(unittest.TestCase):
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Figure.to_html")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.infographics.open")
     def test_figure_to_html(self, mock_open, mock_to_html, mock_path_exists):
         # Arrange
         figure_path = Path("parent/some_figure.html")
@@ -471,7 +471,7 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
 
     @patch("fiat_toolbox.infographics.infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Figure.to_html")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.infographics.open")
     def test_figure_to_html_no_figures(self, mock_open, mock_to_html, mock_path_exists):
         # Arrange
         figure_path = Path("parent/some_figure.html")
