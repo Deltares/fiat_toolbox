@@ -286,7 +286,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
     @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Image.open")
     @patch("fiat_toolbox.infographics.risk_infographics.Figure.to_html")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.risk_infographics.open")
     def test_figure_to_html_no_figures(
         self, mock_open, mock_to_html, mock_open_image, mock_path_exists
     ):
