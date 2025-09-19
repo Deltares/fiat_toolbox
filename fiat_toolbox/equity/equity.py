@@ -117,7 +117,9 @@ class Equity:
                 "Show In Metrics Map",
                 "Long Name",
             ]
-            existing_rows_to_drop = [col for col in rows_to_drop if col in damages_table.index]
+            existing_rows_to_drop = [
+                col for col in rows_to_drop if col in damages_table.index
+            ]
             damages_table = damages_table.drop(existing_rows_to_drop, axis=0)
             damages_table = damages_table.apply(pd.to_numeric)
         # Merge census block groups with fiat output (damages estimations per return period)
