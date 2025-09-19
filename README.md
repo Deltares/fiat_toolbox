@@ -11,7 +11,7 @@ If you do not have `uv` installed, you can install it using `pip install uv`.
 
 - Run the tests with: `uv run pytest`
 
-- Run the linter with: `uv run pre-commit`
+- Run the linter with: `uv run pre-commit run --all-files`
 
 Modules:
 
