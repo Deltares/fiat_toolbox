@@ -29,25 +29,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup MiniConda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          activate-environment: fiat_toolbox
-          auto-update-conda: true
-          channels: conda-forge
-
-      - name: Create environment
-        shell: bash -el {0}
-        run: |
-          conda create -n fiat_toolbox python=${{ matrix.python-version }} -y
+          python-version: ${{ matrix.python-version }}
 
       - name: Install test dependencies
         run: |
-          conda run -n fiat_toolbox pip install -e ".[tests]"
+          uv sync --locked --all-extras
 
       - name: Test with pytest
         run: |
-          conda run -n fiat_toolbox pytest tests
+          uv run pytest
 
       - name: Upload coverage report
         if: matrix.coverage == true

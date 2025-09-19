@@ -1,23 +1,23 @@
 import json
 import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Tuple, Union
 
 import duckdb
 import pandas as pd
 import tomli
+from pydantic import BaseModel
 
 from fiat_toolbox import get_fiat_columns
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
 from fiat_toolbox.metrics_writer.fiat_read_metrics_file import MetricsFileReader
-from pydantic import BaseModel
 
 _AGGR_LABEL_FMT = get_fiat_columns().aggregation_label
 
 
 # sql command struct
+
 
 class sql_struct(BaseModel):
     name: str
@@ -105,13 +105,14 @@ class MetricsFileWriter(IMetricsFileWriter):
                     raise ValueError("No queries specified in the metrics file.")
                 # Loop over the metrics
                 for metric in metrics["queries"]:
-                       
                     # Correct metrics name if it is count
                     if "COUNT" in metric["select"] and "#" not in metric["description"]:
                         metric["description"] = f"{metric['description']} (#)"
 
                     # Create the sql command
-                    metric["groupby"] = f"`{self.aggregation_label_fmt.format(name=aggregate)}`"
+                    metric["groupby"] = (
+                        f"`{self.aggregation_label_fmt.format(name=aggregate)}`"
+                    )
                     sql_command = sql_struct(**metric)
 
                     # Check whether the metric name is already in the dictionary
@@ -142,7 +143,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                 if "COUNT" in metric["select"] and "#" not in metric["description"]:
                     metric["description"] = f"{metric['description']} (#)"
                 # Create the sql command
-                metric["groupby"] = "" 
+                metric["groupby"] = ""
                 sql_command = sql_struct(**metric)
 
                 # Check whether the metric name is already in the dictionary
