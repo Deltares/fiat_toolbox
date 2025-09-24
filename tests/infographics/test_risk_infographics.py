@@ -153,7 +153,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
             "Other": {
                 "Expected_Damages": {
                     "title": "Expected annual damages",
-                    "query": 'ExpectedAnnualDamages',
+                    "query": "ExpectedAnnualDamages",
                     "image": "money.png",
                     "image_scale": 0.125,
                     "title_font_size": 30,
@@ -162,7 +162,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                 },
                 "Flooded": {
                     "title": "Number of homes with a high chance of being flooded in a 30-year period",
-                    "query": 'FloodedHomes',
+                    "query": "FloodedHomes",
                     "image": "house.png",
                     "image_scale": 0.125,
                     "title_font_size": 30,
