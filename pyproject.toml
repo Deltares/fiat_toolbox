@@ -1,11 +1,12 @@
 [build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.24.2"]
+build-backend = "hatchling.build"
 
 [project]
 name = "fiat_toolbox"
 description = "A collection of modules for post-processing Delft-FIAT output."
-readme = "README.md"
+readme = {file = "README.md", content-type = "text/markdown"}
+license = { file = "LICENSE" }
 authors = [
     {name = "Panos Athanasiou", email = "Panos.Athanasiou@deltares.nl"},
     {name = "Luuk Blom", email = "Luuk.Blom@deltares.nl"},
@@ -17,7 +18,8 @@ classifiers = [
     "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
     "Topic :: Scientific/Engineering :: Hydrology",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
+dynamic = ["version"]
 dependencies = [
     "numpy",
     "pandas",
@@ -31,22 +33,18 @@ dependencies = [
     "pydantic",
     "pillow"
 ]
-dynamic = ["version"]
+
+[dependency-groups]
+dev = [
+  {include-group = "lint"},
+  {include-group = "test"}
+]
+test = ["pytest", "pytest-cov"]
+lint = ["pre-commit", "ruff"]
 
 [project.optional-dependencies]
-tests = ["pytest", "pytest-cov"]
-
-[tool.setuptools]
-zip-safe = false
-
-[tool.setuptools.dynamic]
-version = { attr = "fiat_toolbox.__version__" }
-
-[tool.setuptools.packages.find]
-include = ["fiat_toolbox", "fiat_toolbox.*"]
-
-[tool.setuptools.package-data]
-"fiat_toolbox" = ["py.typed"]
+test = ["pytest", "pytest-cov"]
+lint = ["pre-commit", "ruff"]
 
 [project.urls]
 Source = "https://github.com/Deltares/fiat_toolbox"
@@ -54,3 +52,6 @@ Source = "https://github.com/Deltares/fiat_toolbox"
 [tool.pytest.ini_options]
 addopts = "--cov fiat_toolbox --cov-report xml"
 testpaths = ["tests"]
+
+[tool.hatch.version]
+path = "fiat_toolbox/__init__.py"

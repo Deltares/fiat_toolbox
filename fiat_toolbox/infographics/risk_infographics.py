@@ -197,30 +197,30 @@ class RiskInfographicsParser(IInfographicsParser):
                             max-width: 10%;
                             height: auto;
                             margin: 0 auto;
-                            transform: scale({charts['Other']['Expected_Damages']['image_scale']}); /* Add your scale factor here */
+                            transform: scale({charts["Other"]["Expected_Damages"]["image_scale"]}); /* Add your scale factor here */
                         }}
                         .img-container2 {{
                             max-width: 10%;
                             height: auto;
                             margin: 0 auto;
-                            transform: scale({charts['Other']['Flooded']['image_scale']}); /* Add your scale factor here */
+                            transform: scale({charts["Other"]["Flooded"]["image_scale"]}); /* Add your scale factor here */
                         }}
                         h1 {{
-                            font-size: {charts['Other']['Expected_Damages']['title_font_size']}px; /* Adjust the font size as needed */
+                            font-size: {charts["Other"]["Expected_Damages"]["title_font_size"]}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                             font-weight:normal;
                         }}
                         h2 {{
-                            font-size: {charts['Other']['Flooded']['title_font_size']}px; /* Adjust the font size as needed */
+                            font-size: {charts["Other"]["Flooded"]["title_font_size"]}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                             font-weight:normal;
                         }}
                         p1 {{
-                            font-size: {charts['Other']['Flooded']['numbers_font_size']}px; /* Adjust the font size as needed */
+                            font-size: {charts["Other"]["Flooded"]["numbers_font_size"]}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                         }}
                         p2 {{
-                            font-size: {charts['Other']['Flooded']['numbers_font_size']}px; /* Adjust the font size as needed */
+                            font-size: {charts["Other"]["Flooded"]["numbers_font_size"]}px; /* Adjust the font size as needed */
                             font-family: Verdana; /* Specify the font family as Verdana */
                         }}
                     </style>
@@ -228,12 +228,12 @@ class RiskInfographicsParser(IInfographicsParser):
                 <body>
                     <div class="container">
                         <div class="inner-div">
-                            <h1>{charts['Other']['Expected_Damages']['title']}</h1>
+                            <h1>{charts["Other"]["Expected_Damages"]["title"]}</h1>
                             <img src="{RiskInfographicsParser._encode_image_from_path(expected_damage_path)}" alt="Expected Damage" class="img-container1">
                             <p1>${'{:,.0f}'.format(metrics[charts['Other']['Expected_Damages']['query']])}</p1>
                         </div>
                         <div class="inner-div">
-                            <h2>{charts['Other']['Flooded']['title']}</h2>
+                            <h2>{charts["Other"]["Flooded"]["title"]}</h2>
                             <img src="{RiskInfographicsParser._encode_image_from_path(flooded_path)}" alt="Flooded Homes" class="img-container2">
                             <p2>{'{:,.0f}'.format(metrics[charts['Other']['Flooded']['query']])}</p2>
                         </div>

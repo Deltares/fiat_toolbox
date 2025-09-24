@@ -5,12 +5,12 @@ from unittest.mock import patch
 
 import duckdb
 import pandas as pd
+from pydantic import ValidationError  # Add this import at the top if not present
 
 from fiat_toolbox.metrics_writer.fiat_write_metrics_file import (
     MetricsFileWriter,
     sql_struct,
 )
-from pydantic import ValidationError  # Add this import at the top if not present
 
 
 class TestReadMetricsConfigFile(unittest.TestCase):
@@ -463,16 +463,9 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         # Assert
         with self.assertRaises(ValidationError) as context:
             write_class._read_metrics_file(include_aggregates=True)
-        self.assertIn(
-            "Field required", str(context.exception)
-        )
-        self.assertIn(
-            "description", str(context.exception)
-        )
-        self.assertIn(
-            "long_name", str(context.exception)
-        )
-
+        self.assertIn("Field required", str(context.exception))
+        self.assertIn("description", str(context.exception))
+        self.assertIn("long_name", str(context.exception))
 
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.json.load")
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.open")

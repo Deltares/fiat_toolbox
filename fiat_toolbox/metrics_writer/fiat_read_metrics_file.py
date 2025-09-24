@@ -165,11 +165,17 @@ class MetricsFileReader(IMetricsFileReader):
                 df_metrics = df_metrics.drop("Long Name", axis="columns")
 
             # Remove the metrics table selection row
-            if not include_metrics_table_selection and "Show In Metrics Table" in df_metrics.columns:
+            if (
+                not include_metrics_table_selection
+                and "Show In Metrics Table" in df_metrics.columns
+            ):
                 df_metrics = df_metrics.drop("Show In Metrics Table", axis="columns")
 
             # Remove the metrics map selection row
-            if not include_metrics_map_selection and "Show In Metrics Map" in df_metrics.columns:
+            if (
+                not include_metrics_map_selection
+                and "Show In Metrics Map" in df_metrics.columns
+            ):
                 df_metrics = df_metrics.drop("Show In Metrics Map", axis="columns")
 
         # Return the metric

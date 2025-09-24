@@ -156,5 +156,3 @@ def convert_fiat(
         geom = geom.rename(columns=name_translation)
         geom_path.unlink()
         geom.to_file(geom_path)
-
-
