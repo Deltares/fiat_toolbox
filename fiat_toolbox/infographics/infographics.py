@@ -513,7 +513,7 @@ class InfographicsParser(IInfographicsParser):
             fig.add_annotation(
                 x=domain_center_x,
                 y=1,
-                text=f"{ value['Name'] } <br> ",
+                text=f"{value['Name']} <br> ",
                 font={
                     "size": subtitle_font_size,
                     "family": "Verdana",

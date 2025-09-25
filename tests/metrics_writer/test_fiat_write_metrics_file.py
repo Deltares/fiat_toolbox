@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import duckdb
 import pandas as pd
+from pydantic import ValidationError  # Add this import at the top if not present
 
 from fiat_toolbox.metrics_writer.fiat_write_metrics_file import (
     MetricsFileWriter,
@@ -460,17 +461,11 @@ class TestReadMetricsConfigFile(unittest.TestCase):
         write_class = MetricsFileWriter(config_file)
 
         # Assert
-        with self.assertRaises(KeyError) as context:
+        with self.assertRaises(ValidationError) as context:
             write_class._read_metrics_file(include_aggregates=True)
-            self.assertTrue(
-                "Key 'description' missing from query." in str(context.exception)
-            )
-
-        with self.assertRaises(KeyError) as context:
-            write_class._read_metrics_file(include_aggregates=False)
-            self.assertTrue(
-                "Key 'description' missing from query." in str(context.exception)
-            )
+        self.assertIn("Field required", str(context.exception))
+        self.assertIn("description", str(context.exception))
+        self.assertIn("long_name", str(context.exception))
 
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.json.load")
     @patch("fiat_toolbox.metrics_writer.fiat_write_metrics_file.open")

@@ -244,7 +244,7 @@ class Footprints:
         # Get column names per type
         columns = self._get_column_names(gdf)
         agg_cols = columns["string"] + columns["depth"] + columns["damage"]
-        
+
         # Perform the aggregation
         gdf = self._aggregate_objects(gdf, field_name, columns)
 
@@ -490,7 +490,7 @@ class Footprints:
         gdf.loc[
             gdf[field_name].isin(multiple_bffid), self.fiat_columns.primary_object_type
         ] = gdf[field_name].map(bffid_object_mapping)
-        
+
         gdf.loc[gdf[field_name].isin(multiple_bffid), self.fiat_columns.object_id] = (
             gdf[field_name].map(bffid_objectid_mapping)
         )

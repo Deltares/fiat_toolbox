@@ -153,6 +153,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
             "Other": {
                 "Expected_Damages": {
                     "title": "Expected annual damages",
+                    "query": "ExpectedAnnualDamages",
                     "image": "money.png",
                     "image_scale": 0.125,
                     "title_font_size": 30,
@@ -161,6 +162,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
                 },
                 "Flooded": {
                     "title": "Number of homes with a high chance of being flooded in a 30-year period",
+                    "query": "FloodedHomes",
                     "image": "house.png",
                     "image_scale": 0.125,
                     "title_font_size": 30,
@@ -286,7 +288,7 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
     @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Image.open")
     @patch("fiat_toolbox.infographics.risk_infographics.Figure.to_html")
-    @patch("builtins.open")
+    @patch("fiat_toolbox.infographics.risk_infographics.open")
     def test_figure_to_html_no_figures(
         self, mock_open, mock_to_html, mock_open_image, mock_path_exists
     ):

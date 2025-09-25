@@ -1,13 +1,13 @@
 import json
 import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Tuple, Union
 
 import duckdb
 import pandas as pd
 import tomli
+from pydantic import BaseModel
 
 from fiat_toolbox import get_fiat_columns
 from fiat_toolbox.metrics_writer.fiat_metrics_interface import IMetricsFileWriter
@@ -17,11 +17,13 @@ _AGGR_LABEL_FMT = get_fiat_columns().aggregation_label
 
 
 # sql command struct
-@dataclass
-class sql_struct:
+
+
+class sql_struct(BaseModel):
     name: str
     long_name: str
-    show_in_metrics_table: bool
+    show_in_metrics_table: bool = True
+    show_in_metrics_map: bool = True
     description: str
     select: str
     filter: str
@@ -103,31 +105,15 @@ class MetricsFileWriter(IMetricsFileWriter):
                     raise ValueError("No queries specified in the metrics file.")
                 # Loop over the metrics
                 for metric in metrics["queries"]:
-                    # Check whether the metric contains all required fields
-                    if all(
-                        key in metrics
-                        for key in [
-                            "name",
-                            "long_name",
-                            "show_in_metrics_table",
-                            "description",
-                            "select",
-                            "filter",
-                        ]
-                    ):
-                        raise ValueError(
-                            f"The metrics file for metric {metric['name']} does not contain all required fields."
-                        )
+                    # Correct metrics name if it is count
+                    if "COUNT" in metric["select"] and "#" not in metric["description"]:
+                        metric["description"] = f"{metric['description']} (#)"
+
                     # Create the sql command
-                    sql_command = sql_struct(
-                        name=metric["name"],
-                        long_name=metric["long_name"],
-                        show_in_metrics_table=metric["show_in_metrics_table"],
-                        description=metric["description"],
-                        select=metric["select"],
-                        filter=metric["filter"],
-                        groupby=f"`{self.aggregation_label_fmt.format(name=aggregate)}`",
+                    metric["groupby"] = (
+                        f"`{self.aggregation_label_fmt.format(name=aggregate)}`"
                     )
+                    sql_command = sql_struct(**metric)
 
                     # Check whether the metric name is already in the dictionary
                     if metric["name"] in aggregate_command:
@@ -153,32 +139,12 @@ class MetricsFileWriter(IMetricsFileWriter):
 
             # Loop over the metrics
             for metric in metrics["queries"]:
-                # Check whether the metric contains all required fields
-                if all(
-                    key in metrics
-                    for key in [
-                        "name",
-                        "long_name",
-                        "show_in_metrics_table",
-                        "description",
-                        "select",
-                        "filter",
-                    ]
-                ):
-                    raise ValueError(
-                        f"The metrics file for metric {metric['name']} does not contain all required fields."
-                    )
-
+                # Correct metrics name if it is count
+                if "COUNT" in metric["select"] and "#" not in metric["description"]:
+                    metric["description"] = f"{metric['description']} (#)"
                 # Create the sql command
-                sql_command = sql_struct(
-                    name=metric["name"],
-                    long_name=metric["long_name"],
-                    show_in_metrics_table=metric["show_in_metrics_table"],
-                    description=metric["description"],
-                    select=metric["select"],
-                    filter=metric["filter"],
-                    groupby="",
-                )
+                metric["groupby"] = ""
+                sql_command = sql_struct(**metric)
 
                 # Check whether the metric name is already in the dictionary
                 if metric["name"] in sql_command_set:
@@ -188,7 +154,6 @@ class MetricsFileWriter(IMetricsFileWriter):
 
                 # Add the sql command to the dictionary
                 sql_command_set[metric["name"]] = sql_command
-
         # Return the sql commands dictionary
         return sql_command_set
 
@@ -233,6 +198,10 @@ class MetricsFileWriter(IMetricsFileWriter):
         # Finally add the groupby statement
         if sql_command.groupby:
             sql_query += f" GROUP BY {sql_command.groupby}"
+
+        # Register the dataframe as a DuckDB table
+        duckdb.unregister("df_results")
+        duckdb.register("df_results", df_results)
 
         # Execute the query. If the query is invalid, an error PandaSQLException will be raised
         sql_query = sql_query.replace("`", '"')
@@ -367,7 +336,7 @@ class MetricsFileWriter(IMetricsFileWriter):
             # Update all empty metrics with 0
             for key, value in aggregate_metrics.items():
                 if value == {}:
-                    aggregate_metrics[key] = {name: 0 for name in aggregations}
+                    aggregate_metrics[key] = dict.fromkeys(aggregations, 0)
                     continue
                 for name in aggregations:
                     if name not in value:
@@ -398,6 +367,16 @@ class MetricsFileWriter(IMetricsFileWriter):
                 ],
             )
 
+            # Add the metrics table selector to the dataframe
+            metricsFrame.insert(
+                0,
+                "Show In Metrics Map",
+                [
+                    config[write_aggregate][name].show_in_metrics_map
+                    for name, _ in metricsFrame.iterrows()
+                ],
+            )
+
             # Add the description to the dataframe
             metricsFrame.insert(
                 0,
@@ -422,6 +401,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         include_long_names=True,
                         include_description=True,
                         include_metrics_table_selection=True,
+                        include_metrics_map_selection=True,
                     )
                     metricsFrame = pd.concat([new_metrics, metricsFrame])
 
@@ -457,6 +437,16 @@ class MetricsFileWriter(IMetricsFileWriter):
                 ],
             )
 
+            # Add the metrics table selector to the dataframe
+            metricsFrame.insert(
+                0,
+                "Show In Metrics Map",
+                [
+                    config[name].show_in_metrics_map
+                    for name, _ in metricsFrame.iterrows()
+                ],
+            )
+
             # Add the description to the dataframe
             metricsFrame.insert(
                 0,
@@ -478,6 +468,7 @@ class MetricsFileWriter(IMetricsFileWriter):
                         include_long_names=True,
                         include_description=True,
                         include_metrics_table_selection=True,
+                        include_metrics_map_selection=True,
                     )
                     metricsFrame = pd.concat([new_metrics, metricsFrame])
 

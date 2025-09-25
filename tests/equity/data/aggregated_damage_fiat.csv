@@ -1,6 +1,6 @@
 ,TotalDamageRP1,TotalDamageRP2,TotalDamageRP5,TotalDamageRP10,TotalDamageRP25,TotalDamageRP50,TotalDamageRP100,ExpectedAnnualDamages
 Description,Total damage with return period of 1 years,Total damage with return period of 2 years,Total damage with return period of 5 years,Total damage with return period of 10 years,Total damage with return period of 25 years,Total damage with return period of 50 years,Total damage with return period of 100 years,Expected annual damages
-Show In Metrics Table,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE
+Show In Metrics Table,True,True,True,True,True,True,True,True
 Long Name,Total Damage (1Y),Total Damage (2Y),Total Damage (5Y),Total Damage (10Y),Total Damage (25Y),Total Damage (50Y),Total Damage (100Y),Expected Annual Damages
 000100-block1,0,131912.4683,132395.9415,495292.5315,1124593.604,1777441.505,2372217.364,216293.4612
 000100-block2,0,46436.84893,46436.84893,724458.848,1382804.896,1966669.96,2839213.376,203859.3496
