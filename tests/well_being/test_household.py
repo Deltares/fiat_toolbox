@@ -1,5 +1,3 @@
-import pytest
-import numpy as np
 from fiat_toolbox.well_being.household import Household, LossType
 
 
@@ -43,12 +41,9 @@ def test_calc_loss_income():
     assert loss > 0
 
 
-
-
 def test_calc_loss_utility():
     hh = Household(0.1, 50000, 15000, 14000, l=0.7)
     loss = hh.calc_loss(LossType.UTILITY)
-
 
     assert loss > 0
 
@@ -60,8 +55,6 @@ def test_get_losses():
     assert "Asset Loss" in losses
     assert "Equity Weighted Loss" in losses
     for lt in LossType:
-
-
         assert lt in losses
 
 
@@ -71,8 +64,6 @@ def test_opt_lambda_runs():
     # No assertion, just check it runs without error
 
 
-
-
 def test_repr():
     hh = Household(0.1, 50000, 15000, 14000)
     s = repr(hh)
@@ -80,11 +71,12 @@ def test_repr():
     assert "v = 0.1" in s
 
 
-
 def test_plot_loss_all_types():
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     hh = Household(0.1, 50000, 15000, 14000, l=0.7)
     for lt in LossType:
         hh.calc_loss(lt)
@@ -99,8 +91,10 @@ def test_plot_loss_all_types():
 
 def test_plot_consumption():
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     hh = Household(0.1, 50000, 15000, 14000, l=0.7)
     hh.get_losses()
     # Test with no ax, plot_cmin False
@@ -121,8 +115,8 @@ def test_plot_consumption():
 
 def test_plot_opt_lambda():
     import matplotlib
+
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
     hh = Household(0.1, 50000, 15000, 14000, l=0.7)
     hh.opt_lambda(no_steps=10)
     # Test with default x_type ("rate")

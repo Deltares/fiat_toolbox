@@ -3,7 +3,7 @@ from typing import Optional, Union
 
 import numpy as np
 from scipy.integrate import IntegrationWarning, quad
-from scipy.optimize import minimize, brentq
+from scipy.optimize import brentq, minimize
 
 
 def utility(
@@ -253,37 +253,36 @@ def consumption_loss_t(
     np.ndarray
         The calculated consumption loss(es) as an nxm matrix where n is the length of t and m is the length of l.
     """
+
     def c_loss(t):
         return income_loss_t(t=t, l=l, v=v, k_str=k_str, pi=pi) + reconstruction_cost_t(
             t=t, l=l, v=v, k_str=k_str
         )
-        
+
     # Assume that all sources of help are summed up for now
     total_support = savings + insurance + support
-    
+
     # Calculate the alpha values which is the consumption rate at t=0
     alpha = c_loss(0)
-    
+
     if l <= 0 or total_support <= 0:
         gamma, t_hat = None, 0
         cl_t = c_loss(t)
-    elif total_support >= alpha/l:
+    elif total_support >= alpha / l:
         gamma, t_hat = 0, np.inf
         cl_t = np.zeros_like(t)  # No consumption loss if support is enough
     else:
+
         def gamma_func(gamma):
             rhs = 1 - l / alpha * (savings + insurance + support)
             lhs = gamma * (1 - np.log(gamma)) if gamma > 0 else 0
-            return lhs - rhs  
+            return lhs - rhs
+
         gamma = brentq(gamma_func, 0, 1)
         t_hat = -np.log(gamma) / l if gamma > 0 else np.inf
         # For t <= t_hat, cl_t = alpha * gamma; for t > t_hat, use consumption_loss_t
         t = np.array(t)
-        cl_t = np.where(
-            t <= t_hat,
-            alpha * gamma,
-            c_loss(t)
-        )
+        cl_t = np.where(t <= t_hat, alpha * gamma, c_loss(t))
     return cl_t
 
 
@@ -324,7 +323,16 @@ def consumption_t(
     np.ndarray
         The calculated consumption(es) as an nxm matrix where n is the length of t and m is the length of l.
     """
-    cl_t = consumption_loss_t(t=t, l=l, v=v, k_str=k_str, pi=pi, savings=savings, insurance=insurance, support=support)
+    cl_t = consumption_loss_t(
+        t=t,
+        l=l,
+        v=v,
+        k_str=k_str,
+        pi=pi,
+        savings=savings,
+        insurance=insurance,
+        support=support,
+    )
     ct = c0 - cl_t - cmin
     return ct
 
@@ -369,7 +377,18 @@ def utility_loss_t(
     np.ndarray
         The calculated utility loss(es) as an nxm matrix where n is the length of t and m is the length of l.
     """
-    c_t = consumption_t(t=t, l=l, v=v, k_str=k_str, pi=pi, c0=c0, cmin=cmin, savings=savings, insurance=insurance, support=support)
+    c_t = consumption_t(
+        t=t,
+        l=l,
+        v=v,
+        k_str=k_str,
+        pi=pi,
+        c0=c0,
+        cmin=cmin,
+        savings=savings,
+        insurance=insurance,
+        support=support,
+    )
     ul_t = utility(consumption=c0 - cmin, eta=eta) - utility(consumption=c_t, eta=eta)
     return ul_t
 
@@ -489,7 +508,9 @@ def opt_lambda(
         raise ValueError("times must be provided when using the 'trapezoid' method.")
 
     def objective(l: float) -> float:
-        ut_t = UtilityLoss(times, l, v, k_str, pi, c0, eta, cmin, savings, insurance, support)
+        ut_t = UtilityLoss(
+            times, l, v, k_str, pi, c0, eta, cmin, savings, insurance, support
+        )
         loss = ut_t.total(rho=0, method=method)
         return loss
 
@@ -508,7 +529,7 @@ def opt_lambda(
         "T_diff": 0,
     }
     # Check if a tolerance is provided
-    #TODO Check this part again
+    # TODO Check this part again
     if eps_rel > 0:
         l_grid = np.linspace(l_min, l_max, 1000)
         losses = np.array([objective(l) for l in l_grid])
@@ -644,12 +665,11 @@ class Loss:
         elif method == "quad":
             warnings.filterwarnings("ignore", category=IntegrationWarning)
             integral = np.array(
-                    quad(
-                        lambda t, li=self.l: self._fun(t, li) * np.exp(-rho * t),
-                        0,
-                        t_max,
-                    )[0]
-                    
+                quad(
+                    lambda t, li=self.l: self._fun(t, li) * np.exp(-rho * t),
+                    0,
+                    t_max,
+                )[0]
             )
         else:
             raise ValueError("method must be either 'trapezoid' or 'quad'.")
@@ -775,7 +795,9 @@ class ConsumptionLoss(Loss):
         support: float = 0.0,
     ):
         super().__init__(t, l)
-        self._fun = lambda t, l: consumption_loss_t(t, l, v, k_str, pi, savings, insurance, support)
+        self._fun = lambda t, l: consumption_loss_t(
+            t, l, v, k_str, pi, savings, insurance, support
+        )
 
 
 class UtilityLoss(Loss):
@@ -823,7 +845,8 @@ class UtilityLoss(Loss):
         savings: float = 0.0,
         insurance: float = 0.0,
         support: float = 0.0,
-        
     ):
         super().__init__(t, l)
-        self._fun = lambda t, l: utility_loss_t(t, l, v, k_str, pi, c0, eta, cmin, savings, insurance, support)
+        self._fun = lambda t, l: utility_loss_t(
+            t, l, v, k_str, pi, c0, eta, cmin, savings, insurance, support
+        )
