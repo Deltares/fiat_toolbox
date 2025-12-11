@@ -34,7 +34,8 @@ dependencies = [
     "pillow",
     "matplotlib",
     "numpy",
-    "scipy"
+    "scipy",
+    "seaborn"
 ]
 
 [dependency-groups]
