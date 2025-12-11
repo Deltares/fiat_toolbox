@@ -39,7 +39,7 @@ class Household:
         k_str: float,
         c0: float,
         c_avg: float,
-        l: Optional[float] = None,
+        rec_rate: Optional[float] = None,
         pi: Optional[float] = 0.15,
         eta: Optional[float] = 1.5,
         rho: Optional[float] = 0.06,
@@ -65,7 +65,7 @@ class Household:
             Initial consumption rate per year.
         c_avg : float
             Average consumption rate per year.
-        l : float, optional
+        rec_rate : float, optional
             The rate of recovery (per unit time). Default is None.
         pi : float, optional
             Average productivity of capital. Default is 0.15.
@@ -99,11 +99,11 @@ class Household:
         self.dt = self.t_max / (int(self.t_max / dt) + 1)
         self.t = np.linspace(0, self.t_max, int(self.t_max / self.dt) + 1)
         self.currency = currency
-        self.l = l
+        self.rec_rate = rec_rate
         self.recovery_per = recovery_per
-        if l is not None:
+        if rec_rate is not None:
             self.recovery_time = recovery_time(
-                rate=self.l, rebuilt_per=self.recovery_per
+                rate=self.rec_rate, rebuilt_per=self.recovery_per
             )
         self.time_series = pd.DataFrame({"time": self.t})
         self.total_losses = pd.Series()
@@ -123,7 +123,7 @@ class Household:
             f"  k_str = {self.k_str} (total building value),\n"
             f"  c0 = {self.c0} (initial consumption level),\n"
             f"  c_avg = {self.c_avg} (average consumption level),\n"
-            f"  l = {self.l} (recovery rate),\n"
+            f"  rec_rate = {self.rec_rate} (recovery rate),\n"
             f"  pi = {self.pi} (average productivity of capital),\n"
             f"  eta = {self.eta} (elasticity of marginal utility of consumption),\n"
             f"  rho = {self.rho} (discount rate),\n"
@@ -165,13 +165,13 @@ class Household:
             If an invalid loss type is provided.
         """
         if loss_type == LossType.RECONSTRUCTION:
-            loss = ReconstructionCost(self.t, self.l, self.v, self.k_str)
+            loss = ReconstructionCost(self.t, self.rec_rate, self.v, self.k_str)
         elif loss_type == LossType.INCOME:
-            loss = IncomeLoss(self.t, self.l, self.v, self.k_str, self.pi)
+            loss = IncomeLoss(self.t, self.rec_rate, self.v, self.k_str, self.pi)
         elif loss_type == LossType.CONSUMPTION:
             loss = ConsumptionLoss(
                 self.t,
-                self.l,
+                self.rec_rate,
                 self.v,
                 self.k_str,
                 self.pi,
@@ -181,13 +181,13 @@ class Household:
             )
             if self.liquidity:
                 loss_no_liq = ConsumptionLoss(
-                    self.t, self.l, self.v, self.k_str, self.pi
+                    self.t, self.rec_rate, self.v, self.k_str, self.pi
                 )
                 self.time_series[f"{loss_type} No Liquidity"] = loss_no_liq.losses_t
         elif loss_type == LossType.UTILITY:
             loss = UtilityLoss(
                 self.t,
-                self.l,
+                self.rec_rate,
                 self.v,
                 self.k_str,
                 self.pi,
@@ -243,7 +243,7 @@ class Household:
         # Calculate equivalent consumption loss
         ut_t = UtilityLoss(
             t=self.t,
-            l=self.l,
+            rec_rate=self.rec_rate,
             v=self.v,
             k_str=self.k_str,
             pi=self.pi,
@@ -423,7 +423,7 @@ class Household:
             color="black",
             linestyle="-",
             alpha=0.3,
-            label=f"Reconstruction rate: {self.l:.2f}",
+            label=f"Reconstruction rate: {self.rec_rate:.2f}",
         )
 
         # Plot cmin
@@ -521,7 +521,7 @@ class Household:
             reconstruction_costs.append(
                 ReconstructionCost(
                     t=self.t,
-                    l=lmbd,
+                    rec_rate=lmbd,
                     v=self.v,
                     k_str=self.k_str,
                 ).total(rho=0, method=method)
@@ -529,7 +529,7 @@ class Household:
             income_losses.append(
                 IncomeLoss(
                     t=self.t,
-                    l=lmbd,
+                    rec_rate=lmbd,
                     v=self.v,
                     k_str=self.k_str,
                     pi=self.pi,
@@ -538,7 +538,7 @@ class Household:
             consumption_losses.append(
                 ConsumptionLoss(
                     t=self.t,
-                    l=lmbd,
+                    rec_rate=lmbd,
                     v=self.v,
                     k_str=self.k_str,
                     pi=self.pi,
@@ -550,7 +550,7 @@ class Household:
             utility_losses.append(
                 UtilityLoss(
                     t=self.t,
-                    l=lmbd,
+                    rec_rate=lmbd,
                     v=self.v,
                     k_str=self.k_str,
                     pi=self.pi,
@@ -605,7 +605,7 @@ class Household:
         )
 
         # Save lambda value
-        self.l = optimal_lambda
+        self.rec_rate = optimal_lambda
 
         # Calculate the recovery time for the optimal lambda
         self.recovery_time = recovery_time(
@@ -645,7 +645,7 @@ class Household:
         # Check how x axis should be configured
         if x_type == "rate":
             x = self.l_opt["lambda"]
-            val = self.l
+            val = self.rec_rate
             val_min = self.lambda_opt["l_opt_min"]
             leg = "Reconstruction-rate λ"
         elif x_type == "time":

@@ -7,7 +7,7 @@ def test_household_initialization():
         k_str=100000,
         c0=20000,
         c_avg=18000,
-        l=0.5,
+        rec_rate=0.5,
         pi=0.1,
         eta=1.5,
         rho=0.05,
@@ -30,26 +30,26 @@ def test_household_initialization():
 
 
 def test_calc_loss_reconstruction():
-    hh = Household(0.1, 50000, 15000, 14000, l=0.7)
+    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
     loss = hh.calc_loss(LossType.RECONSTRUCTION)
     assert loss > 0
 
 
 def test_calc_loss_income():
-    hh = Household(0.1, 50000, 15000, 14000, l=0.7)
+    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
     loss = hh.calc_loss(LossType.INCOME)
     assert loss > 0
 
 
 def test_calc_loss_utility():
-    hh = Household(0.1, 50000, 15000, 14000, l=0.7)
+    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
     loss = hh.calc_loss(LossType.UTILITY)
 
     assert loss > 0
 
 
 def test_get_losses():
-    hh = Household(0.1, 50000, 15000, 14000, l=0.7)
+    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
     losses = hh.get_losses()
     assert "Wellbeing Loss" in losses
     assert "Asset Loss" in losses
@@ -77,7 +77,7 @@ def test_plot_loss_all_types():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    hh = Household(0.1, 50000, 15000, 14000, l=0.7)
+    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
     for lt in LossType:
         hh.calc_loss(lt)
         # Test with no ax provided
@@ -95,7 +95,7 @@ def test_plot_consumption():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    hh = Household(0.1, 50000, 15000, 14000, l=0.7)
+    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
     hh.get_losses()
     # Test with no ax, plot_cmin False
     fig = hh.plot_consumption()
@@ -117,7 +117,7 @@ def test_plot_opt_lambda():
     import matplotlib
 
     matplotlib.use("Agg")
-    hh = Household(0.1, 50000, 15000, 14000, l=0.7)
+    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
     hh.opt_lambda(no_steps=10)
     # Test with default x_type ("rate")
     fig = hh.plot_opt_lambda()
