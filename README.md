@@ -30,3 +30,7 @@ This module contains functions to aggregate point output from FIAT to building f
 equity
 ======
 This module contains functions to calculate equity weights and equity weighted risk metrics based on socio-economic inputs at an aggregation level.
+
+well_being
+==================
+This module contains functions to estimate household level well-being impacts.

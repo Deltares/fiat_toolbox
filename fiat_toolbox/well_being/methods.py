@@ -1,0 +1,854 @@
+import warnings
+from typing import Optional, Union
+
+import numpy as np
+from scipy.integrate import IntegrationWarning, quad
+from scipy.optimize import brentq, minimize
+
+
+def utility(
+    consumption: Union[float, np.ndarray], eta: float, normalize: bool = False
+) -> Union[float, np.ndarray]:
+    """
+    Calculate the utility of given consumption(s) using a CRRA (Constant Relative Risk Aversion) utility function.
+    Parameters
+    ----------
+    consumption : Union[float, np.ndarray]
+        The consumption value(s) for which to calculate utility. Can be a single float or a numpy array of floats.
+    eta : float
+        The elasticity of the marginal utility of consumption.
+    normalize : bool, optional
+        If True, normalize the utility values to the range [0, 1], by default False.
+    Returns
+    -------
+    Union[float, np.ndarray]
+        The calculated utility value(s). Returns a float if a single consumption value is provided, otherwise returns a numpy array.
+    """
+    consumption = np.array(consumption)  # Ensure input is a numpy array
+
+    # Check for zero or negative consumption values and issue a warning
+    if np.any(consumption <= 0):
+        # warnings.warn("Consumption contains zero or negative values, resulting in NaN utility.", UserWarning, stacklevel=2)
+        consumption = np.where(consumption <= 0, np.nan, consumption)
+
+    if eta <= 0:
+        raise ValueError("Elasticity of marginal utility of consumption must >= 0.")
+
+    if eta == 1:
+        # If eta is 1, use the natural log function instead
+        warnings.warn(
+            "Utility is calculated with the natural logarithm of the consumption when eta == 1.",
+            UserWarning,
+            stacklevel=2,
+        )
+        u = np.log(consumption)
+    else:
+        u = consumption ** (1 - eta) / (1 - eta)  # Calculate utility
+
+    # Normalize utility values if requested
+    if normalize and u.size == 1:
+        raise ValueError("Utility cannot be normalized for a single consumption value.")
+    elif normalize and u.size > 1:
+        min_utility = np.nanmin(u)
+        max_utility = np.nanmax(u)
+        u = (u - min_utility) / (max_utility - min_utility)
+
+    return u if u.size > 1 else u.item()
+
+
+def inverse_utility(u: Union[float, np.ndarray], eta: float):
+    """
+    Compute the inverse of the utility function for given utility values and risk aversion parameter.
+
+    Parameters
+    ----------
+    u : float or np.ndarray
+        The utility value(s) to invert. Can be a scalar or a NumPy array.
+    eta : float
+        The elasticity of the marginal utility of consumption.
+
+    Returns
+    -------
+    float or np.ndarray
+        The value(s) corresponding to the inverse utility transformation of `u`, matching the input type.
+
+    Notes
+    -----
+    - For eta == 1, the inverse utility is the exponential function.
+    - For eta != 1, the inverse utility is computed using the CRRA formula.
+    """
+    if eta == 1:
+        return np.exp(u)
+    else:
+        return (u * (1 - eta)) ** (1 / (1 - eta))
+
+
+def recovery_time(
+    rate: Union[float, np.ndarray], rebuilt_per: float = 95
+) -> Union[float, np.ndarray]:
+    """
+    Calculate the recovery time based on the given rate and percentage rebuilt.
+
+    Parameters
+    ----------
+    rate : Union[float, np.ndarray]
+        The rate of recovery (per unit time). Can be a single float or a numpy array of floats.
+    rebuilt_per : float, optional
+        The percentage of the structure that needs to be rebuilt. Default is 95. Must be [0, 100).
+
+    Returns
+    -------
+    Union[float, np.ndarray]
+        The calculated recovery time (in the same time units as the rate). Returns a float if a single rate value is provided, otherwise returns a numpy array.
+
+    Raises
+    ------
+    ValueError
+        If any rate value is non-positive.
+    ValueError
+        If rebuilt_per is not between 0 and 100.
+    """
+    rate = np.array(rate)  # Ensure input is a numpy array
+
+    if np.any(rate <= 0):
+        raise ValueError("Rate must be positive.")
+    if not (0 <= rebuilt_per < 100):
+        raise ValueError(
+            "rebuilt_per must be a percentage between 0 and 100 (exclusive)."
+        )
+
+    T = np.log(1 / (1 - rebuilt_per / 100)) / rate
+
+    return T if T.size > 1 else T.item()
+
+
+def recovery_rate(
+    time: Union[float, np.ndarray], rebuilt_per: float = 95
+) -> Union[float, np.ndarray]:
+    """
+    Calculate the recovery rate based on the given recovery time and percentage rebuilt.
+
+    Parameters
+    ----------
+    time : Union[float, np.ndarray]
+        The recovery time (in the same time units as the rate). Can be a single float or a numpy array of floats.
+    rebuilt_per : float, optional
+        The percentage of the structure that needs to be rebuilt. Default is 95. Must be [0, 100).
+
+    Returns
+    -------
+    Union[float, np.ndarray]
+        The calculated recovery rate (per unit time). Returns a float if a single time value is provided, otherwise returns a numpy array.
+
+    Raises
+    ------
+    ValueError
+        If any time value is non-positive.
+    ValueError
+        If rebuilt_per is not between 0 and 100.
+    """
+    time = np.array(time)  # Ensure input is a numpy array
+
+    if np.any(time <= 0):
+        raise ValueError("Time must be positive.")
+    if not (0 <= rebuilt_per < 100):
+        raise ValueError(
+            "rebuilt_per must be a percentage between 0 and 100 (exclusive)."
+        )
+
+    rate = np.log(1 / (1 - rebuilt_per / 100)) / time
+
+    return rate if rate.size > 1 else rate.item()
+
+
+def reconstruction_cost_t(
+    t: Union[float, np.ndarray], rec_rate: float, v: float, k_str: float
+) -> np.ndarray:
+    """
+    Calculate the reconstruction cost over time. This represents a cost rate and not the total cost.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        The time value(s) for which to calculate the reconstruction cost. Can be a single float or a numpy array of floats.
+    rec_rate : Union[float, np.ndarray]
+        The rate of recovery value(s). Can be a single float or a numpy array of floats.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+
+    Returns
+    -------
+    np.ndarray
+        The calculated reconstruction cost(s) as an nxm matrix where n is the length of t and m is the length of rec_rate.
+    """
+    # Calculate the reconstruction cost
+    cost = rec_rate * v * k_str * np.exp(-rec_rate * t)
+
+    return cost
+
+
+def income_loss_t(
+    t: Union[float, np.ndarray],
+    rec_rate: float,
+    v: float,
+    k_str: float,
+    pi: float,
+) -> np.ndarray:
+    """
+    Calculate the income loss over time. This represents a loss rate and not the total loss.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        The time value(s) for which to calculate the reconstruction cost. Can be a single float or a numpy array of floats.
+    rec_rate : Union[float, np.ndarray]
+        The rate of recovery value(s). Can be a single float or a numpy array of floats.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    pi : float
+        Average productivity of capital. Can be derived using Penn World Tables.
+
+    Returns
+    -------
+    np.ndarray
+        The calculated reconstruction cost(s) as an nxm matrix where n is the length of t and m is the length of rec_rate.
+    """
+    # Calculate the income loss
+    loss = pi * v * k_str * np.exp(-rec_rate * t)
+    return loss
+
+
+def consumption_loss_t(
+    t: Union[float, np.ndarray],
+    rec_rate: float,
+    v: float,
+    k_str: float,
+    pi: float,
+    savings: float = 0.0,
+    insurance: float = 0.0,
+    support: float = 0.0,
+) -> np.ndarray:
+    """
+    Calculate the consumption loss over time as the sum of income loss and reconstruction cost. This represents a loss rate and not the total loss.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        The time value(s) for which to calculate the consumption loss. Can be a single float or a numpy array of floats.
+    rec_rate : Union[float, np.ndarray]
+        The rate of recovery value(s). Can be a single float or a numpy array of floats.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    pi : float
+        Average productivity of capital. Can be derived using Penn World Tables.
+
+    Returns
+    -------
+    np.ndarray
+        The calculated consumption loss(es) as an nxm matrix where n is the length of t and m is the length of rec_rate.
+    """
+
+    def c_loss(t):
+        return income_loss_t(
+            t=t, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi
+        ) + reconstruction_cost_t(t=t, rec_rate=rec_rate, v=v, k_str=k_str)
+
+    # Assume that all sources of help are summed up for now
+    total_support = savings + insurance + support
+
+    # Calculate the alpha values which is the consumption rate at t=0
+    alpha = c_loss(0)
+
+    if rec_rate <= 0 or total_support <= 0:
+        gamma, t_hat = None, 0
+        cl_t = c_loss(t)
+    elif total_support >= alpha / rec_rate:
+        gamma, t_hat = 0, np.inf
+        cl_t = np.zeros_like(t)  # No consumption loss if support is enough
+    else:
+
+        def gamma_func(gamma):
+            rhs = 1 - rec_rate / alpha * (savings + insurance + support)
+            lhs = gamma * (1 - np.log(gamma)) if gamma > 0 else 0
+            return lhs - rhs
+
+        gamma = brentq(gamma_func, 0, 1)
+        t_hat = -np.log(gamma) / rec_rate if gamma > 0 else np.inf
+        # For t <= t_hat, cl_t = alpha * gamma; for t > t_hat, use consumption_loss_t
+        t = np.array(t)
+        cl_t = np.where(t <= t_hat, alpha * gamma, c_loss(t))
+    return cl_t
+
+
+def consumption_t(
+    t: Union[float, np.ndarray],
+    rec_rate: float,
+    v: float,
+    k_str: float,
+    pi: float,
+    c0: float,
+    cmin: float = 0.0,
+    savings: float = 0.0,
+    insurance: float = 0.0,
+    support: float = 0.0,
+) -> np.ndarray:
+    """
+    Calculate the consumption over time. This represents a consumption rate and not the total consumption.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        The time value(s) for which to calculate the consumption. Can be a single float or a numpy array of floats.
+    rec_rate : Union[float, np.ndarray]
+        The rate of recovery value(s). Can be a single float or a numpy array of floats.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    pi : float
+        Average productivity of capital. Can be derived using Penn World Tables.
+    c0 : float
+        Initial consumption rate per year.
+    cmin : float, optional
+        Minimum consumption rate per year. Default is 0.0.
+
+    Returns
+    -------
+    np.ndarray
+        The calculated consumption(es) as an nxm matrix where n is the length of t and m is the length of rec_rate.
+    """
+    cl_t = consumption_loss_t(
+        t=t,
+        rec_rate=rec_rate,
+        v=v,
+        k_str=k_str,
+        pi=pi,
+        savings=savings,
+        insurance=insurance,
+        support=support,
+    )
+    ct = c0 - cl_t - cmin
+    return ct
+
+
+def utility_loss_t(
+    t: Union[float, np.ndarray],
+    rec_rate: float,
+    v: float,
+    k_str: float,
+    pi: float,
+    c0: float,
+    eta: float,
+    cmin: float = 0.0,
+    savings: float = 0.0,
+    insurance: float = 0.0,
+    support: float = 0.0,
+) -> np.ndarray:
+    """
+    Calculate the utility loss over time. This represents a loss rate and not the total loss.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        The time value(s) for which to calculate the utility loss. Can be a single float or a numpy array of floats.
+    rec_rate : Union[float, np.ndarray]
+        The rate of recovery value(s). Can be a single float or a numpy array of floats.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    pi : float
+        Average productivity of capital. Can be derived using Penn World Tables.
+    c0 : float
+        Initial consumption rate per year.
+    eta : float
+        The elasticity of marginal utility of consumption.
+    cmin : float, optional
+        Minimum consumption rate per year. Default is 0.0.
+
+    Returns
+    -------
+    np.ndarray
+        The calculated utility loss(es) as an nxm matrix where n is the length of t and m is the length of rec_rate.
+    """
+    c_t = consumption_t(
+        t=t,
+        rec_rate=rec_rate,
+        v=v,
+        k_str=k_str,
+        pi=pi,
+        c0=c0,
+        cmin=cmin,
+        savings=savings,
+        insurance=insurance,
+        support=support,
+    )
+    ul_t = utility(consumption=c0 - cmin, eta=eta) - utility(consumption=c_t, eta=eta)
+    return ul_t
+
+
+def wellbeing_loss(du: Union[float, np.ndarray], c_avg: float, eta: float) -> float:
+    """
+    Calculate the wellbeing loss as the equivalent consumption change.
+    The equivalent consumption change represents the amount by which a household earning an average income
+    would have to decrease its consumption to experience the same well-being decrease as the considered household.
+
+    Parameters
+    ----------
+    dw : Union[float, np.ndarray]
+        The utility loss.
+    c_avg : float
+        The average consumption level.
+    eta : float
+        The elasticity of marginal utility of consumption.
+
+    Returns
+    -------
+    float
+        The equivalent consumption loss.
+    """
+    dc_eq = du / (c_avg ** (-eta))
+    return dc_eq
+
+
+def equity_weight(c: float, c_avg: float, eta: float) -> float:
+    """
+    Calculate the equity weight for a given consumption level.
+
+    Parameters
+    ----------
+    c : float
+        The consumption level.
+    c_avg : float
+        The average consumption level.
+    eta : float
+        The elasticity of marginal utility of consumption.
+
+    Returns
+    -------
+    float
+        The equity weight.
+    """
+    return (c / c_avg) ** (-eta)
+
+
+def opt_lambda(
+    v: float,
+    k_str: float,
+    c0: float,
+    pi: float,
+    eta: float,
+    l_min: float = 0.3,
+    l_max: float = 10,
+    t_max: Optional[float] = None,
+    times: Optional[np.ndarray] = None,
+    method: str = "quad",
+    cmin: float = 0.0,
+    eps_rel: float = 0.0,
+    savings: float = 0.0,
+    insurance: float = 0.0,
+    support: float = 0.0,
+) -> dict:
+    """
+    Optimize the recovery rate (lambda) to minimize utility loss.
+
+    Parameters
+    ----------
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    c0 : float
+        Initial consumption rate per year.
+    pi : float
+        Average productivity of capital. Can be derived using Penn World Tables.
+    eta : float
+        The elasticity of marginal utility of consumption.
+    l_min : float, optional
+        The minimum recovery rate to consider during optimization, by default 0.3.
+    l_max : float, optional
+        The maximum recovery rate to consider during optimization, by default 10.
+    t_max : float, optional
+        Maximum recovery time value. Required if `method` is "quad".
+    times : np.ndarray, optional
+        Array of time points. Required if `method` is "trapezoid".
+    method : str, optional
+        The method to use for integration. Can be either "quad" (default) or "trapezoid".
+        "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+    cmin : float, optional
+        Minimum consumption rate per year. Default is 0.0.
+    eps_rel : float, optional
+        Relative tolerance for the optimization. If greater than 0, the function will return
+        the smallest lambda within the relative tolerance of the minimum loss.
+        Default is 0.0.
+
+    Returns
+    -------
+    float
+        The optimized recovery rate (lambda).
+
+    Raises
+    ------
+    ValueError
+        If `t_max` is not provided when using the "quad" method.
+    ValueError
+        If `times` is not provided when using the "trapezoid" method.
+    """
+    if method == "quad":
+        if t_max is None:
+            raise ValueError("t_max must be provided when using the 'quad' method.")
+        times = np.array([0, t_max])
+    elif method == "trapezoid" and times is None:
+        raise ValueError("times must be provided when using the 'trapezoid' method.")
+
+    def objective(rec_rate: float) -> float:
+        ut_t = UtilityLoss(
+            times, rec_rate, v, k_str, pi, c0, eta, cmin, savings, insurance, support
+        )
+        loss = ut_t.total(rho=0, method=method)
+        return loss
+
+    def fun(rec_rate):
+        return objective(rec_rate)
+
+    res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
+    l_opt = res.x[0]
+    loss_opt = res.fun
+
+    opt = {
+        "l_opt_min": l_opt,
+        "loss_opt_min": loss_opt,
+        "eps_rel": eps_rel,
+        "l_opt": l_opt,
+        "loss_opt": loss_opt,
+        "C_diff": 0,
+        "T_diff": 0,
+    }
+    # Check if a tolerance is provided
+    # TODO Check this part again
+    if eps_rel > 0:
+        l_grid = np.linspace(l_min, l_max, 1000)
+        losses = np.array([objective(rec_rate) for rec_rate in l_grid])
+        threshold = loss_opt * (1 + eps_rel)
+        # Find the smallest lambda where the loss is within the threshold
+        valid_indices = np.where(losses <= threshold)[0]
+        if valid_indices.size == 0:
+            raise ValueError(
+                f"No lambda found within the relative tolerance of {eps_rel} from the minimum loss."
+            )
+        ind = valid_indices[-1]
+        l_opt_new = l_grid[ind]
+        loss_opt_new = losses[ind]
+
+        opt["l_opt"] = l_opt_new
+        opt["loss_opt"] = loss_opt_new
+        opt["C_diff"] = inverse_utility(loss_opt_new, eta) - inverse_utility(
+            loss_opt, eta
+        )
+        opt["T_diff"] = recovery_time(l_opt) - recovery_time(l_opt_new)
+
+    return opt
+
+
+class Loss:
+    """
+    A base class for calculating losses over time based on recovery rates.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray], optional
+        Time points provided as a single float or a numpy array. If `t` is None, `t_max`
+        must be provided.
+    rec_rate : Union[float, np.ndarray], optional
+        Levels provided as a single float or a numpy array. Defaults to None.
+    t_max : float, optional
+        Maximum time value used to generate time points if `t` is not provided. Defaults to None.
+
+    Attributes
+    ----------
+    t : np.ndarray
+        Array of time points. If multiple levels are provided in `rec_rate`, this will be reshaped to align with `rec_rate`.
+    rec_rate : np.ndarray
+        Array of levels (e.g., recovery rates).
+    _fun : callable
+        A function that calculates the loss for given time points and levels.
+
+    Raises
+    ------
+    ValueError
+        If neither `t` nor `t_max` is provided.
+    ValueError
+        If both `t` and `t_max` are provided.
+
+    Notes
+    -----
+    - If `t_max` is provided, `t` is generated as 100 evenly spaced points between 0 and `t_max`.
+    - Inputs `t` and `rec_rate` are converted to at least 1D numpy arrays.
+    - If `rec_rate` contains more than one element, `t` is reshaped to align with `rec_rate` for meshgrid-like behavior.
+    """
+
+    _fun: callable
+
+    def __init__(
+        self,
+        t: Optional[Union[float, np.ndarray]] = None,
+        rec_rate: Optional[Union[float, np.ndarray]] = None,
+        t_max: Optional[float] = None,
+    ):
+        if t is None and t_max is None:
+            raise ValueError("Either `t` or `t_max` must be provided.")
+        elif t is not None and t_max is not None:
+            raise ValueError("Only one of `t` or `t_max` should be provided.")
+
+        # Generate time points if only t_max is provided
+        if t is None:
+            t = np.linspace(0, t_max, 100)  # Default to 100 points
+
+        # Ensure inputs are at least 1D arrays
+        t = np.atleast_1d(t)
+
+        self.t = t
+        self.rec_rate = rec_rate
+
+    @property
+    def losses_t(self) -> np.ndarray:
+        """
+        Calculate the loss values for all combinations of time points and levels.
+
+        Returns
+        -------
+        np.ndarray
+            Array of loss values for all combinations of `t` and `rec_rate`.
+        """
+        f_t = self._fun(self.t, self.rec_rate)
+        return f_t
+
+    def total(
+        self, rho: float = 0, method: str = "trapezoid"
+    ) -> Union[float, np.ndarray]:
+        """
+        Calculate the total loss by integrating over time.
+
+        Parameters
+        ----------
+        rho : float, optional
+            Discount rate for the integration. Defaults to 0.
+        method : str, optional
+            Integration method to use. Can be either "trapezoid" (default) or "quad".
+            "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+
+        Returns
+        -------
+        Union[float, np.ndarray]
+            The total loss. Returns a float if a single level is provided, otherwise returns a numpy array.
+
+        Raises
+        ------
+        ValueError
+            If `t` has less than 2 points when using the "trapezoid" method.
+        ValueError
+            If an invalid integration method is provided.
+        """
+        t_max = self.t[-1]
+        if method == "trapezoid":
+            if self.t.size == 1:
+                raise ValueError(
+                    "t must have at least 2 points to calculate the integral."
+                )
+            f_t = self._fun(self.t, self.rec_rate)
+            f_t_dis = f_t * np.exp(-rho * self.t)
+            integral = np.trapz(f_t_dis, x=self.t, axis=0)
+        elif method == "quad":
+            warnings.filterwarnings("ignore", category=IntegrationWarning)
+            integral = np.array(
+                quad(
+                    lambda t, li=self.rec_rate: self._fun(t, li) * np.exp(-rho * t),
+                    0,
+                    t_max,
+                )[0]
+            )
+        else:
+            raise ValueError("method must be either 'trapezoid' or 'quad'.")
+
+        # Ensure the result is always an ndarray or a single float
+        return integral if integral.size > 1 else integral.item()
+
+
+class ReconstructionCost(Loss):
+    """
+    A class to calculate reconstruction cost over time based on recovery rates.
+    It includes the total method to calculate the total loss by integrating over time.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        The time value(s) for which to calculate the reconstruction cost. Can be a single float or a numpy array of floats.
+    rec_rate : Union[float, np.ndarray]
+        The rate of recovery value(s). Can be a single float or a numpy array of floats.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+
+    Attributes
+    ----------
+    t : np.ndarray
+        Array of time points. If multiple recovery rates are provided, this will be expanded to match the shape of `rec_rate`.
+    rec_rate : np.ndarray
+        Array of recovery rates.
+    losses_t : np.ndarray
+        Property that calculates the reconstruction cost values for all combinations of `t` and `rec_rate`.
+    """
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        rec_rate: float,
+        v: float,
+        k_str: float,
+    ):
+        super().__init__(t, rec_rate)
+        self._fun = lambda t, rec_rate: reconstruction_cost_t(t, rec_rate, v, k_str)
+
+
+class IncomeLoss(Loss):
+    """
+    A class to calculate income loss over time based on recovery rates.
+    It includes the total method to calculate the total loss by integrating over time.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        Time points or a single time value.
+    rec_rate : Union[float, np.ndarray]
+        Recovery rates or a single recovery rate.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    pi : float
+        Average productivity of capital.
+
+    Attributes
+    ----------
+    t : np.ndarray
+        Array of time points. If multiple recovery rates are provided, this will be expanded to match the shape of `rec_rate`.
+    rec_rate : np.ndarray
+        Array of recovery rates.
+    losses_t : np.ndarray
+        Property that calculates the income loss values for all combinations of `t` and `rec_rate`.
+    """
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        rec_rate: float,
+        v: float,
+        k_str: float,
+        pi: float,
+    ):
+        super().__init__(t, rec_rate)
+        self._fun = lambda t, rec_rate: income_loss_t(t, rec_rate, v, k_str, pi)
+
+
+class ConsumptionLoss(Loss):
+    """
+    A class to calculate consumption loss over time based on recovery rates.
+    It includes the total method to calculate the total loss by integrating over time.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        Time points or a single time value.
+    rec_rate : Union[float, np.ndarray]
+        Recovery rates or a single recovery rate.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    pi : float
+        Average productivity of capital.
+
+    Attributes
+    ----------
+    t : np.ndarray
+        Array of time points. If multiple recovery rates are provided, this will be expanded to match the shape of `rec_rate`.
+    rec_rate : np.ndarray
+        Array of recovery rates.
+    losses_t : np.ndarray
+        Property that calculates the consumption loss values for all combinations of `t` and `rec_rate`.
+    """
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        rec_rate: float,
+        v: float,
+        k_str: float,
+        pi: float,
+        savings: float = 0.0,
+        insurance: float = 0.0,
+        support: float = 0.0,
+    ):
+        super().__init__(t, rec_rate)
+        self._fun = lambda t, rec_rate: consumption_loss_t(
+            t, rec_rate, v, k_str, pi, savings, insurance, support
+        )
+
+
+class UtilityLoss(Loss):
+    """
+    A class to calculate utility loss over time based on recovery rates.
+    It includes the total method to calculate the total loss by integrating over time.
+
+    Parameters
+    ----------
+    t : Union[float, np.ndarray]
+        Time points or a single time value.
+    rec_rate : Union[float, np.ndarray]
+        Recovery rates or a single recovery rate.
+    v : float
+        The loss ratio, which is reconstruction cost divided by the total building structure value.
+    k_str : float
+        The total building structure value.
+    pi : float
+        Average productivity of capital.
+    c0 : float
+        Initial consumption level.
+    eta : float
+        The elasticity of marginal utility of consumption.
+
+    Attributes
+    ----------
+    t : np.ndarray
+        Array of time points. If multiple recovery rates are provided, this will be expanded to match the shape of `rec_rate`.
+    rec_rate : np.ndarray
+        Array of recovery rates.
+    losses_t : np.ndarray
+        Property that calculates the utility loss values for all combinations of `t` and `rec_rate`.
+    """
+
+    def __init__(
+        self,
+        t: Union[float, np.ndarray],
+        rec_rate: float,
+        v: float,
+        k_str: float,
+        pi: float,
+        c0: float,
+        eta: float,
+        cmin: float = 0.0,
+        savings: float = 0.0,
+        insurance: float = 0.0,
+        support: float = 0.0,
+    ):
+        super().__init__(t, rec_rate)
+        self._fun = lambda t, rec_rate: utility_loss_t(
+            t, rec_rate, v, k_str, pi, c0, eta, cmin, savings, insurance, support
+        )
