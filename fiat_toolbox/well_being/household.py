@@ -295,6 +295,8 @@ class Household:
         if ax is None:
             ax_given = False
             fig, ax = plt.subplots(figsize=(8, 6))
+        else:
+            ax_given = True
         sns.lineplot(x="time", y=loss_type, data=self.time_series, ax=ax)
         ax.fill_between(
             self.time_series.index,
