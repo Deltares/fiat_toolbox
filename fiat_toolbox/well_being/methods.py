@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Union
+from typing import Optional, Union, Sequence, Tuple
 
 import numpy as np
 from scipy.integrate import IntegrationWarning, quad
@@ -217,7 +217,7 @@ def income_loss_t(
     np.ndarray
         The calculated reconstruction cost(s) as an nxm matrix where n is the length of t and m is the length of rec_rate.
     """
-    # Calculate the income loss
+    # Calculate the baseline income loss
     loss = pi * v * k_str * np.exp(-rec_rate * t)
     return loss
 
@@ -228,9 +228,8 @@ def consumption_loss_t(
     v: float,
     k_str: float,
     pi: float,
-    savings: float = 0.0,
-    insurance: float = 0.0,
-    support: float = 0.0,
+    liquidity: float = 0.0,
+    extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> np.ndarray:
     """
     Calculate the consumption loss over time as the sum of income loss and reconstruction cost. This represents a loss rate and not the total loss.
@@ -247,6 +246,11 @@ def consumption_loss_t(
         The total building structure value.
     pi : float
         Average productivity of capital. Can be derived using Penn World Tables.
+    liquidity : float, optional
+        Total liquid support available (savings + insurance + external support). Default is 0.0.
+    extra_losses : Optional[Sequence[Tuple[float, float]]], optional
+        Optional list of (N0, lambda_N) pairs representing additional income-loss
+        components, each decaying exponentially as N0 * exp(-lambda_N * t). Defaults to None.
 
     Returns
     -------
@@ -255,12 +259,18 @@ def consumption_loss_t(
     """
 
     def c_loss(t):
-        return income_loss_t(
+        base = income_loss_t(
             t=t, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi
         ) + reconstruction_cost_t(t=t, rec_rate=rec_rate, v=v, k_str=k_str)
+        if extra_losses:
+            extra = 0.0
+            for N0, lam in extra_losses:
+                extra = extra + (N0 * np.exp(-lam * t))
+            base = base + extra
+        return base
 
-    # Assume that all sources of help are summed up for now
-    total_support = savings + insurance + support
+    # Total liquidity available to smooth consumption losses
+    total_support = liquidity
 
     # Calculate the alpha values which is the consumption rate at t=0
     alpha = c_loss(0)
@@ -274,7 +284,7 @@ def consumption_loss_t(
     else:
 
         def gamma_func(gamma):
-            rhs = 1 - rec_rate / alpha * (savings + insurance + support)
+            rhs = 1 - rec_rate / alpha * total_support
             lhs = gamma * (1 - np.log(gamma)) if gamma > 0 else 0
             return lhs - rhs
 
@@ -294,9 +304,8 @@ def consumption_t(
     pi: float,
     c0: float,
     cmin: float = 0.0,
-    savings: float = 0.0,
-    insurance: float = 0.0,
-    support: float = 0.0,
+    liquidity: float = 0.0,
+    extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> np.ndarray:
     """
     Calculate the consumption over time. This represents a consumption rate and not the total consumption.
@@ -317,6 +326,11 @@ def consumption_t(
         Initial consumption rate per year.
     cmin : float, optional
         Minimum consumption rate per year. Default is 0.0.
+    liquidity : float, optional
+        Total liquid support available (savings + insurance + external support). Default is 0.0.
+    extra_losses : Optional[Sequence[Tuple[float, float]]], optional
+        Optional list of (N0, lambda_N) pairs representing additional income-loss
+        components, each decaying exponentially as N0 * exp(-lambda_N * t). Defaults to None.
 
     Returns
     -------
@@ -329,9 +343,8 @@ def consumption_t(
         v=v,
         k_str=k_str,
         pi=pi,
-        savings=savings,
-        insurance=insurance,
-        support=support,
+        liquidity=liquidity,
+        extra_losses=extra_losses,
     )
     ct = c0 - cl_t - cmin
     return ct
@@ -346,9 +359,8 @@ def utility_loss_t(
     c0: float,
     eta: float,
     cmin: float = 0.0,
-    savings: float = 0.0,
-    insurance: float = 0.0,
-    support: float = 0.0,
+    liquidity: float = 0.0,
+    extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> np.ndarray:
     """
     Calculate the utility loss over time. This represents a loss rate and not the total loss.
@@ -371,6 +383,11 @@ def utility_loss_t(
         The elasticity of marginal utility of consumption.
     cmin : float, optional
         Minimum consumption rate per year. Default is 0.0.
+    liquidity : float, optional
+        Total liquid support available (savings + insurance + external support). Default is 0.0.
+    extra_losses : Optional[Sequence[Tuple[float, float]]], optional
+        Optional list of (N0, lambda_N) pairs representing additional income-loss
+        components, each decaying exponentially as N0 * exp(-lambda_N * t). Defaults to None.
 
     Returns
     -------
@@ -385,9 +402,8 @@ def utility_loss_t(
         pi=pi,
         c0=c0,
         cmin=cmin,
-        savings=savings,
-        insurance=insurance,
-        support=support,
+        liquidity=liquidity,
+        extra_losses=extra_losses,
     )
     ul_t = utility(consumption=c0 - cmin, eta=eta) - utility(consumption=c_t, eta=eta)
     return ul_t
@@ -451,9 +467,8 @@ def opt_lambda(
     method: str = "quad",
     cmin: float = 0.0,
     eps_rel: float = 0.0,
-    savings: float = 0.0,
-    insurance: float = 0.0,
-    support: float = 0.0,
+    liquidity: float = 0.0,
+    extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> dict:
     """
     Optimize the recovery rate (lambda) to minimize utility loss.
@@ -487,6 +502,11 @@ def opt_lambda(
         Relative tolerance for the optimization. If greater than 0, the function will return
         the smallest lambda within the relative tolerance of the minimum loss.
         Default is 0.0.
+    liquidity : float, optional
+        Total liquid support available (savings + insurance + external support). Default is 0.0.
+    extra_losses : Optional[Sequence[Tuple[float, float]]], optional
+        Optional list of (N0, lambda_N) pairs representing additional income-loss
+        components, each decaying exponentially as N0 * exp(-lambda_N * t). Defaults to None.
 
     Returns
     -------
@@ -509,7 +529,16 @@ def opt_lambda(
 
     def objective(rec_rate: float) -> float:
         ut_t = UtilityLoss(
-            times, rec_rate, v, k_str, pi, c0, eta, cmin, savings, insurance, support
+            times,
+            rec_rate,
+            v,
+            k_str,
+            pi,
+            c0,
+            eta,
+            cmin,
+            liquidity,
+            extra_losses,
         )
         loss = ut_t.total(rho=0, method=method)
         return loss
@@ -792,13 +821,12 @@ class ConsumptionLoss(Loss):
         v: float,
         k_str: float,
         pi: float,
-        savings: float = 0.0,
-        insurance: float = 0.0,
-        support: float = 0.0,
+        liquidity: float = 0.0,
+        extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
     ):
         super().__init__(t, rec_rate)
         self._fun = lambda t, rec_rate: consumption_loss_t(
-            t, rec_rate, v, k_str, pi, savings, insurance, support
+            t, rec_rate, v, k_str, pi, liquidity, extra_losses
         )
 
 
@@ -844,11 +872,19 @@ class UtilityLoss(Loss):
         c0: float,
         eta: float,
         cmin: float = 0.0,
-        savings: float = 0.0,
-        insurance: float = 0.0,
-        support: float = 0.0,
+        liquidity: float = 0.0,
+        extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
     ):
         super().__init__(t, rec_rate)
         self._fun = lambda t, rec_rate: utility_loss_t(
-            t, rec_rate, v, k_str, pi, c0, eta, cmin, savings, insurance, support
+            t,
+            rec_rate,
+            v,
+            k_str,
+            pi,
+            c0,
+            eta,
+            cmin,
+            liquidity,
+            extra_losses,
         )

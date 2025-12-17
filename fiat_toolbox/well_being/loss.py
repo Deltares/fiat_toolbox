@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from pydantic import BaseModel, Field
+from typing import Optional
+
 from .methods import (
     ConsumptionLoss,
     IncomeLoss,
@@ -31,112 +34,116 @@ class LossType(str, Enum):
     def __str__(self):
         return self.value
 
+class CapitalStock(BaseModel):
+    k: float = Field(..., description="Value of the capital stock")
+    v: float = Field(..., description="Loss ratio for the capital stock")
+    recovery_time: Optional[float] = Field(None, description="Recovery time for the capital stock")
+    recovery_rate: Optional[float] = Field(None, description="Recovery rate for the capital stock")
 
-class Household:
-    def __init__(
-        self,
-        v: float,
-        k_str: float,
-        c0: float,
-        c_avg: float,
-        rec_rate: Optional[float] = None,
-        pi: Optional[float] = 0.15,
-        eta: Optional[float] = 1.5,
-        rho: Optional[float] = 0.06,
-        t_max: Optional[float] = 10,
-        dt: Optional[float] = 1 / 52,
-        currency: Optional[str] = "$",
-        cmin: Optional[float] = 0.0,
-        recovery_per: Optional[float] = 95.0,
-        savings: Optional[float] = 0.0,
-        insurance: Optional[float] = 0.0,
-        support: Optional[float] = 0.0,
-    ) -> None:
+class Liquidity(BaseModel):
+    savings: float = Field(0.0, description="Household savings")
+    insurance: float = Field(0.0, description="Insurance payout")
+    support: float = Field(0.0, description="External support")
+
+class IncomeConfig(BaseModel):
+    i_0: float = Field(..., description="Initial income rate per year")
+    i_avg: float = Field(..., description="Average income rate per year")
+    pi: float = Field(0.15, description="Productivity of capital")
+    c_L: Optional[float] = Field(None, description="Labour income share")
+    c_i_ratio: float = Field(1.0, description="Consumption to income ratio")
+    i_div: Optional[float] = Field(None, description="Diversified income per year")
+
+class SimulationConfig(BaseModel):
+    eta: float = Field(1.5, description="Elasticity of marginal utility of consumption")
+    rho: float = Field(0.06, description="Discount rate")
+    t_max: float = Field(10, description="Maximum simulation time")
+    dt: float = Field(1/52, description="Time step")
+    currency: str = Field("$", description="Currency symbol")
+    c_min: float = Field(0.0, description="Minimum consumption rate per year")
+    recovery_per: float = Field(95.0, description="Percentage of asset rebuilt to consider as recovered")
+
+class WellBeingConfig(BaseModel):
+    housing: CapitalStock
+    rental_housing: Optional[CapitalStock] = None
+    labour_assets: Optional[CapitalStock] = None
+    income: IncomeConfig
+    liquidity: Optional[Liquidity] = Liquidity()
+    simulation: Optional[SimulationConfig] = SimulationConfig()
+
+class CommunityUnit:
+    def __init__(self, config: WellBeingConfig) -> None:
         """
-        Initialize the WellBeing class with the given parameters.
+        Initialize the CommunityUnit class with the given configuration.
 
         Parameters
         ----------
-        v : float
-            The loss ratio, which is reconstruction cost divided by the total building value.
-        k_str : float
-            The total building value.
-        c0 : float
-            Initial consumption rate per year.
-        c_avg : float
-            Average consumption rate per year.
-        rec_rate : float, optional
-            The rate of recovery (per unit time). Default is None.
-        pi : float, optional
-            Average productivity of capital. Default is 0.15.
-        eta : float, optional
-            Elasticity of marginal utility of consumption. Default is 1.5.
-        rho : float, optional
-            Discount rate. Default is 0.06.
-        t_max : float, optional
-            Maximum time for the simulation. Default is 10.
-        dt : float, optional
-            Time step for the simulation. Default is 1/52 (weekly).
-        currency : str, optional
-            Currency symbol for the plots. Default is "$".
-        cmin : float, optional
-            Minimum consumption rate per year. Default is 0.0.
-        recovery_per : float, optional
-            Percentage (%) of asset rebuilt to consider as "recovered". Default is 95.0.
+        config : CommunityUnitConfig
+            The configuration object containing all grouped parameters.
 
         Returns
         -------
         None
         """
-        self.v = v
-        self.k_str = k_str
-        self.c0 = c0
-        self.c_avg = c_avg
-        self.pi = pi
-        self.eta = eta
-        self.rho = rho
-        self.t_max = t_max
-        self.dt = self.t_max / (int(self.t_max / dt) + 1)
-        self.t = np.linspace(0, self.t_max, int(self.t_max / self.dt) + 1)
-        self.currency = currency
-        self.rec_rate = rec_rate
-        self.recovery_per = recovery_per
-        if rec_rate is not None:
-            self.recovery_time = recovery_time(
-                rate=self.rec_rate, rebuilt_per=self.recovery_per
-            )
+        self.config = config
+        # Time series based on simulation config
+        self.t = self._get_time_array()
         self.time_series = pd.DataFrame({"time": self.t})
-        self.total_losses = pd.Series()
-        self.cmin = cmin
-        self.savings = savings
-        self.insurance = insurance
-        self.support = support
-        if sum([self.savings, self.insurance, self.support]) != 0:
-            self.liquidity = True
-        else:
-            self.liquidity = False
+        # Storage for aggregate outputs
+        self.total_losses = pd.Series(dtype=float)
+
+    def _get_time_array(self):
+        t_max = self.config.simulation.t_max
+        dt = self.config.simulation.dt
+        dt_calc = t_max / (int(t_max / dt) + 1)
+        return np.linspace(0, t_max, int(t_max / dt_calc) + 1)
 
     def __repr__(self):
         return (
-            f"Household(\n"
-            f"  v = {self.v} (loss ratio),\n"
-            f"  k_str = {self.k_str} (total building value),\n"
-            f"  c0 = {self.c0} (initial consumption level),\n"
-            f"  c_avg = {self.c_avg} (average consumption level),\n"
-            f"  rec_rate = {self.rec_rate} (recovery rate),\n"
-            f"  pi = {self.pi} (average productivity of capital),\n"
-            f"  eta = {self.eta} (elasticity of marginal utility of consumption),\n"
-            f"  rho = {self.rho} (discount rate),\n"
-            f"  t_max = {self.t_max} (maximum simulation time),\n"
-            f"  dt = {self.dt} (time step),\n"
-            f"  currency = {self.currency} (currency symbol)\n"
-            f"  cmin = {self.cmin} (minimum consumption level),\n"
-            f"  recovery_per = {self.recovery_per} (recovery percentage),\n"
-            f"  savings = {self.savings} (savings),\n"
-            f"  insurance = {self.insurance} (insurance),\n"
-            f"  support = {self.support} (support)\n"
+            f"CommunityUnit(\n"
+            f"  housing = {self.config.housing},\n"
+            f"  rental_housing = {self.config.rental_housing},\n"
+            f"  labour_assets = {self.config.labour_assets},\n"
+            f"  income = {self.config.income},\n"
+            f"  liquidity = {self.config.liquidity},\n"
+            f"  simulation = {self.config.simulation}\n"
             f")"
         )
+
+    # --- Internal helpers to keep methods config-driven ---
+    def _rec_rate(self) -> Optional[float]:
+        if self.config.housing.recovery_rate is not None:
+            return self.config.housing.recovery_rate
+        if self.config.housing.recovery_time is not None:
+            return recovery_rate(
+                self.config.housing.recovery_time,
+                rebuilt_per=self.config.simulation.recovery_per,
+            )
+        return None
+
+    def _recovery_time(self) -> Optional[float]:
+        if self.config.housing.recovery_time is not None:
+            return self.config.housing.recovery_time
+        if self.config.housing.recovery_rate is not None:
+            return recovery_time(
+                rate=self.config.housing.recovery_rate,
+                rebuilt_per=self.config.simulation.recovery_per,
+            )
+        return None
+
+    def _c0(self) -> float:
+        return self.config.income.c_i_ratio * self.config.income.i_0
+
+    def _c_avg(self) -> float:
+        return self.config.income.c_i_ratio * self.config.income.i_avg
+
+    def _has_liquidity(self) -> bool:
+        return self._liquidity() != 0
+
+    def _liquidity(self) -> float:
+        liq = self.config.liquidity
+        if not liq:
+            return 0.0
+        return (liq.savings or 0.0) + (liq.insurance or 0.0) + (liq.support or 0.0)
 
     def calc_loss(self, loss_type: LossType, method: str = "trapezoid") -> float:
         """
@@ -165,38 +172,50 @@ class Household:
             If an invalid loss type is provided.
         """
         if loss_type == LossType.RECONSTRUCTION:
-            loss = ReconstructionCost(self.t, self.rec_rate, self.v, self.k_str)
+            loss = ReconstructionCost(
+                self.t,
+                self._rec_rate(),
+                self.config.housing.v,
+                self.config.housing.k,
+            )
         elif loss_type == LossType.INCOME:
-            loss = IncomeLoss(self.t, self.rec_rate, self.v, self.k_str, self.pi)
+            loss = IncomeLoss(
+                self.t,
+                self._rec_rate(),
+                self.config.housing.v,
+                self.config.housing.k,
+                self.config.income.pi,
+            )
         elif loss_type == LossType.CONSUMPTION:
             loss = ConsumptionLoss(
                 self.t,
-                self.rec_rate,
-                self.v,
-                self.k_str,
-                self.pi,
-                self.savings,
-                self.insurance,
-                self.support,
+                self._rec_rate(),
+                self.config.housing.v,
+                self.config.housing.k,
+                self.config.income.pi,
+                liquidity=self._liquidity(),
             )
-            if self.liquidity:
+            if self._has_liquidity():
                 loss_no_liq = ConsumptionLoss(
-                    self.t, self.rec_rate, self.v, self.k_str, self.pi
+                    self.t,
+                    self._rec_rate(),
+                    self.config.housing.v,
+                    self.config.housing.k,
+                    self.config.income.pi,
+                    liquidity=0.0,
                 )
                 self.time_series[f"{loss_type} No Liquidity"] = loss_no_liq.losses_t
         elif loss_type == LossType.UTILITY:
             loss = UtilityLoss(
                 self.t,
-                self.rec_rate,
-                self.v,
-                self.k_str,
-                self.pi,
-                self.c0,
-                self.eta,
-                self.cmin,
-                self.savings,
-                self.insurance,
-                self.support,
+                self._rec_rate(),
+                self.config.housing.v,
+                self.config.housing.k,
+                self.config.income.pi,
+                self._c0(),
+                self.config.simulation.eta,
+                self.config.simulation.c_min,
+                liquidity=self._liquidity(),
             )
         else:
             raise ValueError(f"Invalid loss type: {loss_type}")
@@ -243,29 +262,29 @@ class Household:
         # Calculate equivalent consumption loss
         ut_t = UtilityLoss(
             t=self.t,
-            rec_rate=self.rec_rate,
-            v=self.v,
-            k_str=self.k_str,
-            pi=self.pi,
-            c0=self.c0,
-            eta=self.eta,
-            cmin=self.cmin,
-            savings=self.savings,
-            insurance=self.insurance,
-            support=self.support,
+            rec_rate=self._rec_rate(),
+            v=self.config.housing.v,
+            k_str=self.config.housing.k,
+            pi=self.config.income.pi,
+            c0=self._c0(),
+            eta=self.config.simulation.eta,
+            cmin=self.config.simulation.c_min,
+            liquidity=self._liquidity(),
         )
-        du_dis = ut_t.total(rho=self.rho, method=method)
-        well_being_loss = wellbeing_loss(du=du_dis, c_avg=self.c_avg, eta=self.eta)
+        du_dis = ut_t.total(rho=self.config.simulation.rho, method=method)
+        well_being_loss = wellbeing_loss(
+            du=du_dis, c_avg=self._c_avg(), eta=self.config.simulation.eta
+        )
         # Calculate equity weighted loss
-        ew_loss = (
-            equity_weight(c=self.c0, c_avg=self.c_avg, eta=self.eta)
-            * self.v
-            * self.k_str
-        )
+        ew_loss = equity_weight(
+            c=self._c0(), c_avg=self._c_avg(), eta=self.config.simulation.eta
+        ) * self.config.housing.v * self.config.housing.k
 
         # Update total losses with additional metrics
         self.total_losses["Wellbeing Loss"] = well_being_loss
-        self.total_losses["Asset Loss"] = self.v * self.k_str
+        self.total_losses["Asset Loss"] = (
+            self.config.housing.v * self.config.housing.k
+        )
         self.total_losses["Equity Weighted Loss"] = ew_loss
 
         return self.total_losses
@@ -317,14 +336,17 @@ class Household:
             self.time_series[loss_type],
             edgecolor="gray",
             alpha=0.3,
-            label=f"Total {loss_type}: {self.total_losses[loss_type]:.2f} {self.currency}",
+            label=(
+                f"Total {loss_type}: {self.total_losses[loss_type]:.2f} "
+                f"{self.config.simulation.currency}"
+            ),
         )
         ax.set_xlabel("Time after disaster (years)")
         if loss_type != LossType.UTILITY:
             ax.yaxis.set_major_formatter(
                 ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
             )
-            ax.set_ylabel(f"{loss_type} ({self.currency})")
+            ax.set_ylabel(f"{loss_type} ({self.config.simulation.currency})")
             # Add legend
             ax.legend()
         else:
@@ -364,11 +386,14 @@ class Household:
 
         # Plot income losses
         color1 = "brown"
-        label1 = f"Total {LossType.INCOME}: {self.total_losses[LossType.INCOME]:,.0f} {self.currency}"
+        label1 = (
+            f"Total {LossType.INCOME}: {self.total_losses[LossType.INCOME]:,.0f} "
+            f"{self.config.simulation.currency}"
+        )
         ax.fill_between(
             self.time_series["time"],
-            self.c0 - self.time_series[LossType.INCOME],
-            self.c0,
+            self._c0() - self.time_series[LossType.INCOME],
+            self._c0(),
             color=color1,
             alpha=0.6,
             label=label1,
@@ -376,13 +401,17 @@ class Household:
 
         # Plot reconstruction costs
         color2 = "lightcoral"
-        label2 = f"Total {LossType.RECONSTRUCTION}: {self.total_losses[LossType.RECONSTRUCTION]:,.0f} {self.currency}"
+        label2 = (
+            f"Total {LossType.RECONSTRUCTION}: "
+            f"{self.total_losses[LossType.RECONSTRUCTION]:,.0f} "
+            f"{self.config.simulation.currency}"
+        )
         ax.fill_between(
             self.time_series["time"],
-            self.c0
+            self._c0()
             - self.time_series[LossType.INCOME]
             - self.time_series[LossType.RECONSTRUCTION],
-            self.c0 - self.time_series[LossType.INCOME],
+            self._c0() - self.time_series[LossType.INCOME],
             facecolor=color2,
             alpha=0.6,
             label=label2,
@@ -390,13 +419,18 @@ class Household:
         )
 
         # If there is liquidity available, plot the consumption losses without liquidity
-        if self.liquidity:
-            label3 = f"Total Liquidity: {self.savings + self.insurance + self.support:,.0f} {self.currency}"
+        if self._has_liquidity():
+            label3 = (
+                f"Total Liquidity: "
+                f"{self._liquidity():,.0f} "
+                f"{self.config.simulation.currency}"
+            )
             # Add hatch by drawing again with no fill color, only hatch
             ax.fill_between(
                 self.time_series["time"],
-                self.c0 - self.time_series[LossType.CONSUMPTION],
-                self.c0 - self.time_series[f"{LossType.CONSUMPTION} No Liquidity"],
+                self._c0() - self.time_series[LossType.CONSUMPTION],
+                self._c0()
+                - self.time_series[f"{LossType.CONSUMPTION} No Liquidity"],
                 facecolor="none",
                 edgecolor="black",
                 hatch="///",
@@ -407,7 +441,9 @@ class Household:
         # Plot consumption losses with a dashed line and expand to the left by 4 months
         expanded_time = np.insert(self.time_series["time"], 0, [-1, -0.001])
         expanded_consumption_losses = np.insert(
-            self.c0 - self.time_series[LossType.CONSUMPTION], 0, [self.c0, self.c0]
+            self._c0() - self.time_series[LossType.CONSUMPTION],
+            0,
+            [self._c0(), self._c0()],
         )
         ax.plot(
             expanded_time,
@@ -419,29 +455,32 @@ class Household:
 
         # Plot recovery time
         ax.axvline(
-            x=self.recovery_time,
+            x=self._recovery_time(),
             color="black",
             linestyle="-",
             alpha=0.3,
-            label=f"Reconstruction rate: {self.rec_rate:.2f}",
+            label=f"Reconstruction rate: {self._rec_rate():.2f}",
         )
 
         # Plot cmin
         if plot_cmin:
             ax.axhline(
-                y=self.cmin,
+                y=self.config.simulation.c_min,
                 color="black",
                 linestyle="--",
                 alpha=1,
-                label=f"Minimum consumption: {self.cmin:,.0f} {self.currency}",
+                label=(
+                    f"Minimum consumption: {self.config.simulation.c_min:,.0f} "
+                    f"{self.config.simulation.currency}"
+                ),
             )
 
         # Add text annotation for recovery time
-        y_point = self.c0 - self.time_series[LossType.CONSUMPTION].mean()
+        y_point = self._c0() - self.time_series[LossType.CONSUMPTION].mean()
         ax.text(
-            self.recovery_time + 0.1,
+            self._recovery_time() + 0.1,
             y_point,
-            f"Recovery time: {self.recovery_time:.2f} years",
+            f"Recovery time: {self._recovery_time():.2f} years",
             verticalalignment="center",
             horizontalalignment="left",
             color="black",
@@ -453,7 +492,7 @@ class Household:
         lightning_icon = "\u26a1"
         ax.text(
             0,
-            self.c0 + 0.1,
+            self._c0() + 0.1,
             lightning_icon,
             fontsize=50,
             color="red",
@@ -463,7 +502,9 @@ class Household:
 
         # Plot consumption losses
         ax.set_xlabel("Time after disaster (years)")
-        ax.set_ylabel(f"Consumption rate ({self.currency}/year)")
+        ax.set_ylabel(
+            f"Consumption rate ({self.config.simulation.currency}/year)"
+        )
         ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{int(x):,}"))
         # Add legend
         ax.legend()
@@ -507,7 +548,9 @@ class Household:
 
         # Create array of lambda values to check
         times = np.linspace(rec_time_min, rec_time_max, no_steps)
-        lambdas = recovery_rate(times, rebuilt_per=self.recovery_per)
+        lambdas = recovery_rate(
+            times, rebuilt_per=self.config.simulation.recovery_per
+        )
 
         # Calculate losses for each lambda value
         # Initialize arrays to store losses for each lambda
@@ -522,44 +565,40 @@ class Household:
                 ReconstructionCost(
                     t=self.t,
                     rec_rate=lmbd,
-                    v=self.v,
-                    k_str=self.k_str,
+                    v=self.config.housing.v,
+                    k_str=self.config.housing.k,
                 ).total(rho=0, method=method)
             )
             income_losses.append(
                 IncomeLoss(
                     t=self.t,
                     rec_rate=lmbd,
-                    v=self.v,
-                    k_str=self.k_str,
-                    pi=self.pi,
+                    v=self.config.housing.v,
+                    k_str=self.config.housing.k,
+                    pi=self.config.income.pi,
                 ).total(rho=0, method=method)
             )
             consumption_losses.append(
                 ConsumptionLoss(
                     t=self.t,
                     rec_rate=lmbd,
-                    v=self.v,
-                    k_str=self.k_str,
-                    pi=self.pi,
-                    savings=self.savings,
-                    insurance=self.insurance,
-                    support=self.support,
+                    v=self.config.housing.v,
+                    k_str=self.config.housing.k,
+                    pi=self.config.income.pi,
+                    liquidity=self._liquidity(),
                 ).total(rho=0, method=method)
             )
             utility_losses.append(
                 UtilityLoss(
                     t=self.t,
                     rec_rate=lmbd,
-                    v=self.v,
-                    k_str=self.k_str,
-                    pi=self.pi,
-                    c0=self.c0,
-                    eta=self.eta,
-                    cmin=self.cmin,
-                    savings=self.savings,
-                    insurance=self.insurance,
-                    support=self.support,
+                    v=self.config.housing.v,
+                    k_str=self.config.housing.k,
+                    pi=self.config.income.pi,
+                    c0=self._c0(),
+                    eta=self.config.simulation.eta,
+                    cmin=self.config.simulation.c_min,
+                    liquidity=self._liquidity(),
                 ).total(rho=0, method=method)
             )
 
@@ -570,21 +609,19 @@ class Household:
         utility_losses = np.array(utility_losses)
 
         opt = opt_lambda(
-            v=self.v,
-            k_str=self.k_str,
-            c0=self.c0,
-            pi=self.pi,
-            eta=self.eta,
+            v=self.config.housing.v,
+            k_str=self.config.housing.k,
+            c0=self._c0(),
+            pi=self.config.income.pi,
+            eta=self.config.simulation.eta,
             l_min=lambdas.min(),
             l_max=lambdas.max(),
-            t_max=self.t_max,
+            t_max=self.config.simulation.t_max,
             times=self.t,
             method=method,
-            cmin=self.cmin,
+            cmin=self.config.simulation.c_min,
             eps_rel=eps_rel,
-            savings=self.savings,
-            insurance=self.insurance,
-            support=self.support,
+            liquidity=self._liquidity(),
         )
 
         optimal_lambda = opt["l_opt"]
@@ -595,7 +632,7 @@ class Household:
             {
                 "lambda": lambdas,
                 "recovery_time": recovery_time(
-                    rate=lambdas, rebuilt_per=self.recovery_per
+                    rate=lambdas, rebuilt_per=self.config.simulation.recovery_per
                 ),
                 LossType.RECONSTRUCTION: reconstruction_costs,
                 LossType.INCOME: income_losses,
@@ -604,12 +641,10 @@ class Household:
             }
         )
 
-        # Save lambda value
-        self.rec_rate = optimal_lambda
-
-        # Calculate the recovery time for the optimal lambda
-        self.recovery_time = recovery_time(
-            rate=optimal_lambda, rebuilt_per=self.recovery_per
+        # Persist optimal parameters back into config for downstream use
+        self.config.housing.recovery_rate = optimal_lambda
+        self.config.housing.recovery_time = recovery_time(
+            rate=optimal_lambda, rebuilt_per=self.config.simulation.recovery_per
         )
 
         self.l_opt = df
@@ -645,13 +680,16 @@ class Household:
         # Check how x axis should be configured
         if x_type == "rate":
             x = self.l_opt["lambda"]
-            val = self.rec_rate
+            val = self._rec_rate()
             val_min = self.lambda_opt["l_opt_min"]
             leg = "Reconstruction-rate λ"
         elif x_type == "time":
             x = self.l_opt["recovery_time"]
-            val = self.recovery_time
-            val_min = recovery_time(self.lambda_opt["l_opt_min"])
+            val = self._recovery_time()
+            val_min = recovery_time(
+                rate=self.lambda_opt["l_opt_min"],
+                rebuilt_per=self.config.simulation.recovery_per,
+            )
             leg = "Recovery time (years)"
             # axs[0].set_xscale('log')
         axs[1].set_xlabel(leg)
@@ -689,7 +727,9 @@ class Household:
         axs[0].yaxis.set_major_formatter(
             ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
         )
-        axs[0].set_ylabel(f"Total Loss ({self.currency})")
+        axs[0].set_ylabel(
+            f"Total Loss ({self.config.simulation.currency})"
+        )
         axs[0].set_ylim(ylims)
         # Add well-being loss plot
         sns.lineplot(
@@ -714,7 +754,8 @@ class Household:
             axs[1].text(
                 1.02,
                 -0.15,
-                f"consumption diff: {self.lambda_opt['C_diff']:.2f} {self.currency}",
+                f"consumption diff: {self.lambda_opt['C_diff']:.2f} "
+                f"{self.config.simulation.currency}",
                 color="orange",
                 fontsize=10,
                 verticalalignment="top",
