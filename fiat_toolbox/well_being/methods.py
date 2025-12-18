@@ -256,6 +256,28 @@ def consumption_loss_t(
     -------
     np.ndarray
         The calculated consumption loss(es) as an nxm matrix where n is the length of t and m is the length of rec_rate.
+
+        Notes
+        -----
+        Let the total consumption loss be a sum of exponentials:
+        Δc(t) = α_base · exp(−λ t) + Σ_i N_i · exp(−μ_i t), where
+        - α_base = income_loss_t(0) + reconstruction_cost_t(0) captures the base term at t=0,
+        - λ = rec_rate is the recovery rate for the base term,
+        - each (N_i, μ_i) describes an extra loss component with its own decay.
+
+        Useful integrals:
+        - ∫₀^t Δc(s) ds = α_base · (1 − exp(−λ t)) / λ + Σ_i N_i · (1 − exp(−μ_i t)) / μ_i
+        - ∫₀^∞ Δc(s) ds = α_base / λ + Σ_i N_i / μ_i
+
+        Liquidity threshold:
+        - If liquidity ≥ α_base / λ + Σ_i N_i / μ_i, then savings/support fully offset losses and Δc(t) is set to 0 for all t.
+
+        Optimal support period t̂:
+        - When liquidity is insufficient to cover all losses, t̂ is defined implicitly by
+            Δc(t̂) · t̂ + liquidity = ∫₀^{t̂} Δc(s) ds.
+        - The piecewise loss is constructed as
+            cl_t = Δc(t̂) for t ≤ t̂ (constant support level), and cl_t = Δc(t) for t > t̂,
+            which ensures continuity at t̂ and reduces to the single-exponential case when no extra losses are provided.
     """
 
     def c_loss(t):
@@ -269,30 +291,58 @@ def consumption_loss_t(
             base = base + extra
         return base
 
-    # Total liquidity available to smooth consumption losses
-    total_support = liquidity
+    # α_base is the coefficient of the exp(-rec_rate * t) term (income + reconstruction at t=0),
+    # while α_total = Δc(0) includes any extra_losses terms (sum of N0).
+    alpha_base = (
+        income_loss_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi)
+        + reconstruction_cost_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str)
+    )
+    alpha_total = c_loss(0)
 
-    # Calculate the alpha values which is the consumption rate at t=0
-    alpha = c_loss(0)
-
-    if rec_rate <= 0 or total_support <= 0:
-        gamma, t_hat = None, 0
+    if rec_rate <= 0 or liquidity <= 0:
+        # No recovery or no liquidity: follow the baseline Δc(t)
+        t_hat = 0
         cl_t = c_loss(t)
-    elif total_support >= alpha / rec_rate:
-        gamma, t_hat = 0, np.inf
-        cl_t = np.zeros_like(t)  # No consumption loss if support is enough
     else:
+        # Compute the total integral of Δc(t) over [0, ∞) to check if liquidity covers all losses
+        # Use α_base for the exp(-rec_rate * t) component to avoid double-counting extra losses
+        total_integral_inf = alpha_base / rec_rate
+        if extra_losses:
+            for N0, lam in extra_losses:
+                total_integral_inf += N0 / lam
 
-        def gamma_func(gamma):
-            rhs = 1 - rec_rate / alpha * total_support
-            lhs = gamma * (1 - np.log(gamma)) if gamma > 0 else 0
-            return lhs - rhs
+        if liquidity >= total_integral_inf:
+            # Liquidity fully offsets all losses at all times
+            t_hat = np.inf
+            cl_t = np.zeros_like(t)
+        else:
+            # Solve for t̂ from: Δc(t̂) * t̂ + liquidity = ∫₀^{t̂} Δc(s) ds
+            def integral_to_t(th: float) -> float:
+                # Integral of the base component plus each extra loss component
+                val = alpha_base * (1 - np.exp(-rec_rate * th)) / rec_rate
+                if extra_losses:
+                    for N0, lam in extra_losses:
+                        val += N0 * (1 - np.exp(-lam * th)) / lam
+                return val
 
-        gamma = brentq(gamma_func, 0, 1)
-        t_hat = -np.log(gamma) / rec_rate if gamma > 0 else np.inf
-        # For t <= t_hat, cl_t = alpha * gamma; for t > t_hat, use consumption_loss_t
-        t = np.array(t)
-        cl_t = np.where(t <= t_hat, alpha * gamma, c_loss(t))
+            def objective_t_hat(th: float) -> float:
+                return c_loss(th) * th + liquidity - integral_to_t(th)
+
+            # Find a suitable upper bracket where the function is negative
+            rates = [rec_rate] + ([lam for _, lam in extra_losses] if extra_losses else [])
+            min_rate = min(rates) if rates else rec_rate
+            upper = max(10.0 / min_rate, 1.0)
+            f_upper = objective_t_hat(upper)
+            # Expand the bracket if needed
+            while f_upper > 0 and upper < 1e6:
+                upper *= 2
+                f_upper = objective_t_hat(upper)
+
+            t_hat = brentq(objective_t_hat, 0.0, upper)
+            # Set the constant reduction level equal to Δc(t̂) to ensure continuity
+            const_level = c_loss(t_hat)
+            t = np.array(t)
+            cl_t = np.where(t <= t_hat, const_level, c_loss(t))
     return cl_t
 
 
