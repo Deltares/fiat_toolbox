@@ -503,34 +503,48 @@ class CommunityUnit:
                 f"Invalid type '{loss_type}'. Must be one of {valid_values}."
             )
         if ax is None:
-            ax_given = False
             fig, ax = plt.subplots(figsize=(8, 6))
-        else:
-            ax_given = True
+            
         sns.lineplot(x="time", y=loss_type, data=self.time_series, ax=ax)
+        # Shade area under curve with consistent x-axis as in plot_consumption
+        total_val = self.total_losses[loss_type]
+        if loss_type == LossType.UTILITY:
+            label_total = f"Total {loss_type}: {total_val:.2f}"
+        else:
+            label_total = (
+                f"Total {loss_type}: {total_val:,.0f} {self.config.simulation.currency}"
+            )
         ax.fill_between(
-            self.time_series.index,
+            self.time_series["time"],
             0,
             self.time_series[loss_type],
             edgecolor="gray",
             alpha=0.3,
-            label=(
-                f"Total {loss_type}: {self.total_losses[loss_type]:.2f} "
-                f"{self.config.simulation.currency}"
-            ),
+            label=label_total,
         )
         ax.set_xlabel("Time after disaster (years)")
+        # Align y-axis formatting and units with plot_consumption
         if loss_type != LossType.UTILITY:
             ax.yaxis.set_major_formatter(
                 ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
             )
-            ax.set_ylabel(f"{loss_type} ({self.config.simulation.currency})")
-            # Add legend
-            ax.legend()
+            ax.set_ylabel(
+                f"{loss_type} ({self.config.simulation.currency}/year)"
+            )
         else:
+            ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
             ax.set_ylabel(f"{loss_type}")
+        # Make time axis start at 0 and end at simulation horizon
+        try:
+            t_min = float(np.nanmin(self.time_series["time"]))
+            t_max = float(np.nanmax(self.time_series["time"]))
+            ax.set_xlim(left=max(0.0, t_min), right=t_max)
+        except Exception:
+            pass
+        # Add legend consistently
+        ax.legend()
 
-        if not ax_given:
+        if ax is None:
             return fig
 
     def plot_consumption(
