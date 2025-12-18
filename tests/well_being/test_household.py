@@ -28,7 +28,7 @@ def _make_config(
     support=1000,
 ):
     return WellBeingConfig(
-        housing=CapitalStock(k=k, v=v, recovery_rate=rec_rate),
+        owner_housing=CapitalStock(k=k, v=v, recovery_rate=rec_rate),
         income=IncomeConfig(i_0=i0, i_avg=iavg, pi=pi),
         liquidity=Liquidity(savings=savings, insurance=insurance, support=support),
         simulation=SimulationConfig(
@@ -46,8 +46,8 @@ def _make_config(
 def test_household_initialization():
     config = _make_config()
     hh = CommunityUnit(config)
-    assert hh.config.housing.v == 0.2
-    assert hh.config.housing.k == 100000
+    assert hh.config.owner_housing.v == 0.2
+    assert hh.config.owner_housing.k == 100000
     assert hh._c0() == 20000
     assert hh.config.simulation.currency == "€"
     assert hh._liquidity() == 5000 + 2000 + 1000
@@ -102,7 +102,7 @@ def test_repr():
     hh = CommunityUnit(config)
     s = repr(hh)
     assert "CommunityUnit(" in s
-    assert "housing" in s
+    assert "owner_housing" in s
 
 
 def test_plot_loss_all_types():
