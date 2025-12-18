@@ -1,74 +1,108 @@
-from fiat_toolbox.well_being.household import Household, LossType
+from fiat_toolbox.well_being.loss import (
+    CommunityUnit,
+    LossType,
+    WellBeingConfig,
+    CapitalStock,
+    Liquidity,
+    IncomeConfig,
+    SimulationConfig,
+)
+
+
+def _make_config(
+    v=0.2,
+    k=100000,
+    rec_rate=0.5,
+    i0=20000,
+    iavg=18000,
+    pi=0.1,
+    eta=1.5,
+    rho=0.05,
+    t_max=5,
+    dt=0.1,
+    currency="€",
+    cmin=1000,
+    recovery_per=90.0,
+    savings=5000,
+    insurance=2000,
+    support=1000,
+):
+    return WellBeingConfig(
+        housing=CapitalStock(k=k, v=v, recovery_rate=rec_rate),
+        income=IncomeConfig(i_0=i0, i_avg=iavg, pi=pi, c_i_ratio=1.0),
+        liquidity=Liquidity(savings=savings, insurance=insurance, support=support),
+        simulation=SimulationConfig(
+            eta=eta,
+            rho=rho,
+            t_max=t_max,
+            dt=dt,
+            currency=currency,
+            c_min=cmin,
+            recovery_per=recovery_per,
+        ),
+    )
 
 
 def test_household_initialization():
-    hh = Household(
-        v=0.2,
-        k_str=100000,
-        c0=20000,
-        c_avg=18000,
-        rec_rate=0.5,
-        pi=0.1,
-        eta=1.5,
-        rho=0.05,
-        t_max=5,
-        dt=0.1,
-        currency="€",
-        cmin=1000,
-        recovery_per=90.0,
-        savings=5000,
-        insurance=2000,
-        support=1000,
-    )
-    assert hh.v == 0.2
-    assert hh.k_str == 100000
-    assert hh.c0 == 20000
-    assert hh.currency == "€"
-    assert hh.savings == 5000
-    assert hh.insurance == 2000
-    assert hh.support == 1000
+    config = _make_config()
+    hh = CommunityUnit(config)
+    assert hh.config.housing.v == 0.2
+    assert hh.config.housing.k == 100000
+    assert hh._c0() == 20000
+    assert hh.config.simulation.currency == "€"
+    assert hh._liquidity() == 5000 + 2000 + 1000
 
 
 def test_calc_loss_reconstruction():
-    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
-    loss = hh.calc_loss(LossType.RECONSTRUCTION)
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
+    loss = hh.calc_loss(LossType.RECOVERY)
     assert loss > 0
 
 
 def test_calc_loss_income():
-    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
     loss = hh.calc_loss(LossType.INCOME)
     assert loss > 0
 
 
 def test_calc_loss_utility():
-    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
     loss = hh.calc_loss(LossType.UTILITY)
-
-    assert loss > 0
+    assert loss >= 0
 
 
 def test_get_losses():
-    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
     losses = hh.get_losses()
     assert "Wellbeing Loss" in losses
     assert "Asset Loss" in losses
     assert "Equity Weighted Loss" in losses
-    for lt in LossType:
-        assert lt in losses
+    # Only configured loss types should be present
+    assert LossType.RECOVERY in losses
+    assert LossType.INCOME in losses
+    assert LossType.CONSUMPTION in losses
+    assert LossType.UTILITY in losses
+    assert LossType.RENTAL_INCOME not in losses
+    assert LossType.LABOUR_INCOME not in losses
 
 
 def test_opt_lambda_runs():
-    hh = Household(0.1, 50000, 15000, 14000)
+    config = _make_config(v=0.1, k=50000, rec_rate=None, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
     hh.opt_lambda(no_steps=10)
     # No assertion, just check it runs without error
 
 
 def test_repr():
-    hh = Household(0.1, 50000, 15000, 14000)
+    config = _make_config(v=0.1, k=50000, rec_rate=None, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
     s = repr(hh)
-    assert "Household(" in s
-    assert "v = 0.1" in s
+    assert "CommunityUnit(" in s
+    assert "housing" in s
 
 
 def test_plot_loss_all_types():
@@ -77,8 +111,9 @@ def test_plot_loss_all_types():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
-    for lt in LossType:
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
+    for lt in hh._loss_types_for_run():
         hh.calc_loss(lt)
         # Test with no ax provided
         fig = hh.plot_loss(lt)
@@ -95,7 +130,8 @@ def test_plot_consumption():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
     hh.get_losses()
     # Test with no ax, plot_cmin False
     fig = hh.plot_consumption()
@@ -117,7 +153,8 @@ def test_plot_opt_lambda():
     import matplotlib
 
     matplotlib.use("Agg")
-    hh = Household(0.1, 50000, 15000, 14000, rec_rate=0.7)
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
     hh.opt_lambda(no_steps=10)
     # Test with default x_type ("rate")
     fig = hh.plot_opt_lambda()

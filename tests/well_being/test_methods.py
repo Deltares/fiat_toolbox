@@ -45,7 +45,7 @@ def test_consumption_loss_t():
     t = np.linspace(0, 1, 5)
     rec_rate, v, k_str, pi = 0.5, 0.2, 100000, 0.1
     cl = methods.consumption_loss_t(
-        t, rec_rate, v, k_str, pi, savings=1000, insurance=500, support=200
+        t, rec_rate, v, k_str, pi, liquidity=1700
     )
     assert cl.shape == t.shape
     assert np.all(cl >= 0)
@@ -62,9 +62,7 @@ def test_consumption_t():
         pi,
         c0,
         cmin=1000,
-        savings=1000,
-        insurance=500,
-        support=200,
+        liquidity=1700,
     )
     assert ct.shape == t.shape
 
@@ -81,9 +79,7 @@ def test_utility_loss_t():
         c0,
         eta,
         cmin=1000,
-        savings=1000,
-        insurance=500,
-        support=200,
+        liquidity=1700,
     )
     assert ul.shape == t.shape
 
@@ -118,9 +114,7 @@ def test_opt_lambda_runs():
         method="trapezoid",
         cmin=1000,
         eps_rel=0.01,
-        savings=1000,
-        insurance=500,
-        support=200,
+        liquidity=1700,
     )
     assert "l_opt" in result
     assert "loss_opt" in result

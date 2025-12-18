@@ -365,7 +365,7 @@ class CommunityUnit:
             - "Wellbeing Loss": The calculated wellbeing loss.
             - "Asset Loss": The calculated asset loss.
             - "Equity Weighted Loss": The calculated equity-weighted loss.
-            - Additional keys corresponding to each `LossType` (e.g., "Reconstruction Costs", "Income Loss").
+            - Additional keys corresponding to each `LossType` (e.g., "Recovery Costs", "Income Loss").
 
         Notes
         -----
@@ -524,7 +524,7 @@ class CommunityUnit:
         color_rental = "sienna"
         color_labour = "peru"
 
-        # Bottom: Reconstruction
+        # Bottom: Recovery
         label_recon = (
             f"Total {LossType.RECOVERY}: "
             f"{self.total_losses[LossType.RECOVERY]:,.0f} "
@@ -852,7 +852,7 @@ class CommunityUnit:
             x = self.l_opt["lambda"]
             val = self._rec_rate()
             val_min = self.lambda_opt["l_opt_min"]
-            leg = "Reconstruction-rate λ"
+            leg = "Recovery-rate λ"
         elif x_type == "time":
             x = self.l_opt["recovery_time"]
             val = self._recovery_time()
