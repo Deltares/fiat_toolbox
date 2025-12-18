@@ -708,10 +708,14 @@ class Loss:
         return f_t
 
     def total(
-        self, rho: float = 0, method: str = "trapezoid"
+        self,
+        rho: float = 0,
+        method: str = "trapezoid",
+        t1: Optional[float] = None,
+        t2: Optional[float] = None,
     ) -> Union[float, np.ndarray]:
         """
-        Calculate the total loss by integrating over time.
+        Calculate the total loss by integrating over time, optionally between two bounds.
 
         Parameters
         ----------
@@ -720,6 +724,10 @@ class Loss:
         method : str, optional
             Integration method to use. Can be either "trapezoid" (default) or "quad".
             "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+        t1 : float, optional
+            Start time for integration. If None, uses the first time in `t`.
+        t2 : float, optional
+            End time for integration. If None, uses the last time in `t`.
 
         Returns
         -------
@@ -731,24 +739,79 @@ class Loss:
         ValueError
             If `t` has less than 2 points when using the "trapezoid" method.
         ValueError
+            If `t2` is smaller than `t1`.
+        ValueError
             If an invalid integration method is provided.
         """
-        t_max = self.t[-1]
+        # Determine integration bounds
+        t_arr = self.t
+        if t_arr.size < 2:
+            raise ValueError("t must have at least 2 points to calculate the integral.")
+        t_start = float(t_arr[0]) if t1 is None else float(t1)
+        t_end = float(t_arr[-1]) if t2 is None else float(t2)
+        if t_end < t_start:
+            raise ValueError("t2 must be greater than or equal to t1.")
+        # Clamp to available domain
+        t_start = max(t_start, float(t_arr[0]))
+        t_end = min(t_end, float(t_arr[-1]))
+        if t_end == t_start:
+            return 0.0
+
         if method == "trapezoid":
-            if self.t.size == 1:
-                raise ValueError(
-                    "t must have at least 2 points to calculate the integral."
-                )
-            f_t = self._fun(self.t, self.rec_rate)
-            f_t_dis = f_t * np.exp(-rho * self.t)
-            integral = np.trapz(f_t_dis, x=self.t, axis=0)
+            # Compute undiscounted values on original grid
+            f_t = self._fun(t_arr, self.rec_rate)
+
+            # Helper to linearly interpolate f at a time between grid points
+            def interp_f_at(t_val: float):
+                # If exactly on grid
+                if t_val <= t_arr[0]:
+                    f_val = f_t[0]
+                elif t_val >= t_arr[-1]:
+                    f_val = f_t[-1]
+                else:
+                    idx = np.searchsorted(t_arr, t_val, side="right")
+                    i0 = idx - 1
+                    i1 = idx
+                    t0, t1i = float(t_arr[i0]), float(t_arr[i1])
+                    w = (t_val - t0) / (t1i - t0)
+                    f_val = f_t[i0] + w * (f_t[i1] - f_t[i0])
+                # Apply discounting at t_val
+                return f_val * np.exp(-rho * t_val)
+
+            # Build subgrid within [t_start, t_end] including boundaries
+            mask_inside = (t_arr > t_start) & (t_arr < t_end)
+            t_sub = np.concatenate(([t_start], t_arr[mask_inside].astype(float), [t_end]))
+
+            # Discounted values on subgrid
+            f_dis_inside = (self._fun(t_arr[mask_inside], self.rec_rate) *
+                            np.exp(-rho * t_arr[mask_inside]))
+
+            f_start = interp_f_at(t_start)
+            f_end = interp_f_at(t_end)
+
+            # Stack along time axis (axis=0)
+            if f_t.ndim == 1:
+                f_sub = np.concatenate((
+                    np.atleast_1d(f_start),
+                    f_dis_inside,
+                    np.atleast_1d(f_end),
+                ), axis=0)
+            else:
+                f_start_2d = np.expand_dims(f_start, axis=0)
+                f_end_2d = np.expand_dims(f_end, axis=0)
+                f_sub = np.concatenate((f_start_2d, f_dis_inside, f_end_2d), axis=0)
+
+            integral = np.trapz(f_sub, x=t_sub, axis=0)
         elif method == "quad":
             warnings.filterwarnings("ignore", category=IntegrationWarning)
+            # Note: quad integrates scalar-valued functions. For vector-valued rec_rate,
+            # prefer method="trapezoid". Here, we keep previous behavior and integrate
+            # the scalar result element if applicable.
             integral = np.array(
                 quad(
-                    lambda t, li=self.rec_rate: self._fun(t, li) * np.exp(-rho * t),
-                    0,
-                    t_max,
+                    lambda tt, li=self.rec_rate: self._fun(tt, li) * np.exp(-rho * tt),
+                    t_start,
+                    t_end,
                 )[0]
             )
         else:

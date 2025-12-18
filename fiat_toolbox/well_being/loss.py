@@ -114,7 +114,8 @@ class CommunityUnit:
         )
 
     # --- Internal helpers to keep methods config-driven ---
-    def _rec_rate(self) -> Optional[float]:
+    def _reconstruction_rate(self) -> Optional[float]:
+        """Housing reconstruction rate λ (formerly recovery rate)."""
         if self.config.housing.recovery_rate is not None:
             return self.config.housing.recovery_rate
         if self.config.housing.recovery_time is not None:
@@ -124,7 +125,8 @@ class CommunityUnit:
             )
         return None
 
-    def _recovery_time(self) -> Optional[float]:
+    def _reconstruction_time(self) -> Optional[float]:
+        """Housing reconstruction time T (formerly recovery time)."""
         if self.config.housing.recovery_time is not None:
             return self.config.housing.recovery_time
         if self.config.housing.recovery_rate is not None:
@@ -133,6 +135,13 @@ class CommunityUnit:
                 rebuilt_per=self.config.simulation.recovery_per,
             )
         return None
+
+    # Backward-compatible aliases
+    def _rec_rate(self) -> Optional[float]:
+        return self._reconstruction_rate()
+
+    def _recovery_time(self) -> Optional[float]:
+        return self._reconstruction_time()
 
     def _stock_rec_rate(self, stock: CapitalStock) -> Optional[float]:
         if stock.recovery_rate is not None:
@@ -240,6 +249,67 @@ class CommunityUnit:
             types.append(LossType.LABOUR_INCOME)
         types.extend([LossType.CONSUMPTION, LossType.UTILITY])
         return types
+
+    def _unit_recovery_time(self) -> Optional[float]:
+        """
+        General unit recovery time based on consumption losses.
+
+        Defined as the earliest time t where the cumulative recovered
+        consumption loss reaches `simulation.recovery_per` of the total
+        consumption loss over the simulation horizon.
+
+        Uses the realized consumption time series (including liquidity effects).
+        """
+        if LossType.CONSUMPTION not in self.time_series.columns:
+            return None
+        times = self.time_series["time"].to_numpy()
+        # Loss rate over time (currency/year): Δc(t)
+        losses_t = self.time_series[LossType.CONSUMPTION].to_numpy()
+        n = losses_t.size
+        if n == 0:
+            return None
+        # Cumulative total loss via ConsumptionLoss.total() with [t0, t] integration
+        loss_model = ConsumptionLoss(
+            t=self.t,
+            rec_rate=self._rec_rate(),
+            v=self.config.housing.v,
+            k_str=self.config.housing.k,
+            pi=self.config.income.pi,
+            liquidity=self._liquidity(),
+            extra_losses=self._extra_losses(),
+        )
+        t0 = float(times[0])
+        cum = np.array(
+            [float(loss_model.total(rho=0, method="trapezoid", t1=t0, t2=float(t))) for t in times],
+            dtype=float,
+        )
+        total_loss = float(cum[-1])
+        if total_loss <= 0:
+            return 0.0
+        target_fraction = self.config.simulation.recovery_per / 100.0
+        target = total_loss * target_fraction
+        # If already achieved at t=0
+        if cum[0] >= target:
+            return 0.0
+        # Find first index where cumulative loss reaches/exceeds target
+        idxs = np.nonzero(cum >= target)[0]
+        if idxs.size == 0:
+            # Not reached within simulation horizon
+            return None
+        i = int(idxs[0])
+        if i == 0:
+            return float(times[0])
+        # Linear interpolation in cumulative space between points i-1 and i
+        t0, t1 = float(times[i - 1]), float(times[i])
+        c_prev, c_curr = float(cum[i - 1]), float(cum[i])
+        if c_curr == c_prev:
+            return t1
+        s = (target - c_prev) / (c_curr - c_prev)
+        if s < 0.0:
+            s = 0.0
+        elif s > 1.0:
+            s = 1.0
+        return t0 + s * (t1 - t0)
 
     def calc_loss(self, loss_type: LossType, method: str = "trapezoid") -> float:
         """
@@ -406,6 +476,11 @@ class CommunityUnit:
             self.config.housing.v * self.config.housing.k
         )
         self.total_losses["Equity Weighted Loss"] = ew_loss
+
+        # Compute and store general unit recovery time (consumption-based)
+        self.unit_recovery_time = self._unit_recovery_time()
+        # Expose as primary recovery time attribute for the unit
+        self.recovery_time = self.unit_recovery_time
 
         return self.total_losses
 
@@ -620,14 +695,18 @@ class CommunityUnit:
             label="Consumption",
         )
 
-        # Plot recovery time
-        ax.axvline(
-            x=self._recovery_time(),
-            color="black",
-            linestyle="-",
-            alpha=0.3,
-            label=f"Recovery rate: {self._rec_rate():.2f}",
-        )
+        # Plot general unit recovery time based on consumption losses
+        urt = getattr(self, "unit_recovery_time", None)
+        if urt is None:
+            urt = self._unit_recovery_time()
+        if urt is not None:
+            ax.axvline(
+                x=urt,
+                color="black",
+                linestyle=":",
+                alpha=0.5,
+                label=f"Unit recovery time: {urt:.2f} years",
+            )
 
         # Plot cmin
         if plot_cmin:
@@ -642,18 +721,19 @@ class CommunityUnit:
                 ),
             )
 
-        # Add text annotation for recovery time
+        # Add text annotation for unit recovery time
         y_point = self._c0() - self.time_series[LossType.CONSUMPTION].mean()
-        ax.text(
-            self._recovery_time() + 0.1,
-            y_point,
-            f"Recovery time: {self._recovery_time():.2f} years",
-            verticalalignment="center",
-            horizontalalignment="left",
-            color="black",
-            fontsize=10,
-            alpha=0.7,
-        )
+        if urt is not None:
+            ax.text(
+                urt + 0.1,
+                y_point,
+                f"Unit recovery time: {urt:.2f} years",
+                verticalalignment="center",
+                horizontalalignment="left",
+                color="black",
+                fontsize=10,
+                alpha=0.7,
+            )
 
         # Add lightning icon at t=0 years just above self.c0
         lightning_icon = "\u26a1"
@@ -801,7 +881,7 @@ class CommunityUnit:
         df = pd.DataFrame(
             {
                 "lambda": lambdas,
-                "recovery_time": recovery_time(
+                "reconstruction_time": recovery_time(
                     rate=lambdas, rebuilt_per=self.config.simulation.recovery_per
                 ),
                 LossType.RECOVERY: recovery_costs,
@@ -812,6 +892,7 @@ class CommunityUnit:
         )
 
         # Persist optimal parameters back into config for downstream use
+        # Persist (config schema uses recovery_*; keep fields but rename semantics)
         self.config.housing.recovery_rate = optimal_lambda
         self.config.housing.recovery_time = recovery_time(
             rate=optimal_lambda, rebuilt_per=self.config.simulation.recovery_per
@@ -850,17 +931,17 @@ class CommunityUnit:
         # Check how x axis should be configured
         if x_type == "rate":
             x = self.l_opt["lambda"]
-            val = self._rec_rate()
+            val = self._reconstruction_rate()
             val_min = self.lambda_opt["l_opt_min"]
-            leg = "Recovery-rate λ"
+            leg = "Reconstruction-rate λ"
         elif x_type == "time":
-            x = self.l_opt["recovery_time"]
-            val = self._recovery_time()
+            x = self.l_opt["reconstruction_time"]
+            val = self._reconstruction_time()
             val_min = recovery_time(
                 rate=self.lambda_opt["l_opt_min"],
                 rebuilt_per=self.config.simulation.recovery_per,
             )
-            leg = "Recovery time (years)"
+            leg = "Reconstruction time (years)"
             # axs[0].set_xscale('log')
         axs[1].set_xlabel(leg)
         # Make line plots for consumption losses
