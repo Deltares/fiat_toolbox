@@ -29,7 +29,7 @@ def _make_config(
 ):
     return WellBeingConfig(
         housing=CapitalStock(k=k, v=v, recovery_rate=rec_rate),
-        income=IncomeConfig(i_0=i0, i_avg=iavg, pi=pi, c_i_ratio=1.0),
+        income=IncomeConfig(i_0=i0, i_avg=iavg, pi=pi),
         liquidity=Liquidity(savings=savings, insurance=insurance, support=support),
         simulation=SimulationConfig(
             eta=eta,

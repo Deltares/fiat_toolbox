@@ -51,8 +51,6 @@ class IncomeConfig(BaseModel):
     i_0: float = Field(..., description="Initial income rate per year")
     i_avg: float = Field(..., description="Average income rate per year")
     pi: float = Field(0.15, description="Productivity of capital")
-    c_L: Optional[float] = Field(None, description="Labour income share")
-    c_i_ratio: float = Field(1.0, description="Consumption to income ratio")
     i_div: Optional[float] = Field(None, description="Diversified income per year")
 
 class SimulationConfig(BaseModel):
@@ -154,32 +152,20 @@ class CommunityUnit:
 
     def _extra_losses(self):
         extra = []
-        if self.config.rental_housing is not None:
-            rr = self._stock_rec_rate(self.config.rental_housing)
+        for label, stock in (
+            ("rental_housing", self.config.rental_housing),
+            ("labour_assets", self.config.labour_assets),
+        ):
+            if stock is None:
+                continue
+            rr = self._stock_rec_rate(stock)
             if rr is None:
                 raise ValueError(
-                    "rental_housing must define either recovery_rate or recovery_time"
+                    f"{label} must define either recovery_rate or recovery_time"
                 )
-            n0 = (
-                self.config.income.pi
-                * self.config.rental_housing.v
-                * self.config.rental_housing.k
-            )
+            n0 = self.config.income.pi * stock.v * stock.k
             extra.append((n0, rr))
-        if self.config.labour_assets is not None:
-            rr = self._stock_rec_rate(self.config.labour_assets)
-            if rr is None:
-                raise ValueError(
-                    "labour_assets must define either recovery_rate or recovery_time"
-                )
-            n0 = (
-                self.config.income.c_L
-                * self.config.income.pi
-                * self.config.labour_assets.v
-                * self.config.labour_assets.k
-            )
-            extra.append((n0, rr))
-        return extra if len(extra) > 0 else None
+        return extra if extra else None
 
     def _validate_and_fill_recovery_params(self) -> None:
         # For any CapitalStock: only one of recovery_time or recovery_rate can be set
@@ -224,10 +210,12 @@ class CommunityUnit:
     def _c0(self) -> float:
         # Include diversified income (if provided) in baseline income
         i_div = self.config.income.i_div or 0.0
-        return self.config.income.c_i_ratio * (self.config.income.i_0 + i_div)
+        # Consumption equals income by assumption
+        return self.config.income.i_0 + i_div
 
     def _c_avg(self) -> float:
-        return self.config.income.c_i_ratio * self.config.income.i_avg
+        # Consumption equals income by assumption
+        return self.config.income.i_avg
 
     def _has_liquidity(self) -> bool:
         return self._liquidity() != 0
@@ -352,25 +340,20 @@ class CommunityUnit:
                 self.config.housing.k,
                 self.config.income.pi,
             )
-        elif loss_type == LossType.RENTAL_INCOME:
-            if self.config.rental_housing is None:
-                return 0.0
-            loss = IncomeLoss(
-                self.t,
-                self._stock_rec_rate(self.config.rental_housing),
-                self.config.rental_housing.v,
-                self.config.rental_housing.k,
-                self.config.income.pi,
+        elif loss_type in (LossType.RENTAL_INCOME, LossType.LABOUR_INCOME):
+            stock = (
+                self.config.rental_housing
+                if loss_type == LossType.RENTAL_INCOME
+                else self.config.labour_assets
             )
-        elif loss_type == LossType.LABOUR_INCOME:
-            if self.config.labour_assets is None:
+            if stock is None:
                 return 0.0
             loss = IncomeLoss(
                 self.t,
-                self._stock_rec_rate(self.config.labour_assets),
-                self.config.labour_assets.v,
-                self.config.labour_assets.k,
-                self.config.income.pi * self.config.income.c_L,
+                self._stock_rec_rate(stock),
+                stock.v,
+                stock.k,
+                self.config.income.pi,
             )
         elif loss_type == LossType.CONSUMPTION:
             loss = ConsumptionLoss(
@@ -705,7 +688,7 @@ class CommunityUnit:
                 color="black",
                 linestyle=":",
                 alpha=0.5,
-                label=f"Unit recovery time: {urt:.2f} years",
+                label=f"Recovery time: {urt:.2f} years",
             )
 
         # Plot cmin
@@ -719,20 +702,6 @@ class CommunityUnit:
                     f"Minimum consumption: {self.config.simulation.c_min:,.0f} "
                     f"{self.config.simulation.currency}"
                 ),
-            )
-
-        # Add text annotation for unit recovery time
-        y_point = self._c0() - self.time_series[LossType.CONSUMPTION].mean()
-        if urt is not None:
-            ax.text(
-                urt + 0.1,
-                y_point,
-                f"Unit recovery time: {urt:.2f} years",
-                verticalalignment="center",
-                horizontalalignment="left",
-                color="black",
-                fontsize=10,
-                alpha=0.7,
             )
 
         # Add lightning icon at t=0 years just above self.c0
