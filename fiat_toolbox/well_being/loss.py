@@ -13,7 +13,7 @@ from typing import Optional
 from .methods import (
     ConsumptionLoss,
     IncomeLoss,
-    ReconstructionCost,
+    RecoveryCost,
     UtilityLoss,
     equity_weight,
     opt_lambda,
@@ -25,9 +25,9 @@ from .methods import (
 
 # TODO Make class a pydantic model
 class LossType(str, Enum):
-    RECONSTRUCTION = "Reconstruction Costs"
-    INCOME = "Income Loss"
-    RENTAL_INCOME = "Rental Income Loss"
+    RECOVERY = "Recovery Costs"
+    INCOME = "Loss of Housing Services"
+    RENTAL_INCOME = "Loss of Housing Services (Rental)"
     LABOUR_INCOME = "Labour Income Loss"
 
     CONSUMPTION = "Consumption Loss"
@@ -213,7 +213,9 @@ class CommunityUnit:
             complete_stock(self.config.labour_assets, allow_none=False)
 
     def _c0(self) -> float:
-        return self.config.income.c_i_ratio * self.config.income.i_0
+        # Include diversified income (if provided) in baseline income
+        i_div = self.config.income.i_div or 0.0
+        return self.config.income.c_i_ratio * (self.config.income.i_0 + i_div)
 
     def _c_avg(self) -> float:
         return self.config.income.c_i_ratio * self.config.income.i_avg
@@ -229,7 +231,7 @@ class CommunityUnit:
 
     def _loss_types_for_run(self):
         types = [
-            LossType.RECONSTRUCTION,
+            LossType.RECOVERY,
             LossType.INCOME,
         ]
         if self.config.rental_housing is not None:
@@ -247,7 +249,7 @@ class CommunityUnit:
         ----------
         loss_type : LossType
             The type of loss to calculate. Must be one of the following:
-            - LossType.RECONSTRUCTION: Calculates reconstruction cost.
+            - LossType.RECOVERY: Calculates recovery cost.
             - LossType.INCOME: Calculates income loss.
             - LossType.CONSUMPTION: Calculates consumption loss.
             - LossType.UTILITY: Calculates utility loss.
@@ -265,8 +267,8 @@ class CommunityUnit:
         ValueError
             If an invalid loss type is provided.
         """
-        if loss_type == LossType.RECONSTRUCTION:
-            loss = ReconstructionCost(
+        if loss_type == LossType.RECOVERY:
+            loss = RecoveryCost(
                 self.t,
                 self._rec_rate(),
                 self.config.housing.v,
@@ -477,7 +479,7 @@ class CommunityUnit:
         self, ax: Optional[plt.Axes] = None, plot_cmin=False
     ) -> Optional[plt.Figure]:
         """
-        Plot the consumption losses over time, stacking income losses and reconstruction costs with different hatches and colors.
+        Plot the consumption losses over time, stacking loss of housing services and recovery costs with different hatches and colors.
 
         Parameters
         ----------
@@ -504,7 +506,7 @@ class CommunityUnit:
 
         # Prepare component series (use 0 if not present)
         inc = self.time_series[LossType.INCOME]
-        recon = self.time_series[LossType.RECONSTRUCTION]
+        recon = self.time_series[LossType.RECOVERY]
         rental = (
             self.time_series[LossType.RENTAL_INCOME]
             if LossType.RENTAL_INCOME in self.time_series.columns
@@ -524,8 +526,8 @@ class CommunityUnit:
 
         # Bottom: Reconstruction
         label_recon = (
-            f"Total {LossType.RECONSTRUCTION}: "
-            f"{self.total_losses[LossType.RECONSTRUCTION]:,.0f} "
+            f"Total {LossType.RECOVERY}: "
+            f"{self.total_losses[LossType.RECOVERY]:,.0f} "
             f"{self.config.simulation.currency}"
         )
         ax.fill_between(
@@ -624,7 +626,7 @@ class CommunityUnit:
             color="black",
             linestyle="-",
             alpha=0.3,
-            label=f"Reconstruction rate: {self._rec_rate():.2f}",
+            label=f"Recovery rate: {self._rec_rate():.2f}",
         )
 
         # Plot cmin
@@ -686,7 +688,7 @@ class CommunityUnit:
         eps_rel: float = 0.0,
     ) -> None:
         """
-        Optimize the reconstruction rate (lambda) to minimize the total well-being loss.
+        Optimize the recovery rate (lambda) to minimize the total well-being loss.
 
         Parameters
         ----------
@@ -719,15 +721,15 @@ class CommunityUnit:
 
         # Calculate losses for each lambda value
         # Initialize arrays to store losses for each lambda
-        reconstruction_costs = []
+        recovery_costs = []
         income_losses = []
         consumption_losses = []
         utility_losses = []
 
         # Iterate through each lambda value and calculate losses
         for lmbd in lambdas:
-            reconstruction_costs.append(
-                ReconstructionCost(
+            recovery_costs.append(
+                RecoveryCost(
                     t=self.t,
                     rec_rate=lmbd,
                     v=self.config.housing.v,
@@ -770,7 +772,7 @@ class CommunityUnit:
             )
 
         # Convert lists to numpy arrays for further processing
-        reconstruction_costs = np.array(reconstruction_costs)
+        recovery_costs = np.array(recovery_costs)
         income_losses = np.array(income_losses)
         consumption_losses = np.array(consumption_losses)
         utility_losses = np.array(utility_losses)
@@ -802,7 +804,7 @@ class CommunityUnit:
                 "recovery_time": recovery_time(
                     rate=lambdas, rebuilt_per=self.config.simulation.recovery_per
                 ),
-                LossType.RECONSTRUCTION: reconstruction_costs,
+                LossType.RECOVERY: recovery_costs,
                 LossType.INCOME: income_losses,
                 LossType.CONSUMPTION: consumption_losses,
                 LossType.UTILITY: utility_losses,
@@ -864,10 +866,10 @@ class CommunityUnit:
         # Make line plots for consumption losses
         sns.lineplot(
             x=x,
-            y=self.l_opt[LossType.RECONSTRUCTION],
+            y=self.l_opt[LossType.RECOVERY],
             color="green",
             ax=axs[0],
-            label=LossType.RECONSTRUCTION,
+            label=LossType.RECOVERY,
         )
         sns.lineplot(
             x=x,

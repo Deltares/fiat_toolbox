@@ -25,10 +25,10 @@ def test_recovery_time_and_rate():
     assert np.isclose(r, rate)
 
 
-def test_reconstruction_cost_t():
+def test_recovery_cost_t():
     t = np.linspace(0, 1, 5)
     rec_rate, v, k_str = 0.5, 0.2, 100000
-    cost = methods.reconstruction_cost_t(t, rec_rate, v, k_str)
+    cost = methods.recovery_cost_t(t, rec_rate, v, k_str)
     assert cost.shape == t.shape
     assert np.all(cost >= 0)
 

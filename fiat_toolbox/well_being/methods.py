@@ -161,16 +161,16 @@ def recovery_rate(
     return rate if rate.size > 1 else rate.item()
 
 
-def reconstruction_cost_t(
+def recovery_cost_t(
     t: Union[float, np.ndarray], rec_rate: float, v: float, k_str: float
 ) -> np.ndarray:
     """
-    Calculate the reconstruction cost over time. This represents a cost rate and not the total cost.
+    Calculate the recovery cost over time. This represents a cost rate and not the total cost.
 
     Parameters
     ----------
     t : Union[float, np.ndarray]
-        The time value(s) for which to calculate the reconstruction cost. Can be a single float or a numpy array of floats.
+        The time value(s) for which to calculate the recovery cost. Can be a single float or a numpy array of floats.
     rec_rate : Union[float, np.ndarray]
         The rate of recovery value(s). Can be a single float or a numpy array of floats.
     v : float
@@ -181,9 +181,9 @@ def reconstruction_cost_t(
     Returns
     -------
     np.ndarray
-        The calculated reconstruction cost(s) as an nxm matrix where n is the length of t and m is the length of rec_rate.
+        The calculated recovery cost(s) as an nxm matrix where n is the length of t and m is the length of rec_rate.
     """
-    # Calculate the reconstruction cost
+    # Calculate the recovery cost
     cost = rec_rate * v * k_str * np.exp(-rec_rate * t)
 
     return cost
@@ -261,7 +261,7 @@ def consumption_loss_t(
         -----
         Let the total consumption loss be a sum of exponentials:
         Δc(t) = α_base · exp(−λ t) + Σ_i N_i · exp(−μ_i t), where
-        - α_base = income_loss_t(0) + reconstruction_cost_t(0) captures the base term at t=0,
+        - α_base = income_loss_t(0) + recovery_cost_t(0) captures the base term at t=0,
         - λ = rec_rate is the recovery rate for the base term,
         - each (N_i, μ_i) describes an extra loss component with its own decay.
 
@@ -283,7 +283,7 @@ def consumption_loss_t(
     def c_loss(t):
         base = income_loss_t(
             t=t, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi
-        ) + reconstruction_cost_t(t=t, rec_rate=rec_rate, v=v, k_str=k_str)
+        ) + recovery_cost_t(t=t, rec_rate=rec_rate, v=v, k_str=k_str)
         if extra_losses:
             extra = 0.0
             for N0, lam in extra_losses:
@@ -295,9 +295,8 @@ def consumption_loss_t(
     # while α_total = Δc(0) includes any extra_losses terms (sum of N0).
     alpha_base = (
         income_loss_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi)
-        + reconstruction_cost_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str)
+        + recovery_cost_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str)
     )
-    alpha_total = c_loss(0)
 
     if rec_rate <= 0 or liquidity <= 0:
         # No recovery or no liquidity: follow the baseline Δc(t)
@@ -759,19 +758,19 @@ class Loss:
         return integral if integral.size > 1 else integral.item()
 
 
-class ReconstructionCost(Loss):
+class RecoveryCost(Loss):
     """
-    A class to calculate reconstruction cost over time based on recovery rates.
+    A class to calculate recovery cost over time based on recovery rates.
     It includes the total method to calculate the total loss by integrating over time.
 
     Parameters
     ----------
     t : Union[float, np.ndarray]
-        The time value(s) for which to calculate the reconstruction cost. Can be a single float or a numpy array of floats.
+        The time value(s) for which to calculate the recovery cost. Can be a single float or a numpy array of floats.
     rec_rate : Union[float, np.ndarray]
         The rate of recovery value(s). Can be a single float or a numpy array of floats.
     v : float
-        The loss ratio, which is reconstruction cost divided by the total building structure value.
+        The loss ratio, which is recovery cost divided by the total building structure value.
     k_str : float
         The total building structure value.
 
@@ -782,7 +781,7 @@ class ReconstructionCost(Loss):
     rec_rate : np.ndarray
         Array of recovery rates.
     losses_t : np.ndarray
-        Property that calculates the reconstruction cost values for all combinations of `t` and `rec_rate`.
+        Property that calculates the recovery cost values for all combinations of `t` and `rec_rate`.
     """
 
     def __init__(
@@ -793,7 +792,7 @@ class ReconstructionCost(Loss):
         k_str: float,
     ):
         super().__init__(t, rec_rate)
-        self._fun = lambda t, rec_rate: reconstruction_cost_t(t, rec_rate, v, k_str)
+        self._fun = lambda t, rec_rate: recovery_cost_t(t, rec_rate, v, k_str)
 
 
 class IncomeLoss(Loss):
