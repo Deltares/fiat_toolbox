@@ -27,6 +27,8 @@ from .methods import (
 class LossType(str, Enum):
     RECONSTRUCTION = "Reconstruction Costs"
     INCOME = "Income Loss"
+    RENTAL_INCOME = "Rental Income Loss"
+    LABOUR_INCOME = "Labour Income Loss"
 
     CONSUMPTION = "Consumption Loss"
     UTILITY = "Utility Loss"
@@ -90,6 +92,8 @@ class CommunityUnit:
         self.time_series = pd.DataFrame({"time": self.t})
         # Storage for aggregate outputs
         self.total_losses = pd.Series(dtype=float)
+        # Validate and complete recovery parameters for stocks
+        self._validate_and_fill_recovery_params()
 
     def _get_time_array(self):
         t_max = self.config.simulation.t_max
@@ -130,6 +134,84 @@ class CommunityUnit:
             )
         return None
 
+    def _stock_rec_rate(self, stock: CapitalStock) -> Optional[float]:
+        if stock.recovery_rate is not None:
+            return stock.recovery_rate
+        if stock.recovery_time is not None:
+            return recovery_rate(
+                stock.recovery_time, rebuilt_per=self.config.simulation.recovery_per
+            )
+        return None
+
+    def _extra_losses(self):
+        extra = []
+        if self.config.rental_housing is not None:
+            rr = self._stock_rec_rate(self.config.rental_housing)
+            if rr is None:
+                raise ValueError(
+                    "rental_housing must define either recovery_rate or recovery_time"
+                )
+            n0 = (
+                self.config.income.pi
+                * self.config.rental_housing.v
+                * self.config.rental_housing.k
+            )
+            extra.append((n0, rr))
+        if self.config.labour_assets is not None:
+            rr = self._stock_rec_rate(self.config.labour_assets)
+            if rr is None:
+                raise ValueError(
+                    "labour_assets must define either recovery_rate or recovery_time"
+                )
+            n0 = (
+                self.config.income.c_L
+                * self.config.income.pi
+                * self.config.labour_assets.v
+                * self.config.labour_assets.k
+            )
+            extra.append((n0, rr))
+        return extra if len(extra) > 0 else None
+
+    def _validate_and_fill_recovery_params(self) -> None:
+        # For any CapitalStock: only one of recovery_time or recovery_rate can be set
+        # If one is provided, compute the other using simulation.recovery_per
+        def complete_stock(stock: CapitalStock, allow_none: bool) -> None:
+            if stock is None:
+                if allow_none:
+                    return
+                raise ValueError("Missing required CapitalStock configuration")
+            has_rate = stock.recovery_rate is not None
+            has_time = stock.recovery_time is not None
+            if has_rate and has_time:
+                raise ValueError(
+                    "Provide only one of recovery_rate or recovery_time for CapitalStock"
+                )
+            if not has_rate and not has_time:
+                if allow_none:
+                    # housing can be optimized later
+                    return
+                raise ValueError(
+                    "For rental_housing and labour_assets, provide recovery_rate or recovery_time"
+                )
+            if has_rate and not has_time:
+                stock.recovery_time = recovery_time(
+                    rate=stock.recovery_rate,
+                    rebuilt_per=self.config.simulation.recovery_per,
+                )
+            if has_time and not has_rate:
+                stock.recovery_rate = recovery_rate(
+                    time=stock.recovery_time,
+                    rebuilt_per=self.config.simulation.recovery_per,
+                )
+
+        # housing: allow none, will be set by optimization if missing
+        complete_stock(self.config.housing, allow_none=True)
+        # rental_housing and labour_assets must have one specified if provided
+        if self.config.rental_housing is not None:
+            complete_stock(self.config.rental_housing, allow_none=False)
+        if self.config.labour_assets is not None:
+            complete_stock(self.config.labour_assets, allow_none=False)
+
     def _c0(self) -> float:
         return self.config.income.c_i_ratio * self.config.income.i_0
 
@@ -144,6 +226,18 @@ class CommunityUnit:
         if not liq:
             return 0.0
         return (liq.savings or 0.0) + (liq.insurance or 0.0) + (liq.support or 0.0)
+
+    def _loss_types_for_run(self):
+        types = [
+            LossType.RECONSTRUCTION,
+            LossType.INCOME,
+        ]
+        if self.config.rental_housing is not None:
+            types.append(LossType.RENTAL_INCOME)
+        if self.config.labour_assets is not None:
+            types.append(LossType.LABOUR_INCOME)
+        types.extend([LossType.CONSUMPTION, LossType.UTILITY])
+        return types
 
     def calc_loss(self, loss_type: LossType, method: str = "trapezoid") -> float:
         """
@@ -186,6 +280,26 @@ class CommunityUnit:
                 self.config.housing.k,
                 self.config.income.pi,
             )
+        elif loss_type == LossType.RENTAL_INCOME:
+            if self.config.rental_housing is None:
+                return 0.0
+            loss = IncomeLoss(
+                self.t,
+                self._stock_rec_rate(self.config.rental_housing),
+                self.config.rental_housing.v,
+                self.config.rental_housing.k,
+                self.config.income.pi,
+            )
+        elif loss_type == LossType.LABOUR_INCOME:
+            if self.config.labour_assets is None:
+                return 0.0
+            loss = IncomeLoss(
+                self.t,
+                self._stock_rec_rate(self.config.labour_assets),
+                self.config.labour_assets.v,
+                self.config.labour_assets.k,
+                self.config.income.pi * self.config.income.c_L,
+            )
         elif loss_type == LossType.CONSUMPTION:
             loss = ConsumptionLoss(
                 self.t,
@@ -194,6 +308,7 @@ class CommunityUnit:
                 self.config.housing.k,
                 self.config.income.pi,
                 liquidity=self._liquidity(),
+                extra_losses=self._extra_losses(),
             )
             if self._has_liquidity():
                 loss_no_liq = ConsumptionLoss(
@@ -203,6 +318,7 @@ class CommunityUnit:
                     self.config.housing.k,
                     self.config.income.pi,
                     liquidity=0.0,
+                    extra_losses=self._extra_losses(),
                 )
                 self.time_series[f"{loss_type} No Liquidity"] = loss_no_liq.losses_t
         elif loss_type == LossType.UTILITY:
@@ -216,6 +332,7 @@ class CommunityUnit:
                 self.config.simulation.eta,
                 self.config.simulation.c_min,
                 liquidity=self._liquidity(),
+                extra_losses=self._extra_losses(),
             )
         else:
             raise ValueError(f"Invalid loss type: {loss_type}")
@@ -255,8 +372,8 @@ class CommunityUnit:
         - The `wellbeing_loss` and `equity_weight` functions are used to compute the respective metrics.
         - The results are stored in the `time_series` DataFrame and `total_losses` Series attributes.
         """
-        # Calculate losses for each loss type
-        for loss_type in LossType:
+        # Calculate losses for configured loss types only
+        for loss_type in self._loss_types_for_run():
             self.calc_loss(loss_type, method=method)
 
         # Calculate equivalent consumption loss
@@ -270,6 +387,7 @@ class CommunityUnit:
             eta=self.config.simulation.eta,
             cmin=self.config.simulation.c_min,
             liquidity=self._liquidity(),
+            extra_losses=self._extra_losses(),
         )
         du_dis = ut_t.total(rho=self.config.simulation.rho, method=method)
         well_being_loss = wellbeing_loss(
@@ -384,39 +502,86 @@ class CommunityUnit:
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 6))
 
-        # Plot income losses
-        color1 = "brown"
-        label1 = (
-            f"Total {LossType.INCOME}: {self.total_losses[LossType.INCOME]:,.0f} "
-            f"{self.config.simulation.currency}"
+        # Prepare component series (use 0 if not present)
+        inc = self.time_series[LossType.INCOME]
+        recon = self.time_series[LossType.RECONSTRUCTION]
+        rental = (
+            self.time_series[LossType.RENTAL_INCOME]
+            if LossType.RENTAL_INCOME in self.time_series.columns
+            else 0
         )
-        ax.fill_between(
-            self.time_series["time"],
-            self._c0() - self.time_series[LossType.INCOME],
-            self._c0(),
-            color=color1,
-            alpha=0.6,
-            label=label1,
+        labour = (
+            self.time_series[LossType.LABOUR_INCOME]
+            if LossType.LABOUR_INCOME in self.time_series.columns
+            else 0
         )
 
-        # Plot reconstruction costs
-        color2 = "lightcoral"
-        label2 = (
+        # Colors and labels
+        color_income = "brown"
+        color_recon = "lightcoral"
+        color_rental = "sienna"
+        color_labour = "peru"
+
+        # Bottom: Reconstruction
+        label_recon = (
             f"Total {LossType.RECONSTRUCTION}: "
             f"{self.total_losses[LossType.RECONSTRUCTION]:,.0f} "
             f"{self.config.simulation.currency}"
         )
         ax.fill_between(
             self.time_series["time"],
-            self._c0()
-            - self.time_series[LossType.INCOME]
-            - self.time_series[LossType.RECONSTRUCTION],
-            self._c0() - self.time_series[LossType.INCOME],
-            facecolor=color2,
+            self._c0() - inc - rental - labour - recon,
+            self._c0() - inc - rental - labour,
+            facecolor=color_recon,
             alpha=0.6,
-            label=label2,
-            # linewidth=0.0
+            label=label_recon,
         )
+
+        # Above: Income
+        label_income = (
+            f"Total {LossType.INCOME}: {self.total_losses[LossType.INCOME]:,.0f} "
+            f"{self.config.simulation.currency}"
+        )
+        ax.fill_between(
+            self.time_series["time"],
+            self._c0() - inc - rental - labour,
+            self._c0() - rental - labour,
+            facecolor=color_income,
+            alpha=0.6,
+            label=label_income,
+        )
+
+        # Above: Rental Income (if any)
+        if LossType.RENTAL_INCOME in self.time_series.columns:
+            label_rental = (
+                f"Total {LossType.RENTAL_INCOME}: "
+                f"{self.total_losses[LossType.RENTAL_INCOME]:,.0f} "
+                f"{self.config.simulation.currency}"
+            )
+            ax.fill_between(
+                self.time_series["time"],
+                self._c0() - rental - labour,
+                self._c0() - labour,
+                facecolor=color_rental,
+                alpha=0.6,
+                label=label_rental,
+            )
+
+        # Top: Labour Income (if any)
+        if LossType.LABOUR_INCOME in self.time_series.columns:
+            label_labour = (
+                f"Total {LossType.LABOUR_INCOME}: "
+                f"{self.total_losses[LossType.LABOUR_INCOME]:,.0f} "
+                f"{self.config.simulation.currency}"
+            )
+            ax.fill_between(
+                self.time_series["time"],
+                self._c0() - labour,
+                self._c0(),
+                facecolor=color_labour,
+                alpha=0.6,
+                label=label_labour,
+            )
 
         # If there is liquidity available, plot the consumption losses without liquidity
         if self._has_liquidity():
@@ -518,7 +683,7 @@ class CommunityUnit:
         rec_time_min: float = 0.3,
         no_steps: float = 1000,
         method: str = "trapezoid",
-        eps_rel: float = 0.01,
+        eps_rel: float = 0.0,
     ) -> None:
         """
         Optimize the reconstruction rate (lambda) to minimize the total well-being loss.
@@ -586,6 +751,7 @@ class CommunityUnit:
                     k_str=self.config.housing.k,
                     pi=self.config.income.pi,
                     liquidity=self._liquidity(),
+                    extra_losses=self._extra_losses(),
                 ).total(rho=0, method=method)
             )
             utility_losses.append(
@@ -599,6 +765,7 @@ class CommunityUnit:
                     eta=self.config.simulation.eta,
                     cmin=self.config.simulation.c_min,
                     liquidity=self._liquidity(),
+                    extra_losses=self._extra_losses(),
                 ).total(rho=0, method=method)
             )
 
@@ -622,6 +789,7 @@ class CommunityUnit:
             cmin=self.config.simulation.c_min,
             eps_rel=eps_rel,
             liquidity=self._liquidity(),
+            extra_losses=self._extra_losses(),
         )
 
         optimal_lambda = opt["l_opt"]
