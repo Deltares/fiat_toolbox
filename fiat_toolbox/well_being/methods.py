@@ -518,6 +518,20 @@ def opt_lambda(
         return objective(rec_rate)
 
     res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
+
+    if not res.success:
+        l_grid = np.linspace(l_min, l_max, 1000)
+        losses = np.array([objective(rec_rate) for rec_rate in l_grid])
+        if np.all(np.isnan(losses)):
+            msg = "Utility loss could not be calculated for any of the reconstruction rates in the given bounds, since consumption drops below the threshold."
+        else:
+            msg = f"Minimize function: '{res.message}'"
+
+        raise ValueError(
+            f"An optimal reconstruction rate could not be found in the given bounds [{l_min}, {l_max}].\n"
+            + msg
+        )
+
     l_opt = res.x[0]
     loss_opt = res.fun
 
@@ -533,9 +547,9 @@ def opt_lambda(
     # Check if a tolerance is provided
     # TODO Check this part again
     if eps_rel > 0:
+        threshold = loss_opt * (1 + eps_rel)
         l_grid = np.linspace(l_min, l_max, 1000)
         losses = np.array([objective(rec_rate) for rec_rate in l_grid])
-        threshold = loss_opt * (1 + eps_rel)
         # Find the smallest lambda where the loss is within the threshold
         valid_indices = np.where(losses <= threshold)[0]
         if valid_indices.size == 0:
