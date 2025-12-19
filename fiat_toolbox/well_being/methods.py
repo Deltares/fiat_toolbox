@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Union, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 from scipy.integrate import IntegrationWarning, quad
@@ -293,10 +293,9 @@ def consumption_loss_t(
 
     # α_base is the coefficient of the exp(-rec_rate * t) term (income + reconstruction at t=0),
     # while α_total = Δc(0) includes any extra_losses terms (sum of N0).
-    alpha_base = (
-        income_loss_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi)
-        + recovery_cost_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str)
-    )
+    alpha_base = income_loss_t(
+        t=0, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi
+    ) + recovery_cost_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str)
 
     if rec_rate <= 0 or liquidity <= 0:
         # No recovery or no liquidity: follow the baseline Δc(t)
@@ -328,7 +327,9 @@ def consumption_loss_t(
                 return c_loss(th) * th + liquidity - integral_to_t(th)
 
             # Find a suitable upper bracket where the function is negative
-            rates = [rec_rate] + ([lam for _, lam in extra_losses] if extra_losses else [])
+            rates = [rec_rate] + (
+                [lam for _, lam in extra_losses] if extra_losses else []
+            )
             min_rate = min(rates) if rates else rec_rate
             upper = max(10.0 / min_rate, 1.0)
             f_upper = objective_t_hat(upper)
@@ -559,22 +560,52 @@ def opt_lambda(
 
     Returns
     -------
-    float
-        The optimized recovery rate (lambda).
+    dict
+        A result dictionary with fields:
+        - success: bool indicating whether optimization succeeded and met tolerance
+        - message: str with additional context when not successful (or None)
+        - l_opt_min: float|None optimal lambda at minimum loss (no tolerance)
+        - loss_opt_min: float|None corresponding minimum loss
+        - eps_rel: float the requested relative tolerance
+        - l_opt: float|None lambda meeting tolerance criterion (or l_opt_min when tolerance satisfied)
+        - loss_opt: float|None corresponding loss
+        - C_diff: float change in equivalent consumption due to tolerance relaxation
+        - T_diff: float change in recovery time due to tolerance relaxation
 
-    Raises
-    ------
-    ValueError
-        If `t_max` is not provided when using the "quad" method.
-    ValueError
-        If `times` is not provided when using the "trapezoid" method.
+    Notes
+    -----
+    - This function does not raise on failure; it returns success=False and a message.
     """
+    # Initialize a single result dict and update it throughout
+    result: dict = {
+        "success": False,
+        "message": None,
+        "l_opt_min": None,
+        "loss_opt_min": None,
+        "eps_rel": eps_rel,
+        "l_opt": None,
+        "loss_opt": None,
+        "C_diff": None,
+        "T_diff": None,
+    }
+
+    # Validate inputs without raising
     if method == "quad":
         if t_max is None:
-            raise ValueError("t_max must be provided when using the 'quad' method.")
+            result.update(
+                {
+                    "message": "t_max must be provided when using the 'quad' method.",
+                }
+            )
+            return result
         times = np.array([0, t_max])
     elif method == "trapezoid" and times is None:
-        raise ValueError("times must be provided when using the 'trapezoid' method.")
+        result.update(
+            {
+                "message": "times must be provided when using the 'trapezoid' method.",
+            }
+        )
+        return result
 
     def objective(rec_rate: float) -> float:
         ut_t = UtilityLoss(
@@ -601,27 +632,37 @@ def opt_lambda(
         l_grid = np.linspace(l_min, l_max, 1000)
         losses = np.array([objective(rec_rate) for rec_rate in l_grid])
         if np.all(np.isnan(losses)):
-            msg = "Utility loss could not be calculated for any of the reconstruction rates in the given bounds, since consumption drops below the threshold."
+            msg = (
+                "Utility loss could not be calculated for any of the reconstruction rates in the given bounds, "
+                "since consumption drops below the threshold."
+            )
         else:
             msg = f"Minimize function: '{res.message}'"
 
-        raise ValueError(
-            f"An optimal reconstruction rate could not be found in the given bounds [{l_min}, {l_max}].\n"
-            + msg
+        result.update(
+            {
+                "message": (
+                    f"An optimal reconstruction rate could not be found in the given bounds [{l_min}, {l_max}]. "
+                    + msg
+                )
+            }
         )
+        return result
 
     l_opt = res.x[0]
     loss_opt = res.fun
 
-    opt = {
-        "l_opt_min": l_opt,
-        "loss_opt_min": loss_opt,
-        "eps_rel": eps_rel,
-        "l_opt": l_opt,
-        "loss_opt": loss_opt,
-        "C_diff": 0,
-        "T_diff": 0,
-    }
+    # Populate result with successful optimum values
+    result.update(
+        {
+            "success": True,
+            "message": None,
+            "l_opt_min": l_opt,
+            "loss_opt_min": loss_opt,
+            "l_opt": l_opt,
+            "loss_opt": loss_opt,
+        }
+    )
     # Check if a tolerance is provided
     # TODO Check this part again
     if eps_rel > 0:
@@ -631,21 +672,29 @@ def opt_lambda(
         # Find the smallest lambda where the loss is within the threshold
         valid_indices = np.where(losses <= threshold)[0]
         if valid_indices.size == 0:
-            raise ValueError(
-                f"No lambda found within the relative tolerance of {eps_rel} from the minimum loss."
+            # Keep the original optimum, but flag as not meeting eps_rel tolerance
+            result.update(
+                {
+                    "success": False,
+                    "message": f"No lambda found within the relative tolerance of {eps_rel} from the minimum loss.",
+                }
             )
+            return result
         ind = valid_indices[-1]
         l_opt_new = l_grid[ind]
         loss_opt_new = losses[ind]
 
-        opt["l_opt"] = l_opt_new
-        opt["loss_opt"] = loss_opt_new
-        opt["C_diff"] = inverse_utility(loss_opt_new, eta) - inverse_utility(
-            loss_opt, eta
+        result.update(
+            {
+                "l_opt": l_opt_new,
+                "loss_opt": loss_opt_new,
+                "C_diff": inverse_utility(loss_opt_new, eta)
+                - inverse_utility(loss_opt, eta),
+                "T_diff": recovery_time(l_opt) - recovery_time(l_opt_new),
+            }
         )
-        opt["T_diff"] = recovery_time(l_opt) - recovery_time(l_opt_new)
 
-    return opt
+    return result
 
 
 class Loss:
@@ -794,22 +843,28 @@ class Loss:
 
             # Build subgrid within [t_start, t_end] including boundaries
             mask_inside = (t_arr > t_start) & (t_arr < t_end)
-            t_sub = np.concatenate(([t_start], t_arr[mask_inside].astype(float), [t_end]))
+            t_sub = np.concatenate(
+                ([t_start], t_arr[mask_inside].astype(float), [t_end])
+            )
 
             # Discounted values on subgrid
-            f_dis_inside = (self._fun(t_arr[mask_inside], self.rec_rate) *
-                            np.exp(-rho * t_arr[mask_inside]))
+            f_dis_inside = self._fun(t_arr[mask_inside], self.rec_rate) * np.exp(
+                -rho * t_arr[mask_inside]
+            )
 
             f_start = interp_f_at(t_start)
             f_end = interp_f_at(t_end)
 
             # Stack along time axis (axis=0)
             if f_t.ndim == 1:
-                f_sub = np.concatenate((
-                    np.atleast_1d(f_start),
-                    f_dis_inside,
-                    np.atleast_1d(f_end),
-                ), axis=0)
+                f_sub = np.concatenate(
+                    (
+                        np.atleast_1d(f_start),
+                        f_dis_inside,
+                        np.atleast_1d(f_end),
+                    ),
+                    axis=0,
+                )
             else:
                 f_start_2d = np.expand_dims(f_start, axis=0)
                 f_end_2d = np.expand_dims(f_end, axis=0)

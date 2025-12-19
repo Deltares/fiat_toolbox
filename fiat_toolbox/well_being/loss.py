@@ -1,14 +1,12 @@
 from enum import Enum
-from typing import Literal, Optional, Dict
+from typing import Dict, Literal, Optional
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
 from pydantic import BaseModel, Field
-from typing import Optional
 
 from .methods import (
     ConsumptionLoss,
@@ -36,16 +34,23 @@ class LossType(str, Enum):
     def __str__(self):
         return self.value
 
+
 class CapitalStock(BaseModel):
     k: float = Field(..., description="Value of the capital stock")
     v: float = Field(..., description="Loss ratio for the capital stock")
-    recovery_time: Optional[float] = Field(None, description="Recovery time for the capital stock")
-    recovery_rate: Optional[float] = Field(None, description="Recovery rate for the capital stock")
+    recovery_time: Optional[float] = Field(
+        None, description="Recovery time for the capital stock"
+    )
+    recovery_rate: Optional[float] = Field(
+        None, description="Recovery rate for the capital stock"
+    )
+
 
 class Liquidity(BaseModel):
     savings: float = Field(0.0, description="Household savings")
     insurance: float = Field(0.0, description="Insurance payout")
     support: float = Field(0.0, description="External support")
+
 
 class IncomeConfig(BaseModel):
     i_0: float = Field(..., description="Initial income rate per year")
@@ -53,14 +58,18 @@ class IncomeConfig(BaseModel):
     pi: float = Field(0.15, description="Productivity of capital")
     i_div: Optional[float] = Field(None, description="Diversified income per year")
 
+
 class SimulationConfig(BaseModel):
     eta: float = Field(1.5, description="Elasticity of marginal utility of consumption")
     rho: float = Field(0.06, description="Discount rate")
     t_max: float = Field(10, description="Maximum simulation time")
-    dt: float = Field(1/52, description="Time step")
+    dt: float = Field(1 / 52, description="Time step")
     currency: str = Field("$", description="Currency symbol")
     c_min: float = Field(0.0, description="Minimum consumption rate per year")
-    recovery_per: float = Field(95.0, description="Percentage of asset rebuilt to consider as recovered")
+    recovery_per: float = Field(
+        95.0, description="Percentage of asset rebuilt to consider as recovered"
+    )
+
 
 class WellBeingConfig(BaseModel):
     owner_housing: CapitalStock
@@ -69,6 +78,7 @@ class WellBeingConfig(BaseModel):
     income: IncomeConfig
     liquidity: Optional[Liquidity] = Liquidity()
     simulation: Optional[SimulationConfig] = SimulationConfig()
+
 
 class CommunityUnit:
     def __init__(self, config: WellBeingConfig) -> None:
@@ -159,7 +169,11 @@ class CommunityUnit:
                 raise ValueError(
                     "rental_housing must define either recovery_rate or recovery_time"
                 )
-            n0 = self.config.income.pi * self.config.rental_housing.v * self.config.rental_housing.k
+            n0 = (
+                self.config.income.pi
+                * self.config.rental_housing.v
+                * self.config.rental_housing.k
+            )
             extra.append((n0, rr))
 
         # Labour assets as a dictionary of named CapitalStock entries
@@ -294,7 +308,10 @@ class CommunityUnit:
         )
         t0 = float(times[0])
         cum = np.array(
-            [float(loss_model.total(rho=0, method="trapezoid", t1=t0, t2=float(t))) for t in times],
+            [
+                float(loss_model.total(rho=0, method="trapezoid", t1=t0, t2=float(t)))
+                for t in times
+            ],
             dtype=float,
         )
         total_loss = float(cum[-1])
@@ -506,9 +523,13 @@ class CommunityUnit:
             du=du_dis, c_avg=self._c_avg(), eta=self.config.simulation.eta
         )
         # Calculate equity weighted loss
-        ew_loss = equity_weight(
-            c=self._c0(), c_avg=self._c_avg(), eta=self.config.simulation.eta
-        ) * self.config.owner_housing.v * self.config.owner_housing.k
+        ew_loss = (
+            equity_weight(
+                c=self._c0(), c_avg=self._c_avg(), eta=self.config.simulation.eta
+            )
+            * self.config.owner_housing.v
+            * self.config.owner_housing.k
+        )
 
         # Update total losses with additional metrics
         self.total_losses["Wellbeing Loss"] = well_being_loss
@@ -556,7 +577,7 @@ class CommunityUnit:
             raise ValueError(f"{loss_type} losses have not been calculated.")
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 6))
-            
+
         sns.lineplot(x="time", y=loss_type, data=self.time_series, ax=ax)
         # Shade area under curve with consistent x-axis as in plot_consumption
         total_val = self.total_losses[loss_type]
@@ -580,9 +601,7 @@ class CommunityUnit:
             ax.yaxis.set_major_formatter(
                 ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
             )
-            ax.set_ylabel(
-                f"{loss_type} ({self.config.simulation.currency}/year)"
-            )
+            ax.set_ylabel(f"{loss_type} ({self.config.simulation.currency}/year)")
         else:
             ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
             ax.set_ylabel(f"{loss_type}")
@@ -639,7 +658,9 @@ class CommunityUnit:
         )
         # Identify per-asset labour income component columns created in calc_loss
         labour_asset_cols = [
-            c for c in self.time_series.columns if isinstance(c, str) and c.startswith(f"{LossType.LABOUR_INCOME.value} (")
+            c
+            for c in self.time_series.columns
+            if isinstance(c, str) and c.startswith(f"{LossType.LABOUR_INCOME.value} (")
         ]
 
         # Colors and labels
@@ -660,7 +681,9 @@ class CommunityUnit:
         labour_sum = None
         for col in labour_asset_cols:
             labour_sum = (
-                self.time_series[col].copy() if labour_sum is None else labour_sum + self.time_series[col]
+                self.time_series[col].copy()
+                if labour_sum is None
+                else labour_sum + self.time_series[col]
             )
         if labour_sum is None:
             labour_sum = 0
@@ -742,8 +765,7 @@ class CommunityUnit:
             ax.fill_between(
                 self.time_series["time"],
                 self._c0() - self.time_series[LossType.CONSUMPTION],
-                self._c0()
-                - self.time_series[f"{LossType.CONSUMPTION} No Liquidity"],
+                self._c0() - self.time_series[f"{LossType.CONSUMPTION} No Liquidity"],
                 facecolor="none",
                 edgecolor="black",
                 hatch="///",
@@ -806,9 +828,7 @@ class CommunityUnit:
 
         # Plot consumption losses
         ax.set_xlabel("Time after disaster (years)")
-        ax.set_ylabel(
-            f"Consumption rate ({self.config.simulation.currency}/year)"
-        )
+        ax.set_ylabel(f"Consumption rate ({self.config.simulation.currency}/year)")
         ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{int(x):,}"))
         # Add legend
         ax.legend()
@@ -823,6 +843,7 @@ class CommunityUnit:
         no_steps: float = 1000,
         method: str = "trapezoid",
         eps_rel: float = 0.0,
+        raise_on_fail: bool = True,
     ) -> None:
         """
         Optimize the recovery rate (lambda) to minimize the total well-being loss.
@@ -844,7 +865,8 @@ class CommunityUnit:
 
         Returns
         -------
-        None
+        Optional[float]
+            The optimal reconstruction rate if found; otherwise None when raise_on_fail=False.
         """
         # Check if the maximum recovery time is provided, else use the maximum time
         if rec_time_max is None:
@@ -852,9 +874,7 @@ class CommunityUnit:
 
         # Create array of lambda values to check
         times = np.linspace(rec_time_min, rec_time_max, no_steps)
-        lambdas = recovery_rate(
-            times, rebuilt_per=self.config.simulation.recovery_per
-        )
+        lambdas = recovery_rate(times, rebuilt_per=self.config.simulation.recovery_per)
 
         # Calculate losses for each lambda value
         # Initialize arrays to store losses for each lambda
@@ -930,11 +950,9 @@ class CommunityUnit:
             liquidity=self._liquidity(),
             extra_losses=self._extra_losses(),
         )
-
-        optimal_lambda = opt["l_opt"]
         self.lambda_opt = opt
 
-        # Save optimization dataframe
+        # Save optimization dataframe regardless of success
         df = pd.DataFrame(
             {
                 "lambda": lambdas,
@@ -947,6 +965,13 @@ class CommunityUnit:
                 LossType.UTILITY: utility_losses,
             }
         )
+        self.l_opt = df
+
+        # If optimization failed and we didn't raise, return None and avoid mutating config
+        if not opt.get("success", True):
+            return opt
+
+        optimal_lambda = opt["l_opt"]
 
         # Persist optimal parameters back into config for downstream use
         # Persist (config schema uses recovery_*; keep fields but rename semantics)
@@ -955,9 +980,7 @@ class CommunityUnit:
             rate=optimal_lambda, rebuilt_per=self.config.simulation.recovery_per
         )
 
-        self.l_opt = df
-
-        return optimal_lambda
+        return opt
 
     def plot_opt_lambda(self, x_type: Literal["rate", "time"] = "rate") -> plt.Figure:
         """
@@ -1035,9 +1058,7 @@ class CommunityUnit:
         axs[0].yaxis.set_major_formatter(
             ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
         )
-        axs[0].set_ylabel(
-            f"Total Loss ({self.config.simulation.currency})"
-        )
+        axs[0].set_ylabel(f"Total Loss ({self.config.simulation.currency})")
         axs[0].set_ylim(ylims)
         # Add well-being loss plot
         sns.lineplot(
