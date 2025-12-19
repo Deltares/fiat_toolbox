@@ -506,7 +506,7 @@ def opt_lambda(
         times = np.array([0, t_max])
     elif method == "trapezoid" and times is None:
         raise ValueError("times must be provided when using the 'trapezoid' method.")
-    
+
     def objective(rec_rate: float) -> float:
         ut_t = UtilityLoss(
             times, rec_rate, v, k_str, pi, c0, eta, cmin, savings, insurance, support
@@ -518,7 +518,7 @@ def opt_lambda(
         return objective(rec_rate)
 
     res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
-    
+
     if not res.success:
         l_grid = np.linspace(l_min, l_max, 1000)
         losses = np.array([objective(rec_rate) for rec_rate in l_grid])
@@ -526,11 +526,12 @@ def opt_lambda(
             msg = "Utility loss could not be calculated for any of the reconstruction rates in the given bounds, since consumption drops below the threshold."
         else:
             msg = f"Minimize function: '{res.message}'"
-            
+
         raise ValueError(
-            f"An optimal reconstruction rate could not be found in the given bounds [{l_min}, {l_max}].\n" + msg
+            f"An optimal reconstruction rate could not be found in the given bounds [{l_min}, {l_max}].\n"
+            + msg
         )
-    
+
     l_opt = res.x[0]
     loss_opt = res.fun
 
