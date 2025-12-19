@@ -280,67 +280,212 @@ class CommunityUnit:
 
     def _unit_recovery_time(self) -> Optional[float]:
         """
-        General unit recovery time based on consumption losses.
+        Recovery time defined from a sum-of-exponentials model.
 
-        Defined as the earliest time t where the cumulative recovered
-        consumption loss reaches `simulation.recovery_per` of the total
-        consumption loss over the simulation horizon.
+        We model the remaining loss as a sum of exponentials
+        L(t) = Σ_i C_i * exp(-λ_i t), where each component corresponds to:
+        - Owner housing base term (income + recovery cost):
+          C_base = (pi + λ_owner) * v_owner * k_owner, λ_base = λ_owner
+        - Optional rental housing: C = pi * v_rental * k_rental, λ = λ_rental
+        - Each labour asset: C = pi * v_labour * k_labour, λ = λ_labour
 
-        Uses the realized consumption time series (including liquidity effects).
+        We solve for the time T at which the remaining loss equals the
+        target fraction of the initial loss, i.e.,
+            Σ_i C_i * exp(-λ_i T) = r * Σ_i C_i,
+        where r = 1 - recovery_per/100.
+
+        Notes
+        -----
+        - This definition ignores liquidity-induced piecewise effects and
+          uses the underlying exponential modes only.
+        - Requires all involved rates λ_i > 0 and coefficients C_i ≥ 0.
         """
-        if LossType.CONSUMPTION not in self.time_series.columns:
+        comps = self._exponential_loss_components()
+        if comps is None:
             return None
-        times = self.time_series["time"].to_numpy()
-        # Loss rate over time (currency/year): Δc(t)
-        losses_t = self.time_series[LossType.CONSUMPTION].to_numpy()
-        n = losses_t.size
-        if n == 0:
-            return None
-        # Cumulative total loss via ConsumptionLoss.total() with [t0, t] integration
-        loss_model = ConsumptionLoss(
-            t=self.t,
-            rec_rate=self._rec_rate(),
-            v=self.config.owner_housing.v,
-            k_str=self.config.owner_housing.k,
-            pi=self.config.income.pi,
-            liquidity=self._liquidity(),
-            extra_losses=self._extra_losses(),
-        )
-        t0 = float(times[0])
-        cum = np.array(
-            [
-                float(loss_model.total(rho=0, method="trapezoid", t1=t0, t2=float(t)))
-                for t in times
-            ],
-            dtype=float,
-        )
-        total_loss = float(cum[-1])
-        if total_loss <= 0:
+        coeffs, rates = comps
+        if not coeffs:
             return 0.0
-        target_fraction = self.config.simulation.recovery_per / 100.0
-        target = total_loss * target_fraction
-        # If already achieved at t=0
-        if cum[0] >= target:
+        C_sum = float(np.sum(coeffs))
+        if C_sum <= 0:
             return 0.0
-        # Find first index where cumulative loss reaches/exceeds target
-        idxs = np.nonzero(cum >= target)[0]
-        if idxs.size == 0:
-            # Not reached within simulation horizon
+
+        remaining_fraction = 1.0 - (self.config.simulation.recovery_per / 100.0)
+        if remaining_fraction <= 0.0:
+            return 0.0
+        if remaining_fraction >= 1.0:
+            return 0.0
+
+        target = remaining_fraction * C_sum
+
+        def f(t: float) -> float:
+            # Monotone decreasing in t for Ci>=0, λi>0
+            return float(
+                np.sum([c * np.exp(-lam * t) for c, lam in zip(coeffs, rates)]) - target
+            )
+
+        # Bracket: f(0) = C_sum - target = (1 - remaining_fraction) * C_sum > 0
+        f0 = C_sum - target
+        if f0 <= 0:
+            return 0.0
+
+        lam_min = float(np.min(rates))
+        if lam_min <= 0:
             return None
-        i = int(idxs[0])
-        if i == 0:
-            return float(times[0])
-        # Linear interpolation in cumulative space between points i-1 and i
-        t0, t1 = float(times[i - 1]), float(times[i])
-        c_prev, c_curr = float(cum[i - 1]), float(cum[i])
-        if c_curr == c_prev:
-            return t1
-        s = (target - c_prev) / (c_curr - c_prev)
-        if s < 0.0:
-            s = 0.0
-        elif s > 1.0:
-            s = 1.0
-        return t0 + s * (t1 - t0)
+
+        # Start with a conservative upper bound and expand if needed
+        upper = max(10.0 / lam_min, 1.0)
+        f_upper = f(upper)
+        iters = 0
+        while f_upper > 0 and upper < 1e6 and iters < 60:
+            upper *= 2.0
+            f_upper = f(upper)
+            iters += 1
+
+        if f_upper > 0:
+            # Not crossed within reasonable horizon
+            return None
+
+        # Bisection
+        low, high = 0.0, upper
+        for _ in range(80):
+            mid = 0.5 * (low + high)
+            fm = f(mid)
+            if abs(fm) <= 1e-9:
+                return mid
+            if fm > 0:
+                low = mid
+            else:
+                high = mid
+        return 0.5 * (low + high)
+
+    def _exponential_loss_components(self):
+        """
+        Build the list of (C_i, λ_i) components for remaining-loss L(t).
+
+        Returns
+        -------
+        Optional[Tuple[List[float], List[float]]]
+            Two lists (coefficients, rates). Returns None if owner rate missing/invalid.
+        """
+        rr_owner = self._rec_rate()
+        if rr_owner is None or rr_owner <= 0:
+            return None
+        v_owner = self.config.owner_housing.v
+        k_owner = self.config.owner_housing.k
+        pi = self.config.income.pi
+
+        coeffs = []
+        rates = []
+
+        # Owner housing base term: income + recovery cost share
+        c_base = (pi + rr_owner) * v_owner * k_owner
+        if c_base < 0:
+            return None
+        if c_base > 0:
+            coeffs.append(float(c_base))
+            rates.append(float(rr_owner))
+
+        # Rental housing (optional)
+        if self.config.rental_housing is not None:
+            stock = self.config.rental_housing
+            rr = self._stock_rec_rate(stock)
+            if rr is None or rr <= 0:
+                return None
+            c_rental = pi * stock.v * stock.k
+            if c_rental < 0:
+                return None
+            if c_rental > 0:
+                coeffs.append(float(c_rental))
+                rates.append(float(rr))
+
+        # Labour assets (optional, possibly multiple)
+        if self.config.labour_assets:
+            for _, stock in self.config.labour_assets.items():
+                if stock is None:
+                    continue
+                rr = self._stock_rec_rate(stock)
+                if rr is None or rr <= 0:
+                    return None
+                c_lab = pi * stock.v * stock.k
+                if c_lab < 0:
+                    return None
+                if c_lab > 0:
+                    coeffs.append(float(c_lab))
+                    rates.append(float(rr))
+
+        return coeffs, rates
+
+    def achieved_recovery_percent(
+        self, t: Optional[float] = None, realized: bool = False
+    ) -> Optional[float]:
+        """
+        Compute the actually achieved recovery percentage by time t.
+
+        Definitions
+        -----------
+        - Remaining loss L(t) = Σ_i C_i exp(-λ_i t).
+        - Achieved recovery fraction R(t) = 1 − L(t)/L(0).
+
+        Parameters
+        ----------
+        t : float, optional
+            Time horizon to evaluate. Defaults to simulation t_max.
+        realized : bool, default False
+            If True, use realized consumption losses (with liquidity effects)
+            by evaluating Δc(t) from ConsumptionLoss; otherwise use the
+            exponential decomposition (ignoring liquidity piecewise effects).
+
+        Returns
+        -------
+        Optional[float]
+            Achieved recovery percent in [0, 100]. None if undefined.
+        """
+        if t is None:
+            t = float(self.config.simulation.t_max)
+        if t < 0:
+            return None
+
+        if realized:
+            # Evaluate Δc at 0 and t using the realized model
+            rr = self._rec_rate()
+            if rr is None or rr <= 0:
+                return None
+            loss = ConsumptionLoss(
+                t=np.array([0.0, float(t)], dtype=float),
+                rec_rate=rr,
+                v=self.config.owner_housing.v,
+                k_str=self.config.owner_housing.k,
+                pi=self.config.income.pi,
+                liquidity=self._liquidity(),
+                extra_losses=self._extra_losses(),
+            )
+            vals = np.asarray(loss.losses_t, dtype=float).reshape(-1)
+            if vals.size < 2:
+                return None
+            L0 = float(vals[0])
+            Lt = float(vals[-1])
+        else:
+            comps = self._exponential_loss_components()
+            if comps is None:
+                return None
+            coeffs, rates = comps
+            if not coeffs:
+                return 100.0
+            L0 = float(np.sum(coeffs))
+            Lt = float(
+                np.sum([c * np.exp(-lam * float(t)) for c, lam in zip(coeffs, rates)])
+            )
+
+        if L0 <= 0:
+            return None
+        frac = 1.0 - (Lt / L0)
+        # Clamp to [0,1]
+        if frac < 0.0:
+            frac = 0.0
+        elif frac > 1.0:
+            frac = 1.0
+        return 100.0 * frac
 
     def calc_loss(self, loss_type: LossType, method: str = "trapezoid") -> float:
         """
@@ -538,10 +683,8 @@ class CommunityUnit:
         )
         self.total_losses["Equity Weighted Loss"] = ew_loss
 
-        # Compute and store general unit recovery time (consumption-based)
-        self.unit_recovery_time = self._unit_recovery_time()
         # Expose as primary recovery time attribute for the unit
-        self.recovery_time = self.unit_recovery_time
+        self.recovery_time = self._unit_recovery_time()
 
         return self.total_losses
 
@@ -619,7 +762,7 @@ class CommunityUnit:
             return fig
 
     def plot_consumption(
-        self, ax: Optional[plt.Axes] = None, plot_cmin=False
+        self, ax: Optional[plt.Axes] = None, plot_cmin=True
     ) -> Optional[plt.Figure]:
         """
         Plot the consumption losses over time, stacking loss of housing services and recovery costs with different hatches and colors.
