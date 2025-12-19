@@ -44,11 +44,49 @@ def test_income_loss_t():
 def test_consumption_loss_t():
     t = np.linspace(0, 1, 5)
     rec_rate, v, k_str, pi = 0.5, 0.2, 100000, 0.1
-    cl = methods.consumption_loss_t(
-        t, rec_rate, v, k_str, pi, liquidity=1700
-    )
+    cl = methods.consumption_loss_t(t, rec_rate, v, k_str, pi, liquidity=1700)
     assert cl.shape == t.shape
     assert np.all(cl >= 0)
+
+
+def test_consumption_loss_t_with_extra_losses():
+    t = np.linspace(0, 2, 21)
+    rec_rate, v, k_str, pi = 0.5, 0.2, 100000, 0.1
+    # Two extra loss components with different decay rates
+    extra = [(500.0, 0.3), (300.0, 0.8)]
+    cl = methods.consumption_loss_t(
+        t,
+        rec_rate,
+        v,
+        k_str,
+        pi,
+        liquidity=0.0,
+        extra_losses=extra,
+    )
+    assert isinstance(cl, np.ndarray)
+    assert cl.shape == t.shape
+    # Loss at t=0 should be larger than at later times due to decay
+    assert cl[0] > cl[-1]
+
+
+def test_consumption_loss_t_liquidity_fully_offsets():
+    t = np.linspace(0, 2, 21)
+    rec_rate, v, k_str, pi = 0.5, 0.2, 100000, 0.1
+    # Compute a liquidity large enough to offset all losses
+    alpha_base = pi * v * k_str + rec_rate * v * k_str
+    extra = [(500.0, 0.5)]
+    total_integral = (alpha_base / rec_rate) + sum(N0 / lam for N0, lam in extra)
+    cl = methods.consumption_loss_t(
+        t,
+        rec_rate,
+        v,
+        k_str,
+        pi,
+        liquidity=total_integral + 1.0,  # just above threshold
+        extra_losses=extra,
+    )
+    # All losses are fully offset
+    assert np.allclose(cl, 0.0)
 
 
 def test_consumption_t():
@@ -81,6 +119,26 @@ def test_utility_loss_t():
         cmin=1000,
         liquidity=1700,
     )
+    assert ul.shape == t.shape
+
+
+def test_utility_loss_t_with_extra_losses():
+    t = np.linspace(0, 2, 21)
+    rec_rate, v, k_str, pi, c0, eta = 0.5, 0.2, 100000, 0.1, 15000, 1.5
+    extra = [(600.0, 0.4), (250.0, 0.7)]
+    ul = methods.utility_loss_t(
+        t,
+        rec_rate,
+        v,
+        k_str,
+        pi,
+        c0,
+        eta,
+        cmin=1000,
+        liquidity=0.0,
+        extra_losses=extra,
+    )
+    assert isinstance(ul, np.ndarray)
     assert ul.shape == t.shape
 
 

@@ -1,11 +1,11 @@
 from fiat_toolbox.well_being.loss import (
-    CommunityUnit,
-    LossType,
-    WellBeingConfig,
     CapitalStock,
-    Liquidity,
+    CommunityUnit,
     IncomeConfig,
+    Liquidity,
+    LossType,
     SimulationConfig,
+    WellBeingConfig,
 )
 
 
@@ -88,6 +88,61 @@ def test_get_losses():
     assert LossType.UTILITY in losses
     assert LossType.RENTAL_INCOME not in losses
     assert LossType.LABOUR_INCOME not in losses
+
+
+def test_get_losses_with_rental_and_labour():
+    # Configure rental housing and two labour assets with different recovery specs
+    base = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    base.rental_housing = CapitalStock(k=30000, v=0.15, recovery_time=1.5)
+    base.labour_assets = {
+        "shop": CapitalStock(k=20000, v=0.1, recovery_rate=0.6),
+        "workshop": CapitalStock(k=15000, v=0.08, recovery_time=2.0),
+    }
+    hh = CommunityUnit(base)
+    losses = hh.get_losses()
+    # Rental and aggregate labour income losses should be present
+    assert LossType.RENTAL_INCOME in losses
+    assert LossType.LABOUR_INCOME in losses
+    # Per-asset labour components should also be stored
+    assert any(
+        isinstance(c, str) and c.startswith(f"{LossType.LABOUR_INCOME.value} (")
+        for c in hh.time_series.columns
+    )
+    # Recovery time should be computed and exposed
+    assert hh.recovery_time is not None
+
+
+def test_achieved_recovery_percent_exponential_and_realized():
+    # Keep liquidity below full-offset threshold to ensure defined realized percentage
+    base = _make_config(
+        v=0.1,
+        k=50000,
+        rec_rate=0.7,
+        i0=15000,
+        iavg=14000,
+        savings=1000,
+        insurance=500,
+        support=0,
+    )
+    base.rental_housing = CapitalStock(k=30000, v=0.15, recovery_rate=0.5)
+    hh = CommunityUnit(base)
+    # Exponential model (ignores liquidity)
+    perc_exp = hh.achieved_recovery_percent(t=2.0, realized=False)
+    assert isinstance(perc_exp, float)
+    assert 0.0 <= perc_exp <= 100.0
+    # Realized model with liquidity effects
+    perc_real = hh.achieved_recovery_percent(t=2.0, realized=True)
+    assert isinstance(perc_real, float)
+    assert 0.0 <= perc_real <= 100.0
+
+
+def test_validation_and_completion_of_recovery_params():
+    # Provide only recovery_time; recovery_rate should be filled
+    base = _make_config(rec_rate=None)
+    base.owner_housing.recovery_time = 1.0
+    hh = CommunityUnit(base)
+    assert hh.config.owner_housing.recovery_rate is not None
+    assert hh.config.owner_housing.recovery_time is not None
 
 
 def test_opt_lambda_runs():
