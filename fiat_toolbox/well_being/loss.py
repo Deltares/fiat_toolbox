@@ -21,7 +21,6 @@ from .methods import (
 )
 
 
-# TODO Make class a pydantic model
 class LossType(str, Enum):
     RECOVERY = "Recovery Costs"
     INCOME = "Loss of Housing Services"
