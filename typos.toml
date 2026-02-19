@@ -8,5 +8,4 @@ extend-exclude = [
 ignore-hidden = true
 
 [default.extend-words]
-arrange = "arrange"
 arange = "arange"
