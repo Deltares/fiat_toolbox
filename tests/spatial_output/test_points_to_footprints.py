@@ -31,7 +31,7 @@ def test_write_footprints_event():
     footprints.calc_normalized_damages()
     footprints.write(outpath)
 
-    out = footprints.aggregated_results
+    out = footprints.results
 
     out_example = out[_FIAT_COLUMNS.total_damage][
         out[_FIAT_COLUMNS.object_id] == "1393_1394"
@@ -67,7 +67,7 @@ def test_write_footprints_risk():
     footprints.calc_normalized_damages()
     footprints.write(outpath)
 
-    out = footprints.aggregated_results
+    out = footprints.results
 
     out_example = out[_FIAT_COLUMNS.risk_ead][
         out[_FIAT_COLUMNS.object_id] == "1393_1394"
