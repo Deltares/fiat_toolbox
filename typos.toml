@@ -1,0 +1,11 @@
+[files]
+extend-exclude = [
+    "**/*.js",
+    "**/*.css",
+    "**/*.svg",
+    "**/*.json",
+]
+ignore-hidden = true
+
+[default.extend-words]
+arange = "arange"

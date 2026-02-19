@@ -354,7 +354,7 @@ class Footprints:
             )
             gdf[risk_ead_per_name] = gdf[risk_ead_per_name].round(2).fillna(0)
 
-        self.aggregated_results = gdf
+        self.results = gdf
 
     def write(self, output_path: Union[str, Path]):
         """
