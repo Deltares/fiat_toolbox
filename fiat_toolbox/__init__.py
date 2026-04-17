@@ -1,4 +1,4 @@
-__version__ = "0.1.23"
+__version__ = "0.1.24"
 
 from packaging import version
 from pydantic import BaseModel
@@ -44,12 +44,46 @@ def get_fiat_columns(fiat_version: str = "0.2") -> FiatColumns:
     Raises:
     ValueError: If the specified version is not supported.
     Supported Versions:
-    - "0.2" and greater: Uses a specific set of column names.
-    - "0.1.0rc2": Uses a different set of column names.
+    - "1.0" and greater: Delft-FIAT v1 schema (single object_type; ground_flht +
+      ground_elevtn remain as FloodAdapt working columns and a separate
+      ``elevation`` column is materialised at write-time for the binary).
+    - "0.2"–"0.2.x": v0.2 snake-case schema (primary/secondary_object_type,
+      ground_flht + ground_elevtn).
+    - "0.1.0rc2": Display-name schema.
     """
     fiat_version = version.parse(fiat_version)
-    # Columns for versions > 0.1
-    if fiat_version > version.parse("0.1"):
+    # Columns for versions >= 1.0 — Delft-FIAT v1 schema
+    if fiat_version >= version.parse("1.0"):
+        fiat_columns = FiatColumns(
+            object_id="object_id",
+            object_name="object_name",
+            # v1 collapsed primary/secondary into a single object_type.
+            primary_object_type="object_type",
+            secondary_object_type="object_type",
+            extraction_method="extract_method",
+            # v1 FIAT reads floor height as "elevation" and ground elevation as
+            # "reference" (the latter only for flood.level mode). Mapping these
+            # directly via FiatColumns eliminates any materialization step.
+            ground_floor_height="elevation",
+            ground_elevation="reference",
+            damage_function="fn_damage_{name}",
+            max_potential_damage="max_damage_{name}",
+            aggregation_label="aggregation_label:{name}",
+            # v1 output columns use a hazard-band suffix: depth_<H>, damage_<suffix>_<H>,
+            # total_damage_<H>. For flood.level the prefix is level_ instead of depth_.
+            inundation_depth="depth_{hazard}",
+            inundation_depth_rp="depth_{hazard}",
+            reduction_factor="red_fact",
+            reduction_factor_rp="red_fact_{hazard}",
+            damage="damage_{name}_{hazard}",
+            damage_rp="damage_{name}_{hazard}",
+            total_damage="total_damage_{hazard}",
+            total_damage_rp="total_damage_{hazard}",
+            risk_ead="ead_{name}",
+            segment_length="segment_length",
+        )
+    # Columns for 0.1 < version < 1.0 (v0.2 snake-case schema)
+    elif fiat_version > version.parse("0.1"):
         fiat_columns = FiatColumns(
             object_id="object_id",
             object_name="object_name",
