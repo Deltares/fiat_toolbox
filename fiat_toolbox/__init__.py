@@ -15,7 +15,7 @@ class FiatColumns(BaseModel):
     object_id: str
     object_name: str
     primary_object_type: str
-    secondary_object_type: str
+    secondary_object_type: str | None = None
     extraction_method: str
     ground_floor_height: str
     ground_elevation: str
@@ -57,9 +57,8 @@ def get_fiat_columns(fiat_version: str = "0.2") -> FiatColumns:
         fiat_columns = FiatColumns(
             object_id="object_id",
             object_name="object_name",
-            # v1 collapsed primary/secondary into a single object_type.
+            # v1 has a single object_type column; secondary is intentionally unset.
             primary_object_type="object_type",
-            secondary_object_type="object_type",
             extraction_method="extract_method",
             # v1 FIAT reads floor height as "elevation" and ground elevation as
             # "reference" (the latter only for flood.level mode). Mapping these
