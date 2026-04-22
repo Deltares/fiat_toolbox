@@ -80,7 +80,7 @@ def test_get_losses():
     losses = hh.get_losses()
     assert "Wellbeing Loss" in losses
     assert "Asset Loss" in losses
-    assert "Equity Weighted Loss" in losses
+    assert "Equity Weighted Asset Loss" in losses
     # Only configured loss types should be present
     assert LossType.RECOVERY in losses
     assert LossType.INCOME in losses
@@ -217,3 +217,142 @@ def test_plot_opt_lambda():
     # Test with x_type="time"
     fig2 = hh.plot_opt_lambda(x_type="time")
     assert fig2 is None or hasattr(fig2, "savefig")
+
+
+def test_opt_lambda_flags_flat_objective_on_zero_damage():
+    # With v=0, utility loss is identically 0 across all lambdas; the
+    # optimizer must detect this and report flat_objective=True rather than
+    # returning arbitrary Nelder-Mead noise.
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.0),
+        income=IncomeConfig(i_0=20000.0, i_avg=20000.0, pi=0.1),
+        simulation=SimulationConfig(t_max=10, dt=0.1),
+    )
+    hh = CommunityUnit(config)
+    opt = hh.opt_lambda(no_steps=10)
+    assert opt["success"] is True
+    assert opt["flat_objective"] is True, (
+        "zero-damage case should be flagged as flat_objective=True"
+    )
+
+
+def test_exponential_loss_components_owner_uses_pi_only():
+    # The owner coefficient must be pi * v * k (NOT (pi + lambda) * v * k).
+    # A previously buggy aggregator inflated the owner term by lambda, which
+    # pulled the aggregate recovery time below the correct mix when lambda
+    # was large.
+    config = _make_config(v=0.1, k=50000, rec_rate=5.0, i0=15000, iavg=14000, pi=0.1)
+    hh = CommunityUnit(config)
+    comps = hh._exponential_loss_components()
+    assert comps is not None
+    coeffs, rates = comps
+    # With only owner housing present, expect exactly one component.
+    assert len(coeffs) == 1 and len(rates) == 1
+    expected_c = 0.1 * 0.1 * 50000  # pi * v * k
+    assert abs(coeffs[0] - expected_c) < 1e-9, (
+        f"owner coefficient {coeffs[0]} != pi*v*k = {expected_c}; the +lambda "
+        "asymmetry regressed"
+    )
+    assert abs(rates[0] - 5.0) < 1e-9
+
+
+def test_recovery_times_per_component_structure():
+    # With rental + labour present the per-component dict should expose
+    # recovery_time, rate, coefficient and share for each.
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.2, recovery_rate=0.5),
+        rental_housing=CapitalStock(k=30000.0, v=0.1, recovery_time=4.0),
+        labour_assets={"Private": CapitalStock(k=50000.0, v=0.08, recovery_time=4.0)},
+        income=IncomeConfig(i_0=20000.0, i_avg=20000.0, pi=0.1),
+        simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    )
+    hh = CommunityUnit(config)
+    hh.get_losses("trapezoid")  # populates hh.recovery_time_per_component
+    pc = hh.recovery_time_per_component
+    assert pc is not None
+    assert set(pc.keys()) == {"owner", "rental", "labour/Private"}
+    share_sum = sum(d["share"] for d in pc.values())
+    assert abs(share_sum - 1.0) < 1e-9, f"component shares sum to {share_sum}, not 1"
+    for name, d in pc.items():
+        assert d["recovery_time"] > 0
+        assert d["rate"] > 0
+        assert d["coefficient"] > 0
+        assert 0 <= d["share"] <= 1
+
+
+def test_capital_stock_per_stock_pi_override():
+    # Setting CapitalStock.pi must override IncomeConfig.pi for that stock in
+    # the remaining-loss aggregator. Housing uses income.pi, firm uses its own.
+    pi_h, pi_f = 0.08, 0.15
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.2, recovery_rate=0.5),  # -> pi_h
+        labour_assets={
+            "Private": CapitalStock(k=50000.0, v=0.1, recovery_time=4.0, pi=pi_f),
+        },
+        income=IncomeConfig(i_0=20000.0, i_avg=20000.0, pi=pi_h),
+        simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    )
+    hh = CommunityUnit(config)
+    hh.get_losses("trapezoid")
+    pc = hh.recovery_time_per_component
+    # owner: pi_h * 0.2 * 100000 = 1600
+    assert abs(pc["owner"]["coefficient"] - (pi_h * 0.2 * 100000)) < 1e-6
+    # labour: pi_f * 0.1 * 50000 = 750
+    assert abs(pc["labour/Private"]["coefficient"] - (pi_f * 0.1 * 50000)) < 1e-6
+
+
+def test_owner_pi_override_propagates_to_owner_losses():
+    # B1: CapitalStock.pi on owner_housing must flow through calc_loss(INCOME),
+    # get_losses()'s UtilityLoss, and achieved_recovery_percent. Previously only
+    # the aggregator respected it, giving an inconsistent picture of owner costs.
+    pi_income, pi_owner = 0.10, 0.30
+
+    def _cfg(owner_pi):
+        return WellBeingConfig(
+            owner_housing=CapitalStock(
+                k=100000.0, v=0.5, recovery_rate=0.5, pi=owner_pi
+            ),
+            income=IncomeConfig(i_0=50000.0, i_avg=50000.0, pi=pi_income),
+            simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+        )
+
+    hh_owner = CommunityUnit(_cfg(pi_owner))
+    hh_income = CommunityUnit(_cfg(None))  # falls back to IncomeConfig.pi
+
+    # Income loss scales linearly with pi: pi * v * k * integral_exp
+    ratio = hh_owner.calc_loss(LossType.INCOME) / hh_income.calc_loss(
+        LossType.INCOME
+    )
+    assert abs(ratio - (pi_owner / pi_income)) < 1e-6, (
+        f"Income loss ratio {ratio} should equal pi_owner/pi_income="
+        f"{pi_owner / pi_income}; per-stock pi not applied to owner income path"
+    )
+
+
+def test_calc_loss_raises_when_owner_rate_missing():
+    # B2: requesting a loss that needs owner's recovery rate before opt_lambda
+    # was called must raise a clear ValueError, not a cryptic TypeError from
+    # np.exp(-None * t).
+    config = WellBeingConfig(
+        # Neither rate nor time set - owner is in "waiting for optimization" state
+        owner_housing=CapitalStock(k=100000.0, v=0.2),
+        income=IncomeConfig(i_0=20000.0, i_avg=20000.0, pi=0.1),
+        simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    )
+    hh = CommunityUnit(config)
+    import pytest
+
+    with pytest.raises(ValueError, match="opt_lambda"):
+        hh.calc_loss(LossType.RECOVERY)
+    with pytest.raises(ValueError, match="opt_lambda"):
+        hh.get_losses("trapezoid")
+
+
+def test_total_losses_uses_renamed_equity_key():
+    # B3: the module now writes "Equity Weighted Asset Loss" (not the misleading
+    # "Equity Weighted Loss"). Guard against silent regression to the old key.
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
+    losses = hh.get_losses()
+    assert "Equity Weighted Asset Loss" in losses
+    assert "Equity Weighted Loss" not in losses

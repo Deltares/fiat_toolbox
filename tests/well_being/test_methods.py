@@ -176,3 +176,45 @@ def test_opt_lambda_runs():
     )
     assert "l_opt" in result
     assert "loss_opt" in result
+
+
+def test_utility_warns_on_nonpositive_consumption():
+    # S1: the warning for c <= 0 was previously commented out. Subzero
+    # consumption silently became NaN. Now it must warn so callers can see
+    # when c_min + losses pushed c(t) below zero.
+    import warnings as _w
+
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        result = methods.utility(np.array([10.0, -1.0, 5.0]), 1.5)
+    assert any(
+        "zero or negative" in str(w.message).lower() for w in caught
+    ), "utility() must emit a UserWarning when consumption <= 0"
+    # And the result still coerces subzero values to NaN (unchanged behavior)
+    assert np.isnan(result[1])
+
+
+def test_quad_integration_does_not_leak_warning_filter():
+    # S2: previously `warnings.filterwarnings("ignore", ...)` was called
+    # without a context manager, permanently silencing IntegrationWarning in
+    # the caller's process. Now it must be context-managed.
+    import warnings as _w
+
+    # Run a quad integration that historically triggered the leak.
+    loss = methods.RecoveryCost(
+        t=np.array([0.0, 10.0]), rec_rate=0.5, v=0.2, k_str=100000.0
+    )
+    _ = loss.total(rho=0.0, method="quad")
+
+    # After the quad call, emit an IntegrationWarning and confirm it is NOT
+    # suppressed (i.e. the filter did not leak).
+    from scipy.integrate import IntegrationWarning
+
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        _w.warn("leak-check", IntegrationWarning)
+    assert any(
+        "leak-check" in str(w.message) for w in caught
+    ), "warnings.filterwarnings(IntegrationWarning) leaked out of Loss.total"
+
+

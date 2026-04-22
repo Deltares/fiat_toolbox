@@ -26,9 +26,15 @@ def utility(
     """
     consumption = np.array(consumption)  # Ensure input is a numpy array
 
-    # Check for zero or negative consumption values and issue a warning
+    # Check for zero or negative consumption values and issue a warning.
+    # The warning is emitted only once per process to avoid spam in loops; set
+    # the simplefilter in the caller if you want repeats.
     if np.any(consumption <= 0):
-        # warnings.warn("Consumption contains zero or negative values, resulting in NaN utility.", UserWarning, stacklevel=2)
+        warnings.warn(
+            "Consumption contains zero or negative values, resulting in NaN utility.",
+            UserWarning,
+            stacklevel=2,
+        )
         consumption = np.where(consumption <= 0, np.nan, consumption)
 
     if eta <= 0:
@@ -338,6 +344,19 @@ def consumption_loss_t(
                 upper *= 2
                 f_upper = objective_t_hat(upper)
 
+            if f_upper > 0:
+                # Bracket never switched sign out to 1e6 years. Without this
+                # guard brentq would raise a cryptic "f(a) and f(b) have the
+                # same sign" error. Surface the domain cause instead.
+                raise ValueError(
+                    "consumption_loss_t: could not bracket t_hat in [0, 1e6] "
+                    "for the liquidity-offset equation. Parameters leave no "
+                    "crossing — typically happens when liquidity is extremely "
+                    "large relative to the loss stream, or when recovery "
+                    "rates are near zero. Check rec_rate, liquidity, and "
+                    "extra_losses."
+                )
+
             t_hat = brentq(objective_t_hat, 0.0, upper)
             # Set the constant reduction level equal to Δc(t̂) to ensure continuity
             const_level = c_loss(t_hat)
@@ -517,6 +536,7 @@ def opt_lambda(
     method: str = "quad",
     cmin: float = 0.0,
     eps_rel: float = 0.0,
+    eps_flat: float = 1e-3,
     liquidity: float = 0.0,
     extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> dict:
@@ -571,6 +591,10 @@ def opt_lambda(
         - loss_opt: float|None corresponding loss
         - C_diff: float change in equivalent consumption due to tolerance relaxation
         - T_diff: float change in recovery time due to tolerance relaxation
+        - flat_objective: bool True when the utility-loss landscape is numerically
+          flat (range below eps_flat of its scale). In that case the optimizer
+          replaces Nelder-Mead's noisy answer with the coarse-grid argmin to make
+          the result deterministic and flags it for the caller.
 
     Notes
     -----
@@ -587,6 +611,7 @@ def opt_lambda(
         "loss_opt": None,
         "C_diff": None,
         "T_diff": None,
+        "flat_objective": False,
     }
 
     # Validate inputs without raising
@@ -628,6 +653,22 @@ def opt_lambda(
 
     res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
 
+    # Probe the full range to detect flat / plateau objectives. Nelder-Mead
+    # on a flat landscape "converges" at an arbitrary point (dependent on the
+    # initial simplex and `l_min`), which is misleading — downstream code
+    # treats it as a true minimum. A cheap 21-point grid tells us whether any
+    # lambda actually beats any other within `eps_flat` of the loss scale.
+    l_probe = np.linspace(l_min, l_max, 21)
+    probe_losses = np.array([objective(lm) for lm in l_probe])
+    finite_mask = np.isfinite(probe_losses)
+    if finite_mask.any():
+        finite = probe_losses[finite_mask]
+        loss_range = float(finite.max() - finite.min())
+        loss_scale = float(max(abs(finite.max()), abs(finite.min()), 1e-300))
+        flat_objective = loss_range <= eps_flat * loss_scale
+    else:
+        flat_objective = True  # nothing finite -> degenerate
+
     if not res.success:
         l_grid = np.linspace(l_min, l_max, 1000)
         losses = np.array([objective(rec_rate) for rec_rate in l_grid])
@@ -644,7 +685,8 @@ def opt_lambda(
                 "message": (
                     f"An optimal reconstruction rate could not be found in the given bounds [{l_min}, {l_max}]. "
                     + msg
-                )
+                ),
+                "flat_objective": flat_objective,
             }
         )
         return result
@@ -652,15 +694,32 @@ def opt_lambda(
     l_opt = res.x[0]
     loss_opt = res.fun
 
+    if flat_objective:
+        # Deterministic fallback: pick the grid argmin. np.argmin picks the
+        # first occurrence, so ties break toward the smallest lambda (slowest
+        # recovery) — the most conservative choice when welfare is indifferent.
+        probe_for_argmin = np.where(finite_mask, probe_losses, np.inf)
+        idx = int(np.argmin(probe_for_argmin))
+        l_opt = float(l_probe[idx])
+        loss_opt = float(probe_losses[idx])
+        flat_msg = (
+            f"Flat objective: utility-loss range is {loss_range:.3e} across "
+            f"lambda in [{l_min:.3g}, {l_max:.3g}] (within eps_flat={eps_flat:g} "
+            "of the loss scale). Returned l_opt is the coarse-grid argmin."
+        )
+    else:
+        flat_msg = None
+
     # Populate result with successful optimum values
     result.update(
         {
             "success": True,
-            "message": None,
+            "message": flat_msg,
             "l_opt_min": l_opt,
             "loss_opt_min": loss_opt,
             "l_opt": l_opt,
             "loss_opt": loss_opt,
+            "flat_objective": flat_objective,
         }
     )
     # Check if a tolerance is provided
@@ -872,17 +931,19 @@ class Loss:
 
             integral = np.trapz(f_sub, x=t_sub, axis=0)
         elif method == "quad":
-            warnings.filterwarnings("ignore", category=IntegrationWarning)
             # Note: quad integrates scalar-valued functions. For vector-valued rec_rate,
             # prefer method="trapezoid". Here, we keep previous behavior and integrate
             # the scalar result element if applicable.
-            integral = np.array(
-                quad(
-                    lambda tt, li=self.rec_rate: self._fun(tt, li) * np.exp(-rho * tt),
-                    t_start,
-                    t_end,
-                )[0]
-            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=IntegrationWarning)
+                integral = np.array(
+                    quad(
+                        lambda tt, li=self.rec_rate: self._fun(tt, li)
+                        * np.exp(-rho * tt),
+                        t_start,
+                        t_end,
+                    )[0]
+                )
         else:
             raise ValueError("method must be either 'trapezoid' or 'quad'.")
 

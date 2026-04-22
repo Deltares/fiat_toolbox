@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -42,6 +42,16 @@ class CapitalStock(BaseModel):
     )
     recovery_rate: Optional[float] = Field(
         None, description="Recovery rate for the capital stock"
+    )
+    pi: Optional[float] = Field(
+        None,
+        description=(
+            "Optional per-stock productivity of capital. When set, overrides "
+            "IncomeConfig.pi for this stock in the income-loss, consumption-"
+            "loss extras, and remaining-loss aggregation. Useful when housing "
+            "and firm capital have different productivities (e.g. rent-adjusted "
+            "pi for housing vs GDP-based pi for firms)."
+        ),
     )
 
 
@@ -159,6 +169,12 @@ class CommunityUnit:
             )
         return None
 
+    def _stock_pi(self, stock: CapitalStock) -> float:
+        """Resolve the productivity for a given stock: per-stock override or income.pi fallback."""
+        if stock is not None and stock.pi is not None:
+            return float(stock.pi)
+        return float(self.config.income.pi)
+
     def _extra_losses(self):
         extra = []
         # Rental housing as a single optional stock
@@ -169,7 +185,7 @@ class CommunityUnit:
                     "rental_housing must define either recovery_rate or recovery_time"
                 )
             n0 = (
-                self.config.income.pi
+                self._stock_pi(self.config.rental_housing)
                 * self.config.rental_housing.v
                 * self.config.rental_housing.k
             )
@@ -186,7 +202,7 @@ class CommunityUnit:
                     raise ValueError(
                         f"labour_assets['{name}'] must define either recovery_rate or recovery_time"
                     )
-                n0 = self.config.income.pi * stock.v * stock.k
+                n0 = self._stock_pi(stock) * stock.v * stock.k
                 extra.append((n0, rr))
 
         return extra if extra else None
@@ -281,10 +297,10 @@ class CommunityUnit:
         """
         Recovery time defined from a sum-of-exponentials model.
 
-        We model the remaining loss as a sum of exponentials
-        L(t) = Σ_i C_i * exp(-λ_i t), where each component corresponds to:
-        - Owner housing base term (income + recovery cost):
-          C_base = (pi + λ_owner) * v_owner * k_owner, λ_base = λ_owner
+        We model the remaining income-loss stream as a sum of exponentials
+        L(t) = Σ_i C_i * exp(-λ_i t), where each component corresponds to the
+        productivity-weighted remaining damaged capital:
+        - Owner housing: C = pi * v_owner * k_owner, λ = λ_owner
         - Optional rental housing: C = pi * v_rental * k_rental, λ = λ_rental
         - Each labour asset: C = pi * v_labour * k_labour, λ = λ_labour
 
@@ -297,6 +313,13 @@ class CommunityUnit:
         -----
         - This definition ignores liquidity-induced piecewise effects and
           uses the underlying exponential modes only.
+        - The owner term uses pi * v * k (same shape as rental and labour), so
+          the remaining-loss proxy is homogeneous in lambda. The recovery-cost
+          stream lambda * v * k * exp(-lambda t) belongs to consumption loss,
+          not to the remaining-capital proxy; including it here inflates the
+          owner coefficient roughly (pi + lambda)/pi ~ 20x at lambda=pi*(~20),
+          which makes the aggregate T collapse toward owner's fast mode even
+          for small v_owner and breaks monotonicity of T vs damage.
         - Requires all involved rates λ_i > 0 and coefficients C_i ≥ 0.
         """
         comps = self._exponential_loss_components()
@@ -367,53 +390,92 @@ class CommunityUnit:
         Optional[Tuple[List[float], List[float]]]
             Two lists (coefficients, rates). Returns None if owner rate missing/invalid.
         """
+        labelled = self._exponential_loss_components_labelled()
+        if labelled is None:
+            return None
+        coeffs = [c for _, c, _ in labelled]
+        rates = [r for _, _, r in labelled]
+        return coeffs, rates
+
+    def _exponential_loss_components_labelled(self):
+        """Same as _exponential_loss_components but keeps a label per term.
+
+        Returns [(name, C_i, lambda_i), ...] or None if owner rate missing.
+        Names are "owner", "rental", "labour/<key>".
+        """
         rr_owner = self._rec_rate()
         if rr_owner is None or rr_owner <= 0:
             return None
         v_owner = self.config.owner_housing.v
         k_owner = self.config.owner_housing.k
-        pi = self.config.income.pi
 
-        coeffs = []
-        rates = []
+        labelled: List[Tuple[str, float, float]] = []
 
-        # Owner housing base term: income + recovery cost share
-        c_base = (pi + rr_owner) * v_owner * k_owner
+        c_base = self._stock_pi(self.config.owner_housing) * v_owner * k_owner
         if c_base < 0:
             return None
         if c_base > 0:
-            coeffs.append(float(c_base))
-            rates.append(float(rr_owner))
+            labelled.append(("owner", float(c_base), float(rr_owner)))
 
-        # Rental housing (optional)
         if self.config.rental_housing is not None:
             stock = self.config.rental_housing
             rr = self._stock_rec_rate(stock)
             if rr is None or rr <= 0:
                 return None
-            c_rental = pi * stock.v * stock.k
+            c_rental = self._stock_pi(stock) * stock.v * stock.k
             if c_rental < 0:
                 return None
             if c_rental > 0:
-                coeffs.append(float(c_rental))
-                rates.append(float(rr))
+                labelled.append(("rental", float(c_rental), float(rr)))
 
-        # Labour assets (optional, possibly multiple)
         if self.config.labour_assets:
-            for _, stock in self.config.labour_assets.items():
+            for name, stock in self.config.labour_assets.items():
                 if stock is None:
                     continue
                 rr = self._stock_rec_rate(stock)
                 if rr is None or rr <= 0:
                     return None
-                c_lab = pi * stock.v * stock.k
+                c_lab = self._stock_pi(stock) * stock.v * stock.k
                 if c_lab < 0:
                     return None
                 if c_lab > 0:
-                    coeffs.append(float(c_lab))
-                    rates.append(float(rr))
+                    labelled.append((f"labour/{name}", float(c_lab), float(rr)))
 
-        return coeffs, rates
+        return labelled
+
+    def recovery_times_per_component(self) -> Optional[Dict[str, Dict[str, float]]]:
+        """
+        Per-component recovery diagnostics.
+
+        Each entry is a dict with keys:
+        - `recovery_time`: ln(1/(1-r)) / lambda_i, i.e. the time for this single
+          exponential component alone to reach `recovery_per` percent rebuilt.
+        - `rate`: lambda_i as used in the aggregate.
+        - `coefficient`: C_i = pi * v * k (the weight in Sum(C_i)).
+        - `share`: coefficient / Sum(C_i) (fraction of the aggregate driven by
+          this component). Lets callers see which process dominates the
+          single-number `recovery_time` and whether that dominance is load-
+          bearing for their interpretation.
+
+        Returns None when the aggregate cannot be built (e.g. owner rate missing).
+        """
+        labelled = self._exponential_loss_components_labelled()
+        if labelled is None:
+            return None
+        if not labelled:
+            return {}
+        total_C = float(sum(C for _, C, _ in labelled))
+        out: Dict[str, Dict[str, float]] = {}
+        rec_per = self.config.simulation.recovery_per
+        for name, C, lam in labelled:
+            out[name] = {
+                "recovery_time": float(recovery_time(rate=lam, rebuilt_per=rec_per)),
+                "rate": float(lam),
+                "coefficient": float(C),
+                "share": float(C / total_C) if total_C > 0 else 0.0,
+            }
+        return out
+
 
     def achieved_recovery_percent(
         self, t: Optional[float] = None, realized: bool = False
@@ -455,7 +517,7 @@ class CommunityUnit:
                 rec_rate=rr,
                 v=self.config.owner_housing.v,
                 k_str=self.config.owner_housing.k,
-                pi=self.config.income.pi,
+                pi=self._stock_pi(self.config.owner_housing),
                 liquidity=self._liquidity(),
                 extra_losses=self._extra_losses(),
             )
@@ -510,8 +572,23 @@ class CommunityUnit:
         Raises
         ------
         ValueError
-            If an invalid loss type is provided.
+            If an invalid loss type is provided, or if a loss type that depends
+            on owner housing is requested while owner_housing has neither
+            `recovery_rate` nor `recovery_time` set.
         """
+        owner_touched = loss_type in (
+            LossType.RECOVERY,
+            LossType.INCOME,
+            LossType.CONSUMPTION,
+            LossType.UTILITY,
+        )
+        if owner_touched and self._rec_rate() is None:
+            raise ValueError(
+                f"Cannot compute {loss_type}: owner_housing has no recovery_rate "
+                "or recovery_time set. Call opt_lambda() first to optimize the "
+                "housing recovery rate, or specify one on CapitalStock."
+            )
+
         if loss_type == LossType.RECOVERY:
             loss = RecoveryCost(
                 self.t,
@@ -525,7 +602,7 @@ class CommunityUnit:
                 self._rec_rate(),
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
-                self.config.income.pi,
+                self._stock_pi(self.config.owner_housing),
             )
         elif loss_type in (LossType.RENTAL_INCOME, LossType.LABOUR_INCOME):
             if loss_type == LossType.RENTAL_INCOME:
@@ -537,7 +614,7 @@ class CommunityUnit:
                     self._stock_rec_rate(stock),
                     stock.v,
                     stock.k,
-                    self.config.income.pi,
+                    self._stock_pi(stock),
                 )
                 self.time_series[loss_type] = loss.losses_t
                 self.total_losses[loss_type] = loss.total(rho=0, method=method)
@@ -561,7 +638,7 @@ class CommunityUnit:
                         rr,
                         stock.v,
                         stock.k,
-                        self.config.income.pi,
+                        self._stock_pi(stock),
                     )
                     # Store per-asset component series and totals
                     asset_key = f"{LossType.LABOUR_INCOME.value} ({name})"
@@ -579,7 +656,7 @@ class CommunityUnit:
                 self._rec_rate(),
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
-                self.config.income.pi,
+                self._stock_pi(self.config.owner_housing),
                 liquidity=self._liquidity(),
                 extra_losses=self._extra_losses(),
             )
@@ -589,7 +666,7 @@ class CommunityUnit:
                     self._rec_rate(),
                     self.config.owner_housing.v,
                     self.config.owner_housing.k,
-                    self.config.income.pi,
+                    self._stock_pi(self.config.owner_housing),
                     liquidity=0.0,
                     extra_losses=self._extra_losses(),
                 )
@@ -600,7 +677,7 @@ class CommunityUnit:
                 self._rec_rate(),
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
-                self.config.income.pi,
+                self._stock_pi(self.config.owner_housing),
                 self._c0(),
                 self.config.simulation.eta,
                 self.config.simulation.c_min,
@@ -635,7 +712,12 @@ class CommunityUnit:
             A pandas Series containing the following keys:
             - "Wellbeing Loss": The calculated wellbeing loss.
             - "Asset Loss": The calculated asset loss.
-            - "Equity Weighted Loss": The calculated equity-weighted loss.
+            - "Equity Weighted Asset Loss": Owner asset loss weighted by the
+              inverse-marginal-utility factor `(c0/c_avg)^(-eta)`. Note: this
+              weights the raw asset loss (pre-recovery), not the welfare
+              (wellbeing) loss; rename reflects that honestly. For a welfare-
+              scaled equity metric, multiply `equity_weight(c0, c_avg, eta)` by
+              `"Wellbeing Loss"` yourself.
             - Additional keys corresponding to each `LossType` (e.g., "Recovery Costs", "Income Loss").
 
         Notes
@@ -655,7 +737,7 @@ class CommunityUnit:
             rec_rate=self._rec_rate(),
             v=self.config.owner_housing.v,
             k_str=self.config.owner_housing.k,
-            pi=self.config.income.pi,
+            pi=self._stock_pi(self.config.owner_housing),
             c0=self._c0(),
             eta=self.config.simulation.eta,
             cmin=self.config.simulation.c_min,
@@ -680,10 +762,14 @@ class CommunityUnit:
         self.total_losses["Asset Loss"] = (
             self.config.owner_housing.v * self.config.owner_housing.k
         )
-        self.total_losses["Equity Weighted Loss"] = ew_loss
+        self.total_losses["Equity Weighted Asset Loss"] = ew_loss
 
         # Expose as primary recovery time attribute for the unit
         self.recovery_time = self._unit_recovery_time()
+        # Per-component breakdown: owner / rental / labour. The aggregate
+        # `recovery_time` above collapses these onto one axis; callers should
+        # prefer this dict when plotting recovery time against damage.
+        self.recovery_time_per_component = self.recovery_times_per_component()
 
         return self.total_losses
 
@@ -1041,7 +1127,7 @@ class CommunityUnit:
                     rec_rate=lmbd,
                     v=self.config.owner_housing.v,
                     k_str=self.config.owner_housing.k,
-                    pi=self.config.income.pi,
+                    pi=self._stock_pi(self.config.owner_housing),
                 ).total(rho=0, method=method)
             )
             consumption_losses.append(
@@ -1050,7 +1136,7 @@ class CommunityUnit:
                     rec_rate=lmbd,
                     v=self.config.owner_housing.v,
                     k_str=self.config.owner_housing.k,
-                    pi=self.config.income.pi,
+                    pi=self._stock_pi(self.config.owner_housing),
                     liquidity=self._liquidity(),
                     extra_losses=self._extra_losses(),
                 ).total(rho=0, method=method)
@@ -1061,7 +1147,7 @@ class CommunityUnit:
                     rec_rate=lmbd,
                     v=self.config.owner_housing.v,
                     k_str=self.config.owner_housing.k,
-                    pi=self.config.income.pi,
+                    pi=self._stock_pi(self.config.owner_housing),
                     c0=self._c0(),
                     eta=self.config.simulation.eta,
                     cmin=self.config.simulation.c_min,
@@ -1080,7 +1166,7 @@ class CommunityUnit:
             v=self.config.owner_housing.v,
             k_str=self.config.owner_housing.k,
             c0=self._c0(),
-            pi=self.config.income.pi,
+            pi=self._stock_pi(self.config.owner_housing),
             eta=self.config.simulation.eta,
             l_min=lambdas.min(),
             l_max=lambdas.max(),
@@ -1109,8 +1195,12 @@ class CommunityUnit:
         )
         self.l_opt = df
 
-        # If optimization failed and we didn't raise, return None and avoid mutating config
         if not opt.get("success", True):
+            if raise_on_fail:
+                raise RuntimeError(
+                    f"opt_lambda failed: {opt.get('message') or 'no message'}"
+                )
+            # Otherwise return without mutating config
             return opt
 
         optimal_lambda = opt["l_opt"]
