@@ -414,7 +414,8 @@ def test_opt_lambda_status_interior():
 
 def test_opt_lambda_status_flat():
     # Zero damage → welfare identically 0 across every λ. Must flag FLAT and
-    # pick the coarse-grid argmin (ties toward smallest λ).
+    # pick the coarse-grid argmin with ties toward the *largest* λ (fastest
+    # recovery — consistent with eps_rel's convention).
     times = np.linspace(0, 10, 100)
     res = methods.opt_lambda(
         v=0.0,
@@ -429,9 +430,11 @@ def test_opt_lambda_status_flat():
     )
     assert res["success"] is True
     assert res["status"] == methods.OptLambdaStatus.FLAT
-    # Returned l_opt is the smallest grid point on the 21-point probe.
-    assert res["l_opt_min"] <= 0.3 + 1e-9
+    # Ties toward fastest recovery → returned l_opt is at the largest grid
+    # point (= l_max).
+    assert res["l_opt_min"] >= 10.0 - 1e-9
     assert "flat" in (res["message"] or "").lower()
+    assert "fastest" in (res["message"] or "").lower()
 
 
 def test_opt_lambda_status_boundary_lower():

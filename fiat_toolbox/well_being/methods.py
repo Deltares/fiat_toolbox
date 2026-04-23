@@ -780,11 +780,17 @@ def opt_lambda(
 
     # FLAT: welfare function is numerically constant across the range.
     if is_flat:
-        # Deterministic fallback: pick the grid argmin. np.argmin picks the
-        # first occurrence, so ties break toward the smallest λ (slowest
-        # recovery) — the most conservative choice when welfare is indifferent.
+        # Deterministic fallback: pick the grid argmin with ties breaking
+        # toward the *largest* λ (fastest recovery). Picking fastest is
+        # consistent with the eps_rel relabel convention (which also picks
+        # the largest λ within the near-optimal band) and matches the
+        # intuitive "return to normal sooner" default when welfare is
+        # indifferent. We find argmin on the reversed array (which gives
+        # the first hit from the fast end) and translate back to the
+        # original index.
         probe_for_argmin = np.where(finite_mask, probe_losses, np.inf)
-        idx = int(np.argmin(probe_for_argmin))
+        idx_rev = int(np.argmin(probe_for_argmin[::-1]))
+        idx = len(probe_for_argmin) - 1 - idx_rev
         l_opt = float(l_probe[idx])
         loss_opt = float(probe_losses[idx])
         message = (
@@ -792,9 +798,10 @@ def opt_lambda(
             f"(loss range {loss_range:.3e}, within eps_flat={eps_flat:g} of "
             "loss scale). Every λ gives essentially the same welfare loss; "
             f"returned λ={l_opt:.3g} is the coarse-grid argmin (ties toward "
-            "slowest recovery). The household is effectively indifferent to "
-            "reconstruction speed in this regime (e.g. zero damage, or "
-            "liquidity covers all losses)."
+            "fastest recovery — consistent with the eps_rel convention). "
+            "The household is effectively indifferent to reconstruction "
+            "speed in this regime (e.g. zero damage, or liquidity covers "
+            "all losses)."
         )
         status = OptLambdaStatus.FLAT
     else:
