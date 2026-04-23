@@ -2,6 +2,7 @@ from fiat_toolbox.well_being.loss import (
     CapitalStock,
     CommunityUnit,
     IncomeConfig,
+    IncomeStream,
     Liquidity,
     LossType,
     SimulationConfig,
@@ -44,33 +45,43 @@ def _make_config(
 
 
 def test_household_initialization():
-    config = _make_config()
+    # Default path: i_0 omitted → c0 derived from Σ π·k + (i_div or 0).
+    # Fixture defaults: pi=0.1, k=100000, no rental/labour, no i_div → c0 = 10000.
+    import pytest
+
+    config = _make_config(i0=None)
     hh = CommunityUnit(config)
     assert hh.config.owner_housing.v == 0.2
     assert hh.config.owner_housing.k == 100000
-    assert hh._c0() == 20000
+    assert hh._c0() == 10000
     assert hh.config.simulation.currency == "€"
     assert hh._liquidity() == 5000 + 2000 + 1000
+
+    # Override path: i_0 supplied and ≠ Σ π·k → override in effect with warning.
+    override_config = _make_config(i0=20000)
+    with pytest.warns(UserWarning, match="overrides the stock-derived baseline"):
+        hh_override = CommunityUnit(override_config)
+    assert hh_override._c0() == 20000
 
 
 def test_calc_loss_reconstruction():
     config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
     hh = CommunityUnit(config)
-    loss = hh.calc_loss(LossType.RECOVERY)
+    loss = hh.calc_loss(LossType.RECOVERY_COST)
     assert loss > 0
 
 
 def test_calc_loss_income():
     config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
     hh = CommunityUnit(config)
-    loss = hh.calc_loss(LossType.INCOME)
+    loss = hh.calc_loss(LossType.OWNER_HOUSING_LOSS)
     assert loss > 0
 
 
 def test_calc_loss_utility():
     config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
     hh = CommunityUnit(config)
-    loss = hh.calc_loss(LossType.UTILITY)
+    loss = hh.calc_loss(LossType.UTILITY_LOSS)
     assert loss >= 0
 
 
@@ -82,12 +93,12 @@ def test_get_losses():
     assert "Asset Loss" in losses
     assert "Equity Weighted Asset Loss" in losses
     # Only configured loss types should be present
-    assert LossType.RECOVERY in losses
-    assert LossType.INCOME in losses
-    assert LossType.CONSUMPTION in losses
-    assert LossType.UTILITY in losses
-    assert LossType.RENTAL_INCOME not in losses
-    assert LossType.LABOUR_INCOME not in losses
+    assert LossType.RECOVERY_COST in losses
+    assert LossType.OWNER_HOUSING_LOSS in losses
+    assert LossType.CONSUMPTION_LOSS in losses
+    assert LossType.UTILITY_LOSS in losses
+    assert LossType.RENTAL_HOUSING_LOSS not in losses
+    assert LossType.LABOUR_INCOME_LOSS not in losses
 
 
 def test_get_losses_with_rental_and_labour():
@@ -101,11 +112,11 @@ def test_get_losses_with_rental_and_labour():
     hh = CommunityUnit(base)
     losses = hh.get_losses()
     # Rental and aggregate labour income losses should be present
-    assert LossType.RENTAL_INCOME in losses
-    assert LossType.LABOUR_INCOME in losses
+    assert LossType.RENTAL_HOUSING_LOSS in losses
+    assert LossType.LABOUR_INCOME_LOSS in losses
     # Per-asset labour components should also be stored
     assert any(
-        isinstance(c, str) and c.startswith(f"{LossType.LABOUR_INCOME.value} (")
+        isinstance(c, str) and c.startswith(f"{LossType.LABOUR_INCOME_LOSS.value} (")
         for c in hh.time_series.columns
     )
     # Recovery time should be computed and exposed
@@ -324,7 +335,9 @@ def test_owner_pi_propagates_to_owner_losses():
     hh_b = CommunityUnit(_cfg(pi_b))
 
     # Income loss scales linearly with pi: pi * v * k * integral_exp
-    ratio = hh_b.calc_loss(LossType.INCOME) / hh_a.calc_loss(LossType.INCOME)
+    ratio = hh_b.calc_loss(LossType.OWNER_HOUSING_LOSS) / hh_a.calc_loss(
+        LossType.OWNER_HOUSING_LOSS
+    )
     assert abs(ratio - (pi_b / pi_a)) < 1e-6, (
         f"Income loss ratio {ratio} should equal pi_b/pi_a="
         f"{pi_b / pi_a}; per-stock pi not applied to owner income path"
@@ -345,7 +358,7 @@ def test_calc_loss_raises_when_owner_rate_missing():
     import pytest
 
     with pytest.raises(ValueError, match="opt_lambda"):
-        hh.calc_loss(LossType.RECOVERY)
+        hh.calc_loss(LossType.RECOVERY_COST)
     with pytest.raises(ValueError, match="opt_lambda"):
         hh.get_losses("trapezoid")
 
@@ -517,3 +530,417 @@ def test_opt_lambda_rho_defaults_to_config_rho():
     assert not math.isclose(
         res_default["loss_opt"], res_zero["loss_opt"], rel_tol=1e-6
     ), "rho=config vs rho=0 produced identical loss_opt — rho not threaded through"
+
+
+def test_c0_default_is_sum_of_stock_pi_k_plus_i_div():
+    # When i_0 is omitted, c0 must equal Σ π·k across configured stocks,
+    # plus i_div when present. Covers owner-only, owner+rental+labour, and
+    # owner + i_div.
+    owner_pi, owner_k = 0.12, 200000.0
+    # (a) owner only
+    cfg_a = WellBeingConfig(
+        owner_housing=CapitalStock(k=owner_k, v=0.1, recovery_rate=0.5, pi=owner_pi),
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh_a = CommunityUnit(cfg_a)
+    assert hh_a._c0() == owner_pi * owner_k
+
+    # (b) owner + rental + one labour asset
+    rental_pi, rental_k = 0.10, 80000.0
+    lab_pi, lab_k = 0.08, 50000.0
+    cfg_b = WellBeingConfig(
+        owner_housing=CapitalStock(k=owner_k, v=0.1, recovery_rate=0.5, pi=owner_pi),
+        rental_housing=CapitalStock(k=rental_k, v=0.1, recovery_time=3.0, pi=rental_pi),
+        labour_assets={
+            "firm": CapitalStock(k=lab_k, v=0.1, recovery_time=4.0, pi=lab_pi)
+        },
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh_b = CommunityUnit(cfg_b)
+    expected_b = owner_pi * owner_k + rental_pi * rental_k + lab_pi * lab_k
+    assert abs(hh_b._c0() - expected_b) < 1e-9
+
+    # (c) owner + i_div
+    i_div = 7500.0
+    cfg_c = WellBeingConfig(
+        owner_housing=CapitalStock(k=owner_k, v=0.1, recovery_rate=0.5, pi=owner_pi),
+        income=IncomeConfig(i_avg=20000.0, i_div=i_div),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh_c = CommunityUnit(cfg_c)
+    assert abs(hh_c._c0() - (owner_pi * owner_k + i_div)) < 1e-9
+
+
+def test_c0_override_warns_on_mismatch():
+    # When i_0 is supplied and disagrees with Σ π·k, a UserWarning fires at
+    # construction and c0 == i_0 + (i_div or 0) — the override wins.
+    import pytest
+
+    pi_h, k_h = 0.10, 100000.0  # Σ π·k = 10000
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        income=IncomeConfig(i_0=30000.0, i_avg=20000.0, i_div=2000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    with pytest.warns(UserWarning, match=r"overrides the stock-derived baseline"):
+        hh = CommunityUnit(cfg)
+    assert hh._c0() == 30000.0 + 2000.0
+
+
+def test_c0_override_silent_when_consistent():
+    # When i_0 exactly matches Σ π·k (within tolerance), no UserWarning fires.
+    import warnings as _w
+
+    pi_h, k_h = 0.10, 100000.0  # Σ π·k = 10000 exactly
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        income=IncomeConfig(i_0=pi_h * k_h, i_avg=20000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        hh = CommunityUnit(cfg)
+    mismatch_warnings = [
+        w for w in caught if "overrides the stock-derived baseline" in str(w.message)
+    ]
+    assert mismatch_warnings == [], (
+        f"no mismatch warning expected, got: {[str(w.message) for w in mismatch_warnings]}"
+    )
+    assert hh._c0() == pi_h * k_h
+
+
+def _analytical_income_integral(
+    baseline: float, v: float, lam: float, t_max: float
+) -> float:
+    """∫₀^{t_max} baseline · v · exp(-λt) dt  =  baseline · v · (1 − e^{-λT}) / λ."""
+    import math
+
+    return baseline * v * (1.0 - math.exp(-lam * t_max)) / lam
+
+
+def test_income_stream_rental_housing():
+    # rental_housing as IncomeStream: _c0 must include the income flow, and
+    # RENTAL_INCOME loss must equal the closed-form analytical integral.
+    import math
+
+    pi_h, k_h = 0.10, 100000.0  # owner: Σ π·k = 10000
+    rental_income = 12000.0
+    rental_v = 0.15
+    rental_rt = 1.5
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        rental_housing=IncomeStream(
+            income=rental_income, v=rental_v, recovery_time=rental_rt
+        ),
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    )
+    hh = CommunityUnit(cfg)
+    # Baseline includes the rental income directly.
+    assert abs(hh._c0() - (pi_h * k_h + rental_income)) < 1e-9
+
+    # Rate derived from recovery_time via ln(1/(1-0.95))/T.
+    lam = math.log(1 / (1 - 0.95)) / rental_rt
+    total = hh.calc_loss(LossType.RENTAL_HOUSING_LOSS, method="trapezoid")
+    expected = _analytical_income_integral(rental_income, rental_v, lam, hh.t[-1])
+    assert abs(total - expected) / expected < 5e-3, (
+        f"RENTAL_INCOME total {total} disagrees with analytical {expected}"
+    )
+
+
+def test_income_stream_labour_asset():
+    # labour_assets with IncomeStream: aggregated LABOUR_INCOME total should
+    # match the analytical integral of income·v·exp(-λt).
+    income, v, lam = 8000.0, 0.4, 0.5
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.1, recovery_rate=0.5, pi=0.1),
+        labour_assets={
+            "Firms": IncomeStream(income=income, v=v, recovery_rate=lam),
+        },
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    )
+    hh = CommunityUnit(cfg)
+    total = hh.calc_loss(LossType.LABOUR_INCOME_LOSS, method="trapezoid")
+    expected = _analytical_income_integral(income, v, lam, hh.t[-1])
+    assert abs(total - expected) / expected < 5e-3, (
+        f"LABOUR_INCOME total {total} disagrees with analytical {expected}"
+    )
+
+
+def test_income_stream_mixed_with_capital_stock():
+    # Same unit with CapitalStock + IncomeStream across labour_assets:
+    # recovery_time_per_component must produce correct coefficients for each.
+    cs_pi, cs_k, cs_v = 0.12, 40000.0, 0.2  # π·k·v = 960
+    is_income, is_v = 7500.0, 0.3  # income·v = 2250
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.1, recovery_rate=0.5, pi=0.1),
+        labour_assets={
+            "Firms": CapitalStock(k=cs_k, v=cs_v, recovery_time=3.0, pi=cs_pi),
+            "Public": IncomeStream(income=is_income, v=is_v, recovery_time=4.0),
+        },
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    )
+    hh = CommunityUnit(cfg)
+    hh.get_losses("trapezoid")
+    pc = hh.recovery_time_per_component
+    assert pc is not None
+    assert abs(pc["labour/Firms"]["coefficient"] - cs_pi * cs_k * cs_v) < 1e-9
+    assert abs(pc["labour/Public"]["coefficient"] - is_income * is_v) < 1e-9
+
+
+def test_income_stream_negative_income_rejected():
+    # IncomeStream.income must be > 0 — pydantic-level constraint fires at
+    # IncomeStream(...), before WellBeingConfig or CommunityUnit even see it.
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="greater than 0"):
+        IncomeStream(income=-1.0, v=0.1, recovery_time=1.0)
+
+
+def test_income_stream_requires_recovery_time_or_rate():
+    # Neither recovery_time nor recovery_rate on a rental / labour stock must
+    # raise at WellBeingConfig construction via the @model_validator on the
+    # parent config. Owner_housing is allowed to have both None (opt_lambda
+    # path), so this rule only applies to extras.
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="recovery_rate or recovery_time"):
+        WellBeingConfig(
+            owner_housing=CapitalStock(k=100000.0, v=0.1, recovery_rate=0.5, pi=0.1),
+            rental_housing=IncomeStream(income=1000.0, v=0.1),
+            income=IncomeConfig(i_avg=20000.0),
+            simulation=SimulationConfig(t_max=5, dt=0.1),
+        )
+
+
+def test_labels_plot_only_do_not_change_total_losses_keys():
+    # Custom recovery_label / income_label must not leak into total_losses or
+    # time_series column names — those stay structural (LossType-driven).
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(
+            k=100000.0,
+            v=0.1,
+            recovery_rate=0.5,
+            pi=0.1,
+            recovery_label="Rebuild our house",
+            income_label="Our housing services",
+        ),
+        rental_housing=IncomeStream(
+            income=5000.0,
+            v=0.2,
+            recovery_time=3.0,
+            income_label="Landlord rebuilding",
+        ),
+        labour_assets={
+            "Public": IncomeStream(
+                income=6000.0,
+                v=0.3,
+                recovery_time=5.0,
+                income_label="Public sector wage loss",
+            ),
+        },
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh = CommunityUnit(cfg)
+    losses = hh.get_losses("trapezoid")
+    # Structural keys remain
+    assert LossType.RECOVERY_COST in losses
+    assert LossType.OWNER_HOUSING_LOSS in losses
+    assert LossType.RENTAL_HOUSING_LOSS in losses
+    assert LossType.LABOUR_INCOME_LOSS in losses
+    assert "Labour Income Loss (Public)" in hh.time_series.columns
+    # Custom labels must NOT appear as dict/column keys
+    for custom in (
+        "Rebuild our house",
+        "Our housing services",
+        "Landlord rebuilding",
+        "Public sector wage loss",
+    ):
+        assert custom not in losses.index
+        assert custom not in hh.time_series.columns
+
+
+def test_display_label_resolution():
+    # _display_label and _label_for must follow the precedence rules:
+    # override (when set) > enum default > enum default + fallback suffix.
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(
+            k=100000.0,
+            v=0.1,
+            recovery_rate=0.5,
+            pi=0.1,
+            recovery_label="Rebuild our house",
+            # income_label intentionally left None → enum default
+        ),
+        rental_housing=IncomeStream(
+            income=5000.0,
+            v=0.2,
+            recovery_time=3.0,
+            income_label="Landlord rebuilding",
+        ),
+        labour_assets={
+            "Public": IncomeStream(
+                income=6000.0,
+                v=0.3,
+                recovery_time=5.0,
+                income_label="Public sector",
+            ),
+            # "Private" has no income_label → falls back to "{default} ({name})"
+            "Private": IncomeStream(
+                income=4000.0,
+                v=0.2,
+                recovery_time=4.0,
+            ),
+        },
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh = CommunityUnit(cfg)
+
+    # Owner RECOVERY: override wins.
+    assert hh._label_for(LossType.RECOVERY_COST) == "Rebuild our house"
+    # Owner INCOME: no override → enum default.
+    assert (
+        hh._label_for(LossType.OWNER_HOUSING_LOSS) == LossType.OWNER_HOUSING_LOSS.value
+    )
+    # Rental: override on rental_housing.income_label.
+    assert hh._label_for(LossType.RENTAL_HOUSING_LOSS) == "Landlord rebuilding"
+    # LABOUR_INCOME aggregate: no per-stock override applies.
+    assert (
+        hh._label_for(LossType.LABOUR_INCOME_LOSS) == LossType.LABOUR_INCOME_LOSS.value
+    )
+    # Per-asset column key, with override:
+    assert hh._label_for("Labour Income Loss (Public)") == "Public sector"
+    # Per-asset column key, without override → default + suffix:
+    assert (
+        hh._label_for("Labour Income Loss (Private)")
+        == f"{LossType.LABOUR_INCOME_LOSS.value} (Private)"
+    )
+    # Consumption / Utility stay as LossType defaults.
+    assert hh._label_for(LossType.CONSUMPTION_LOSS) == LossType.CONSUMPTION_LOSS.value
+    assert hh._label_for(LossType.UTILITY_LOSS) == LossType.UTILITY_LOSS.value
+
+
+def test_extra_fields_forbidden_on_all_config_models():
+    # extra='forbid' on every BaseModel must reject unknown fields with a
+    # ValidationError — catches typos and silent field drift.
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match=r"[Ee]xtra"):
+        CapitalStock(k=100.0, v=0.1, recovery_rate=0.5, bogus_field=True)
+    with pytest.raises(ValidationError, match=r"[Ee]xtra"):
+        IncomeStream(income=100.0, v=0.1, recovery_time=1.0, bogus=1)
+    with pytest.raises(ValidationError, match=r"[Ee]xtra"):
+        Liquidity(savings=100, bogus=True)
+    with pytest.raises(ValidationError, match=r"[Ee]xtra"):
+        IncomeConfig(i_avg=1000.0, typo_field=1)
+    with pytest.raises(ValidationError, match=r"[Ee]xtra"):
+        SimulationConfig(unknown=42)
+    with pytest.raises(ValidationError, match=r"[Ee]xtra"):
+        WellBeingConfig(
+            owner_housing=CapitalStock(k=1.0, v=0.1, recovery_rate=0.5),
+            income=IncomeConfig(i_avg=1.0),
+            mystery_field=123,
+        )
+
+
+def test_numeric_field_bounds_raise_on_invalid():
+    # Layer 2 bounds: negative k, v outside [0,1], recovery_per >= 100, etc.
+    import pytest
+    from pydantic import ValidationError
+
+    # CapitalStock: negative k rejected.
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        CapitalStock(k=-1.0, v=0.1, recovery_rate=0.5)
+    # v > 1 rejected.
+    with pytest.raises(ValidationError, match="less than or equal to 1"):
+        CapitalStock(k=100.0, v=1.5, recovery_rate=0.5)
+    # pi must be > 0.
+    with pytest.raises(ValidationError, match="greater than 0"):
+        CapitalStock(k=100.0, v=0.1, recovery_rate=0.5, pi=0)
+
+    # IncomeStream: income must be > 0.
+    with pytest.raises(ValidationError, match="greater than 0"):
+        IncomeStream(income=0, v=0.1, recovery_time=1.0)
+
+    # SimulationConfig: recovery_per >= 100 rejected.
+    with pytest.raises(ValidationError, match="less than 100"):
+        SimulationConfig(recovery_per=100.0)
+    # c_min negative rejected.
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        SimulationConfig(c_min=-1.0)
+    # eta must be > 0.
+    with pytest.raises(ValidationError, match="greater than 0"):
+        SimulationConfig(eta=0)
+
+    # Liquidity: negative savings rejected.
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        Liquidity(savings=-1)
+
+    # IncomeConfig: i_avg must be > 0.
+    with pytest.raises(ValidationError, match="greater than 0"):
+        IncomeConfig(i_avg=0)
+
+
+def test_recovery_xor_rule_fires_at_wellbeing_config():
+    # Layer 3: both recovery_rate AND recovery_time set on the same stock at
+    # construction → WellBeingConfig's @model_validator raises. Covers owner,
+    # rental, and labour paths. Owner allowed to have both None (opt_lambda).
+    import pytest
+    from pydantic import ValidationError
+
+    # Owner: both set at construction → raises on the XOR rule.
+    with pytest.raises(ValidationError, match="Provide only one"):
+        WellBeingConfig(
+            owner_housing=CapitalStock(
+                k=100.0, v=0.1, recovery_rate=0.5, recovery_time=2.0
+            ),
+            income=IncomeConfig(i_avg=1000.0),
+            simulation=SimulationConfig(recovery_per=95.0),
+        )
+
+    # Owner: both None is allowed (opt_lambda will fill).
+    WellBeingConfig(
+        owner_housing=CapitalStock(k=100.0, v=0.1),
+        income=IncomeConfig(i_avg=1000.0),
+        simulation=SimulationConfig(recovery_per=95.0),
+    )
+
+    # Rental: both None raises (no opt_lambda relaxation).
+    with pytest.raises(ValidationError, match="recovery_rate or recovery_time"):
+        WellBeingConfig(
+            owner_housing=CapitalStock(k=100.0, v=0.1, recovery_rate=0.5),
+            rental_housing=CapitalStock(k=50.0, v=0.1),
+            income=IncomeConfig(i_avg=1000.0),
+            simulation=SimulationConfig(recovery_per=95.0),
+        )
+
+
+def test_recovery_xor_fill_is_idempotent():
+    # Constructing already fills the missing field; re-running
+    # normalize_recovery_params (as CommunityUnit does) must not raise on the
+    # now-both-set state because the two values are consistent.
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=100.0, v=0.1, recovery_rate=0.5, pi=0.1),
+        income=IncomeConfig(i_avg=1000.0),
+        simulation=SimulationConfig(recovery_per=95.0),
+    )
+    # After construction both fields are set (recovery_time was filled).
+    assert cfg.owner_housing.recovery_rate is not None
+    assert cfg.owner_housing.recovery_time is not None
+
+    # Re-running the normalizer must be a no-op — this is what
+    # CommunityUnit.__init__ does to cover post-construction nested mutations.
+    cfg.normalize_recovery_params()
+
+    # And CommunityUnit construction must succeed.
+    hh = CommunityUnit(cfg)
+    assert hh.config.owner_housing.recovery_rate == 0.5

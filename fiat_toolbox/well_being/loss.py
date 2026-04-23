@@ -1,12 +1,13 @@
+import warnings
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .methods import (
     ConsumptionLoss,
@@ -22,67 +23,300 @@ from .methods import (
 
 
 class LossType(str, Enum):
-    RECOVERY = "Recovery Costs"
-    INCOME = "Loss of Housing Services"
-    RENTAL_INCOME = "Loss of Housing Services (Rental)"
-    LABOUR_INCOME = "Labour Income Loss"
+    RECOVERY_COST = "Recovery Costs"
+    OWNER_HOUSING_LOSS = "Loss of Housing Services"
+    RENTAL_HOUSING_LOSS = "Loss of Housing Services (Rental)"
+    LABOUR_INCOME_LOSS = "Labour Income Loss"
 
-    CONSUMPTION = "Consumption Loss"
-    UTILITY = "Utility Loss"
+    CONSUMPTION_LOSS = "Consumption Loss"
+    UTILITY_LOSS = "Utility Loss"
 
     def __str__(self):
         return self.value
 
 
 class CapitalStock(BaseModel):
-    k: float = Field(..., description="Value of the capital stock")
-    v: float = Field(..., description="Loss ratio for the capital stock")
+    model_config = ConfigDict(extra="forbid")
+
+    k: float = Field(..., ge=0, description="Value of the capital stock (≥ 0)")
+    v: float = Field(
+        ...,
+        ge=0,
+        le=1,
+        description="Loss ratio for the capital stock (0 ≤ v ≤ 1)",
+    )
     recovery_time: Optional[float] = Field(
-        None, description="Recovery time for the capital stock"
+        None, gt=0, description="Recovery time for the capital stock (> 0)"
     )
     recovery_rate: Optional[float] = Field(
-        None, description="Recovery rate for the capital stock"
+        None, gt=0, description="Recovery rate for the capital stock (> 0)"
     )
     pi: float = Field(
         0.15,
+        gt=0,
         description=(
-            "Productivity of capital for this stock. Used wherever the stock "
-            "contributes an income-loss stream"
+            "Productivity of capital for this stock (> 0). Used wherever the "
+            "stock contributes an income-loss stream"
+        ),
+    )
+    recovery_label: Optional[str] = Field(
+        None,
+        description=(
+            "Optional plot-legend text for the RecoveryCost stream this stock "
+            "drives. When None, CommunityUnit falls back "
+            "to the default LossType.RECOVERY_COST display string. Plot-only: does "
+            "not affect total_losses / time_series dict keys."
+        ),
+    )
+    income_label: Optional[str] = Field(
+        None,
+        description=(
+            "Optional plot-legend text for the IncomeLoss stream this stock "
+            "drives. When None, CommunityUnit falls back to the default "
+            "LossType display string (optionally suffixed with a labour "
+            "asset's dict key). Plot-only: does not affect total_losses / "
+            "time_series dict keys."
+        ),
+    )
+
+
+class IncomeStream(BaseModel):
+    """Income flow specified directly (not decomposed into π·k).
+
+    Use in `rental_housing` and `labour_assets` when you already have the
+    baseline income figure from survey, tax, or Penn-World-Table data and
+    the π / k split would be artificial. The household does not bear
+    recovery cost on this stream — only income loss `income · v · exp(-λt)`
+    is generated, so `IncomeStream` is never valid for `owner_housing`
+    (which drives RecoveryCost and needs `k` directly).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    income: float = Field(
+        ...,
+        gt=0,
+        description=(
+            "Baseline income flow (per year) from this stream, pre-computed. "
+            "Equivalent to π·k under a CapitalStock specification. Must be > 0."
+        ),
+    )
+    v: float = Field(
+        ...,
+        ge=0,
+        le=1,
+        description="Fraction of the income flow lost at t=0 (0 ≤ v ≤ 1)",
+    )
+    recovery_time: Optional[float] = Field(
+        None,
+        gt=0,
+        description=(
+            "Recovery time of the underlying productive capacity (years, > 0). "
+            "Exactly one of recovery_time / recovery_rate must be provided."
+        ),
+    )
+    recovery_rate: Optional[float] = Field(
+        None,
+        gt=0,
+        description=(
+            "Recovery rate λ (per year, > 0). Exactly one of recovery_time / "
+            "recovery_rate must be provided."
+        ),
+    )
+    income_label: Optional[str] = Field(
+        None,
+        description=(
+            "Optional plot-legend text for the IncomeLoss stream. When None, "
+            "CommunityUnit falls back to the default LossType display string "
+            "(optionally suffixed with a labour asset's dict key). Plot-only."
         ),
     )
 
 
 class Liquidity(BaseModel):
-    savings: float = Field(0.0, description="Household savings")
-    insurance: float = Field(0.0, description="Insurance payout")
-    support: float = Field(0.0, description="External support")
+    model_config = ConfigDict(extra="forbid")
+
+    savings: float = Field(0.0, ge=0, description="Household savings (≥ 0)")
+    insurance: float = Field(0.0, ge=0, description="Insurance payout (≥ 0)")
+    support: float = Field(0.0, ge=0, description="External support (≥ 0)")
 
 
 class IncomeConfig(BaseModel):
-    i_0: float = Field(..., description="Initial income rate per year")
-    i_avg: float = Field(..., description="Average income rate per year")
-    i_div: Optional[float] = Field(None, description="Diversified income per year")
+    model_config = ConfigDict(extra="forbid")
+
+    i_0: Optional[float] = Field(
+        None,
+        ge=0,
+        description=(
+            "Optional explicit baseline-income override (≥ 0). When omitted "
+            "(the default), c0 is derived as Σ π·k + (i_div or 0) across all "
+            "configured capital stocks. When supplied, c0 = i_0 + (i_div or 0) "
+            "and a UserWarning is emitted at CommunityUnit construction if "
+            "i_0 differs from Σ π·k."
+        ),
+    )
+    i_avg: float = Field(..., gt=0, description="Average income rate per year (> 0)")
+    i_div: Optional[float] = Field(
+        None,
+        ge=0,
+        description=(
+            "Residual non-asset-based income (≥ 0; remittances, transfers, "
+            "pensions, …) added to c0 on top of the stock-derived baseline."
+        ),
+    )
 
 
 class SimulationConfig(BaseModel):
-    eta: float = Field(1.5, description="Elasticity of marginal utility of consumption")
-    rho: float = Field(0.06, description="Discount rate")
-    t_max: float = Field(10, description="Maximum simulation time")
-    dt: float = Field(1 / 52, description="Time step")
+    model_config = ConfigDict(extra="forbid")
+
+    eta: float = Field(
+        1.5, gt=0, description="Elasticity of marginal utility of consumption (> 0)"
+    )
+    rho: float = Field(0.06, ge=0, description="Discount rate (≥ 0)")
+    t_max: float = Field(10, gt=0, description="Maximum simulation time (> 0)")
+    dt: float = Field(1 / 52, gt=0, description="Time step (> 0)")
     currency: str = Field("$", description="Currency symbol")
-    c_min: float = Field(0.0, description="Minimum consumption rate per year")
+    c_min: float = Field(
+        0.0, ge=0, description="Minimum consumption rate per year (≥ 0)"
+    )
     recovery_per: float = Field(
-        95.0, description="Percentage of asset rebuilt to consider as recovered"
+        95.0,
+        ge=0,
+        lt=100,
+        description=(
+            "Percentage of asset rebuilt to consider as recovered "
+            "(0 ≤ recovery_per < 100)"
+        ),
     )
 
 
 class WellBeingConfig(BaseModel):
-    owner_housing: CapitalStock
-    rental_housing: Optional[CapitalStock] = None
-    labour_assets: Optional[Dict[str, CapitalStock]] = None
+    model_config = ConfigDict(extra="forbid")
+
+    owner_housing: CapitalStock = Field(
+        ...,
+        description=(
+            "Household's own housing stock. Drives both a RecoveryCost stream "
+            "(λ·v·k for reconstruction) and an IncomeLoss stream (π·v·k for "
+            "lost housing services). Must be CapitalStock — recovery cost "
+            "needs k directly."
+        ),
+    )
+    rental_housing: Optional[Union[CapitalStock, IncomeStream]] = Field(
+        None,
+        description=(
+            "Rental housing stream. Models the landlord's structural capital "
+            "affecting tenant housing services (paper's k^rent_str / "
+            "Δi^rent(t) stream): the household, as tenant, loses housing "
+            "services while the landlord's damaged building is reconstructed. "
+            "Household does NOT bear recovery cost (landlord assumed outside "
+            "the study area). Only an IncomeLoss stream is produced. "
+            "Supply as CapitalStock (π·k decomposition) or IncomeStream "
+            "(income directly)."
+        ),
+    )
+    labour_assets: Optional[Dict[str, Union[CapitalStock, IncomeStream]]] = Field(
+        None,
+        description=(
+            "Productive assets that generate household labour income (paper's "
+            "k^pub, k^firm). Each entry drives an IncomeLoss stream; no "
+            "household-borne recovery cost. Supply as CapitalStock or "
+            "IncomeStream per entry."
+        ),
+    )
     income: IncomeConfig
     liquidity: Optional[Liquidity] = Liquidity()
     simulation: Optional[SimulationConfig] = SimulationConfig()
+
+    def normalize_recovery_params(self) -> None:
+        """Validate and fill `recovery_time` / `recovery_rate` across all stocks.
+
+        Rules enforced for each configured stock (owner_housing,
+        rental_housing, every labour_assets entry):
+
+        - Both `recovery_time` and `recovery_rate` set → `ValueError`.
+        - Exactly one set → fill the other via the inverse function using
+          `simulation.recovery_per`.
+        - Neither set → `ValueError`, **except** for `owner_housing`, which
+          may be left fully unset so that `CommunityUnit.opt_lambda` can fill
+          it later.
+
+        Legacy shim: if `labour_assets` is passed as a single
+        `CapitalStock` / `IncomeStream` (not a dict), it's wrapped into
+        `{"labour": stock}`.
+
+        Runs automatically via `@model_validator(mode='after')` at
+        construction; `CommunityUnit.__init__` re-runs it to cover
+        post-construction mutations of nested stocks.
+        """
+        rec_per = self.simulation.recovery_per
+
+        def complete_stock(stock, allow_none: bool) -> None:
+            if stock is None:
+                if allow_none:
+                    return
+                raise ValueError("Missing required stock configuration")
+            has_rate = stock.recovery_rate is not None
+            has_time = stock.recovery_time is not None
+            if has_rate and has_time:
+                # Both set — verify consistency. This state legitimately arises
+                # when `normalize_recovery_params` is called a second time
+                # after a prior fill (e.g., CommunityUnit.__init__ re-runs it
+                # to cover post-construction mutations). If the values agree
+                # within tolerance, pass through as already normalised; if they
+                # disagree, the user supplied contradictory numbers — raise.
+                expected_time = recovery_time(
+                    rate=stock.recovery_rate, rebuilt_per=rec_per
+                )
+                tol = 1e-6 * max(1.0, abs(expected_time))
+                if abs(stock.recovery_time - expected_time) > tol:
+                    raise ValueError(
+                        f"recovery_rate={stock.recovery_rate!r} and "
+                        f"recovery_time={stock.recovery_time!r} are both set "
+                        f"but inconsistent (expected recovery_time ≈ "
+                        f"{expected_time:g} given recovery_per={rec_per}). "
+                        "Provide only one of them."
+                    )
+                return
+            if not has_rate and not has_time:
+                if allow_none:
+                    # owner_housing may be left unset and filled by opt_lambda
+                    return
+                raise ValueError(
+                    "For rental_housing and labour_assets, provide recovery_rate or recovery_time"
+                )
+            if has_rate and not has_time:
+                stock.recovery_time = recovery_time(
+                    rate=stock.recovery_rate, rebuilt_per=rec_per
+                )
+            if has_time and not has_rate:
+                stock.recovery_rate = recovery_rate(
+                    time=stock.recovery_time, rebuilt_per=rec_per
+                )
+
+        complete_stock(self.owner_housing, allow_none=True)
+        if self.rental_housing is not None:
+            complete_stock(self.rental_housing, allow_none=False)
+        if self.labour_assets is not None:
+            if isinstance(self.labour_assets, dict):
+                for name, stock in self.labour_assets.items():
+                    try:
+                        complete_stock(stock, allow_none=False)
+                    except ValueError as e:
+                        raise ValueError(f"Invalid labour_assets['{name}']: {e}")
+            else:
+                # Backward compat: single CapitalStock / IncomeStream → dict
+                stock = self.labour_assets  # type: ignore[assignment]
+                try:
+                    complete_stock(stock, allow_none=False)
+                except ValueError as e:
+                    raise ValueError(f"Invalid labour_assets: {e}")
+                self.labour_assets = {"labour": stock}  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def _run_normalize_recovery_params(self) -> "WellBeingConfig":
+        self.normalize_recovery_params()
+        return self
 
 
 class CommunityUnit:
@@ -105,8 +339,13 @@ class CommunityUnit:
         self.time_series = pd.DataFrame({"time": self.t})
         # Storage for aggregate outputs
         self.total_losses = pd.Series(dtype=float)
-        # Validate and complete recovery parameters for stocks
-        self._validate_and_fill_recovery_params()
+        # Re-normalize recovery params in case nested stocks were mutated
+        # after config construction; the @model_validator on WellBeingConfig
+        # already ran once at construction time.
+        self.config.normalize_recovery_params()
+        # Warn (once per instance) if an explicit i_0 override disagrees with
+        # the stock-derived baseline Σ π·k; this is otherwise silent.
+        self._check_i0_consistency()
 
     def _get_time_array(self):
         t_max = self.config.simulation.t_max
@@ -166,12 +405,108 @@ class CommunityUnit:
         return None
 
     def _stock_pi(self, stock: CapitalStock) -> float:
-        """Productivity of capital for this stock (see CapitalStock.pi)."""
+        """Productivity of capital for this stock (see CapitalStock.pi).
+
+        Defined for CapitalStock only. IncomeStream carries an explicit
+        income flow instead — callers should go through `_baseline_income`,
+        which routes correctly for either class.
+        """
+        if isinstance(stock, IncomeStream):
+            raise TypeError(
+                "_stock_pi is only defined for CapitalStock. Use "
+                "_baseline_income(stock) to get the baseline income flow "
+                "for either CapitalStock or IncomeStream."
+            )
         return float(stock.pi)
+
+    def _baseline_income(self, stock) -> float:
+        """Baseline pre-shock income from `stock` (per year).
+
+        - `CapitalStock` → `π · k`
+        - `IncomeStream` → `income`
+
+        Every helper that previously wrote `pi * k` should route through
+        here so both stock types work transparently.
+        """
+        if isinstance(stock, IncomeStream):
+            return float(stock.income)
+        return float(self._stock_pi(stock) * stock.k)
+
+    def _display_label(
+        self,
+        loss_type: "LossType",
+        stock=None,
+        fallback_suffix: Optional[str] = None,
+    ) -> str:
+        """Resolve the legend/display string for a loss stream.
+
+        - If `stock` is provided and carries a matching `*_label` override
+          (`recovery_label` for `RECOVERY`, `income_label` otherwise), use it.
+        - Otherwise use the `LossType` default, optionally suffixed with
+          `fallback_suffix` in parentheses (used for per-labour-asset names).
+
+        Plot-only: does not affect `total_losses` / `time_series` dict keys.
+        """
+        if stock is not None:
+            attr = (
+                "recovery_label"
+                if loss_type is LossType.RECOVERY_COST
+                else "income_label"
+            )
+            override = getattr(stock, attr, None)
+            if override:
+                return str(override)
+        base = loss_type.value
+        return f"{base} ({fallback_suffix})" if fallback_suffix else base
+
+    def _label_for(self, loss_type) -> str:
+        """Resolve a display label for a loss stream (enum OR column key).
+
+        Plot-only. Dispatches by `loss_type`:
+        - `LossType.RECOVERY_COST` / `LossType.OWNER_HOUSING_LOSS` → owner-housing label override.
+        - `LossType.RENTAL_HOUSING_LOSS` → rental-housing label override.
+        - `LossType.LABOUR_INCOME_LOSS` (aggregate), `CONSUMPTION`, `UTILITY` →
+          enum default (no per-stock override applies).
+        - Per-asset labour column key like `"Labour Income Loss (shop)"` →
+          labour_assets["shop"] label override, falling back to the current
+          `"{default} ({name})"` string.
+        - Any other string → returned as-is.
+        """
+        if isinstance(loss_type, LossType):
+            if (
+                loss_type is LossType.RECOVERY_COST
+                or loss_type is LossType.OWNER_HOUSING_LOSS
+            ):
+                return self._display_label(loss_type, stock=self.config.owner_housing)
+            if loss_type is LossType.RENTAL_HOUSING_LOSS:
+                return self._display_label(loss_type, stock=self.config.rental_housing)
+            return loss_type.value
+        s = str(loss_type)
+        prefix = f"{LossType.LABOUR_INCOME_LOSS.value} ("
+        if s.startswith(prefix) and s.endswith(")"):
+            name = s[len(prefix) : -1]
+            stock = None
+            if self.config.labour_assets:
+                stock = self.config.labour_assets.get(name)
+            return self._display_label(
+                LossType.LABOUR_INCOME_LOSS, stock=stock, fallback_suffix=name
+            )
+        return s
+
+    def _income_loss_for_stock(self, stock, t, rec_rate: float) -> "IncomeLoss":
+        """Construct an IncomeLoss primitive abstracted over CapitalStock / IncomeStream.
+
+        `methods.IncomeLoss` computes `pi · v · k_str · exp(-λt)`. We pass
+        `(k_str=baseline_income, pi=1.0)` so the product collapses to
+        `baseline_income · v · exp(-λt)` — the form shared by both stock
+        types. Keeps methods.py's primitive untouched.
+        """
+        baseline = self._baseline_income(stock)
+        return IncomeLoss(t, rec_rate, stock.v, k_str=baseline, pi=1.0)
 
     def _extra_losses(self):
         extra = []
-        # Rental housing as a single optional stock
+        # Rental housing as a single optional stock (CapitalStock or IncomeStream)
         if self.config.rental_housing is not None:
             rr = self._stock_rec_rate(self.config.rental_housing)
             if rr is None:
@@ -179,13 +514,12 @@ class CommunityUnit:
                     "rental_housing must define either recovery_rate or recovery_time"
                 )
             n0 = (
-                self._stock_pi(self.config.rental_housing)
+                self._baseline_income(self.config.rental_housing)
                 * self.config.rental_housing.v
-                * self.config.rental_housing.k
             )
             extra.append((n0, rr))
 
-        # Labour assets as a dictionary of named CapitalStock entries
+        # Labour assets: dict of named CapitalStock / IncomeStream entries
         if self.config.labour_assets:
             for name, stock in self.config.labour_assets.items():
                 if stock is None:
@@ -196,71 +530,69 @@ class CommunityUnit:
                     raise ValueError(
                         f"labour_assets['{name}'] must define either recovery_rate or recovery_time"
                     )
-                n0 = self._stock_pi(stock) * stock.v * stock.k
+                n0 = self._baseline_income(stock) * stock.v
                 extra.append((n0, rr))
 
         return extra if extra else None
 
-    def _validate_and_fill_recovery_params(self) -> None:
-        # For any CapitalStock: only one of recovery_time or recovery_rate can be set
-        # If one is provided, compute the other using simulation.recovery_per
-        def complete_stock(stock: CapitalStock, allow_none: bool) -> None:
-            if stock is None:
-                if allow_none:
-                    return
-                raise ValueError("Missing required CapitalStock configuration")
-            has_rate = stock.recovery_rate is not None
-            has_time = stock.recovery_time is not None
-            if has_rate and has_time:
-                raise ValueError(
-                    "Provide only one of recovery_rate or recovery_time for CapitalStock"
-                )
-            if not has_rate and not has_time:
-                if allow_none:
-                    # housing can be optimized later
-                    return
-                raise ValueError(
-                    "For rental_housing and labour_assets, provide recovery_rate or recovery_time"
-                )
-            if has_rate and not has_time:
-                stock.recovery_time = recovery_time(
-                    rate=stock.recovery_rate,
-                    rebuilt_per=self.config.simulation.recovery_per,
-                )
-            if has_time and not has_rate:
-                stock.recovery_rate = recovery_rate(
-                    time=stock.recovery_time,
-                    rebuilt_per=self.config.simulation.recovery_per,
-                )
+    def _stock_income_sum(self) -> float:
+        """Baseline pre-shock income summed across modelled stocks.
 
-        # owner_housing: allow none, will be set by optimization if missing
-        complete_stock(self.config.owner_housing, allow_none=True)
-        # rental_housing and labour_assets must have one specified if provided
+        For each stock, contribution is `_baseline_income(stock)` which
+        resolves to `π·k` for `CapitalStock` and `income` for
+        `IncomeStream`. Iterates over owner housing, optional rental
+        housing, and each entry in optional labour_assets (skipping `None`
+        labour entries). Mirrors the shape used by
+        `_exponential_loss_components_labelled` and `_extra_losses` so new
+        stock types land in all three helpers together.
+        """
+        total = self._baseline_income(self.config.owner_housing)
         if self.config.rental_housing is not None:
-            complete_stock(self.config.rental_housing, allow_none=False)
-        if self.config.labour_assets is not None:
-            # Expect a dictionary of labour asset stocks
-            if isinstance(self.config.labour_assets, dict):
-                for name, stock in self.config.labour_assets.items():
-                    try:
-                        complete_stock(stock, allow_none=False)
-                    except ValueError as e:
-                        raise ValueError(f"Invalid labour_assets['{name}']: {e}")
-            else:
-                # Backward compatibility: if a single CapitalStock is passed, convert to dict
-                stock = self.config.labour_assets  # type: ignore[assignment]
-                try:
-                    complete_stock(stock, allow_none=False)
-                except ValueError as e:
-                    raise ValueError(f"Invalid labour_assets: {e}")
-                # Promote to dict for internal consistency
-                self.config.labour_assets = {"labour": stock}  # type: ignore[assignment]
+            total += self._baseline_income(self.config.rental_housing)
+        if self.config.labour_assets:
+            for stock in self.config.labour_assets.values():
+                if stock is None:
+                    continue
+                total += self._baseline_income(stock)
+        return float(total)
 
     def _c0(self) -> float:
-        # Include diversified income (if provided) in baseline income
+        # Baseline consumption by the usual assumption c = income.
+        # Default: derive from the configured stocks (Σ π·k + i_div) so c(t)
+        # and the pre-shock c0 live in the same units. If the user supplied
+        # an explicit i_0, it wins as an override (any mismatch with Σ π·k
+        # is flagged via a UserWarning at construction).
         i_div = self.config.income.i_div or 0.0
-        # Consumption equals income by assumption
-        return self.config.income.i_0 + i_div
+        if self.config.income.i_0 is not None:
+            return float(self.config.income.i_0) + i_div
+        return self._stock_income_sum() + i_div
+
+    def _check_i0_consistency(self) -> None:
+        """Warn if an explicit `i_0` disagrees with the stock-derived Σ π·k.
+
+        Fires once from `__init__`. Relative tolerance 1e-6 against
+        max(|i_0|, |Σ π·k|, 1) so round-number survey inputs don't trip
+        floating-point noise.
+        """
+        i_0 = self.config.income.i_0
+        if i_0 is None:
+            return
+        stock_sum = self._stock_income_sum()
+        scale = max(abs(float(i_0)), abs(stock_sum), 1.0)
+        diff = float(i_0) - stock_sum
+        if abs(diff) <= 1e-6 * scale:
+            return
+        rel = diff / scale
+        warnings.warn(
+            (
+                f"IncomeConfig.i_0={float(i_0):g} overrides the stock-derived "
+                f"baseline Σ π·k={stock_sum:g} (diff={diff:+.3g}, "
+                f"rel={rel:.2%}). The override is in effect. Omit i_0 to use "
+                "the stock-consistent value."
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
 
     def _c_avg(self) -> float:
         # Consumption equals income by assumption
@@ -296,14 +628,14 @@ class CommunityUnit:
 
     def _loss_types_for_run(self):
         types = [
-            LossType.RECOVERY,
-            LossType.INCOME,
+            LossType.RECOVERY_COST,
+            LossType.OWNER_HOUSING_LOSS,
         ]
         if self.config.rental_housing is not None:
-            types.append(LossType.RENTAL_INCOME)
+            types.append(LossType.RENTAL_HOUSING_LOSS)
         if self.config.labour_assets is not None:
-            types.append(LossType.LABOUR_INCOME)
-        types.extend([LossType.CONSUMPTION, LossType.UTILITY])
+            types.append(LossType.LABOUR_INCOME_LOSS)
+        types.extend([LossType.CONSUMPTION_LOSS, LossType.UTILITY_LOSS])
         return types
 
     def _unit_recovery_time(self) -> Optional[float]:
@@ -420,17 +752,19 @@ class CommunityUnit:
         """Same as _exponential_loss_components but keeps a label per term.
 
         Returns [(name, C_i, lambda_i), ...] or None if owner rate missing.
-        Names are "owner", "rental", "labour/<key>".
+        Names are "owner", "rental", "labour/<key>". Each term's `C_i` is
+        `baseline_income · v` so both `CapitalStock` (π·k·v) and
+        `IncomeStream` (income·v) contribute consistently.
         """
         rr_owner = self._rec_rate()
         if rr_owner is None or rr_owner <= 0:
             return None
-        v_owner = self.config.owner_housing.v
-        k_owner = self.config.owner_housing.k
 
         labelled: List[Tuple[str, float, float]] = []
 
-        c_base = self._stock_pi(self.config.owner_housing) * v_owner * k_owner
+        c_base = self._baseline_income(self.config.owner_housing) * (
+            self.config.owner_housing.v
+        )
         if c_base < 0:
             return None
         if c_base > 0:
@@ -441,7 +775,7 @@ class CommunityUnit:
             rr = self._stock_rec_rate(stock)
             if rr is None or rr <= 0:
                 return None
-            c_rental = self._stock_pi(stock) * stock.v * stock.k
+            c_rental = self._baseline_income(stock) * stock.v
             if c_rental < 0:
                 return None
             if c_rental > 0:
@@ -454,7 +788,7 @@ class CommunityUnit:
                 rr = self._stock_rec_rate(stock)
                 if rr is None or rr <= 0:
                     return None
-                c_lab = self._stock_pi(stock) * stock.v * stock.k
+                c_lab = self._baseline_income(stock) * stock.v
                 if c_lab < 0:
                     return None
                 if c_lab > 0:
@@ -575,10 +909,10 @@ class CommunityUnit:
         ----------
         loss_type : LossType
             The type of loss to calculate. Must be one of the following:
-            - LossType.RECOVERY: Calculates recovery cost.
-            - LossType.INCOME: Calculates income loss.
-            - LossType.CONSUMPTION: Calculates consumption loss.
-            - LossType.UTILITY: Calculates utility loss.
+            - LossType.RECOVERY_COST: Calculates recovery cost.
+            - LossType.OWNER_HOUSING_LOSS: Calculates income loss.
+            - LossType.CONSUMPTION_LOSS: Calculates consumption loss.
+            - LossType.UTILITY_LOSS: Calculates utility loss.
         method : str, optional
             The numerical method to use for calculating the total loss.
             Can be either "trapezoid" (default) or "quad"
@@ -596,10 +930,10 @@ class CommunityUnit:
             `recovery_rate` nor `recovery_time` set.
         """
         owner_touched = loss_type in (
-            LossType.RECOVERY,
-            LossType.INCOME,
-            LossType.CONSUMPTION,
-            LossType.UTILITY,
+            LossType.RECOVERY_COST,
+            LossType.OWNER_HOUSING_LOSS,
+            LossType.CONSUMPTION_LOSS,
+            LossType.UTILITY_LOSS,
         )
         if owner_touched and self._rec_rate() is None:
             raise ValueError(
@@ -608,14 +942,14 @@ class CommunityUnit:
                 "housing recovery rate, or specify one on CapitalStock."
             )
 
-        if loss_type == LossType.RECOVERY:
+        if loss_type == LossType.RECOVERY_COST:
             loss = RecoveryCost(
                 self.t,
                 self._rec_rate(),
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
             )
-        elif loss_type == LossType.INCOME:
+        elif loss_type == LossType.OWNER_HOUSING_LOSS:
             loss = IncomeLoss(
                 self.t,
                 self._rec_rate(),
@@ -623,17 +957,15 @@ class CommunityUnit:
                 self.config.owner_housing.k,
                 self._stock_pi(self.config.owner_housing),
             )
-        elif loss_type in (LossType.RENTAL_INCOME, LossType.LABOUR_INCOME):
-            if loss_type == LossType.RENTAL_INCOME:
+        elif loss_type in (LossType.RENTAL_HOUSING_LOSS, LossType.LABOUR_INCOME_LOSS):
+            if loss_type == LossType.RENTAL_HOUSING_LOSS:
                 stock = self.config.rental_housing
                 if stock is None:
                     return 0.0
-                loss = IncomeLoss(
-                    self.t,
-                    self._stock_rec_rate(stock),
-                    stock.v,
-                    stock.k,
-                    self._stock_pi(stock),
+                # _income_loss_for_stock abstracts over CapitalStock /
+                # IncomeStream so this branch handles either.
+                loss = self._income_loss_for_stock(
+                    stock, self.t, self._stock_rec_rate(stock)
                 )
                 self.time_series[loss_type] = loss.losses_t
                 self.total_losses[loss_type] = loss.total(rho=0, method=method)
@@ -652,15 +984,9 @@ class CommunityUnit:
                         raise ValueError(
                             f"labour_assets['{name}'] must define either recovery_rate or recovery_time"
                         )
-                    il = IncomeLoss(
-                        self.t,
-                        rr,
-                        stock.v,
-                        stock.k,
-                        self._stock_pi(stock),
-                    )
+                    il = self._income_loss_for_stock(stock, self.t, rr)
                     # Store per-asset component series and totals
-                    asset_key = f"{LossType.LABOUR_INCOME.value} ({name})"
+                    asset_key = f"{LossType.LABOUR_INCOME_LOSS.value} ({name})"
                     self.time_series[asset_key] = il.losses_t
                     self.total_losses[asset_key] = il.total(rho=0, method=method)
                     # Accumulate into aggregate
@@ -669,7 +995,7 @@ class CommunityUnit:
                 self.time_series[loss_type] = losses_sum
                 self.total_losses[loss_type] = total_sum
                 return self.total_losses[loss_type]
-        elif loss_type == LossType.CONSUMPTION:
+        elif loss_type == LossType.CONSUMPTION_LOSS:
             loss = ConsumptionLoss(
                 self.t,
                 self._rec_rate(),
@@ -690,7 +1016,7 @@ class CommunityUnit:
                     extra_losses=self._extra_losses(),
                 )
                 self.time_series[f"{loss_type} No Liquidity"] = loss_no_liq.losses_t
-        elif loss_type == LossType.UTILITY:
+        elif loss_type == LossType.UTILITY_LOSS:
             loss = UtilityLoss(
                 self.t,
                 self._rec_rate(),
@@ -711,7 +1037,9 @@ class CommunityUnit:
         # and is discounted at config.simulation.rho so the
         # utility total here matches what get_losses uses for Wellbeing Loss
         # and what opt_lambda minimizes.
-        loss_rho = self.config.simulation.rho if loss_type == LossType.UTILITY else 0.0
+        loss_rho = (
+            self.config.simulation.rho if loss_type == LossType.UTILITY_LOSS else 0.0
+        )
         self.time_series[loss_type] = loss.losses_t
         self.total_losses[loss_type] = loss.total(rho=loss_rho, method=method)
 
@@ -758,7 +1086,7 @@ class CommunityUnit:
 
         eta = self.config.simulation.eta
         c_avg = self._c_avg()
-        du_dis = float(self.total_losses[LossType.UTILITY])
+        du_dis = float(self.total_losses[LossType.UTILITY_LOSS])
 
         # first-order correction for the permanent
         # welfare cost of a depleted liquidity buffer, evaluated at pre-shock
@@ -835,11 +1163,12 @@ class CommunityUnit:
         sns.lineplot(x="time", y=loss_type, data=self.time_series, ax=ax)
         # Shade area under curve with consistent x-axis as in plot_consumption
         total_val = self.total_losses[loss_type]
-        if isinstance(loss_type, LossType) and loss_type == LossType.UTILITY:
-            label_total = f"Total {loss_type}: {total_val:.2f}"
+        display = self._label_for(loss_type)
+        if isinstance(loss_type, LossType) and loss_type == LossType.UTILITY_LOSS:
+            label_total = f"Total {display}: {total_val:.2f}"
         else:
             label_total = (
-                f"Total {loss_type}: {total_val:,.0f} {self.config.simulation.currency}"
+                f"Total {display}: {total_val:,.0f} {self.config.simulation.currency}"
             )
         ax.fill_between(
             self.time_series["time"],
@@ -851,14 +1180,14 @@ class CommunityUnit:
         )
         ax.set_xlabel("Time after disaster (years)")
         # Align y-axis formatting and units with plot_consumption
-        if not (isinstance(loss_type, LossType) and loss_type == LossType.UTILITY):
+        if not (isinstance(loss_type, LossType) and loss_type == LossType.UTILITY_LOSS):
             ax.yaxis.set_major_formatter(
                 ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
             )
-            ax.set_ylabel(f"{loss_type} ({self.config.simulation.currency}/year)")
+            ax.set_ylabel(f"{display} ({self.config.simulation.currency}/year)")
         else:
             ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
-            ax.set_ylabel(f"{loss_type}")
+            ax.set_ylabel(f"{display}")
         # Make time axis start at 0 and end at simulation horizon
         try:
             t_min = float(np.nanmin(self.time_series["time"]))
@@ -893,7 +1222,7 @@ class CommunityUnit:
         ValueError
             If the losses have not been calculated.
         """
-        if LossType.CONSUMPTION not in self.time_series.columns:
+        if LossType.CONSUMPTION_LOSS not in self.time_series.columns:
             raise ValueError(
                 "Losses have not been calculated. Run the 'get_losses' method first."
             )
@@ -903,18 +1232,19 @@ class CommunityUnit:
 
         # Prepare component series
         time = self.time_series["time"]
-        inc = self.time_series[LossType.INCOME]
-        recon = self.time_series[LossType.RECOVERY]
+        inc = self.time_series[LossType.OWNER_HOUSING_LOSS]
+        recon = self.time_series[LossType.RECOVERY_COST]
         rental = (
-            self.time_series[LossType.RENTAL_INCOME]
-            if LossType.RENTAL_INCOME in self.time_series.columns
+            self.time_series[LossType.RENTAL_HOUSING_LOSS]
+            if LossType.RENTAL_HOUSING_LOSS in self.time_series.columns
             else None
         )
         # Identify per-asset labour income component columns created in calc_loss
         labour_asset_cols = [
             c
             for c in self.time_series.columns
-            if isinstance(c, str) and c.startswith(f"{LossType.LABOUR_INCOME.value} (")
+            if isinstance(c, str)
+            and c.startswith(f"{LossType.LABOUR_INCOME_LOSS.value} (")
         ]
 
         # Colors and labels
@@ -945,8 +1275,8 @@ class CommunityUnit:
 
         # Bottom layer: Recovery
         label_recon = (
-            f"Total {LossType.RECOVERY}: "
-            f"{self.total_losses[LossType.RECOVERY]:,.0f} "
+            f"Total {self._label_for(LossType.RECOVERY_COST)}: "
+            f"{self.total_losses[LossType.RECOVERY_COST]:,.0f} "
             f"{self.config.simulation.currency}"
         )
         ax.fill_between(
@@ -960,7 +1290,8 @@ class CommunityUnit:
 
         # Next layer: Income
         label_income = (
-            f"Total {LossType.INCOME}: {self.total_losses[LossType.INCOME]:,.0f} "
+            f"Total {self._label_for(LossType.OWNER_HOUSING_LOSS)}: "
+            f"{self.total_losses[LossType.OWNER_HOUSING_LOSS]:,.0f} "
             f"{self.config.simulation.currency}"
         )
         ax.fill_between(
@@ -975,8 +1306,8 @@ class CommunityUnit:
         # Next layer: Rental (if any)
         if rental is not None:
             label_rental = (
-                f"Total {LossType.RENTAL_INCOME}: "
-                f"{self.total_losses[LossType.RENTAL_INCOME]:,.0f} "
+                f"Total {self._label_for(LossType.RENTAL_HOUSING_LOSS)}: "
+                f"{self.total_losses[LossType.RENTAL_HOUSING_LOSS]:,.0f} "
                 f"{self.config.simulation.currency}"
             )
             ax.fill_between(
@@ -997,7 +1328,8 @@ class CommunityUnit:
             # The label uses the total stored for this component if present
             total_val = self.total_losses.get(col, float(series.to_numpy().sum()))
             label_lab = (
-                f"Total {col}: {total_val:,.0f} {self.config.simulation.currency}"
+                f"Total {self._label_for(col)}: "
+                f"{total_val:,.0f} {self.config.simulation.currency}"
             )
             ax.fill_between(
                 time,
@@ -1018,8 +1350,9 @@ class CommunityUnit:
             # Add hatch by drawing again with no fill color, only hatch
             ax.fill_between(
                 self.time_series["time"],
-                self._c0() - self.time_series[LossType.CONSUMPTION],
-                self._c0() - self.time_series[f"{LossType.CONSUMPTION} No Liquidity"],
+                self._c0() - self.time_series[LossType.CONSUMPTION_LOSS],
+                self._c0()
+                - self.time_series[f"{LossType.CONSUMPTION_LOSS} No Liquidity"],
                 facecolor="none",
                 edgecolor="black",
                 hatch="///",
@@ -1030,7 +1363,7 @@ class CommunityUnit:
         # Plot consumption losses with a dashed line and expand to the left by 4 months
         expanded_time = np.insert(self.time_series["time"], 0, [-1, -0.001])
         expanded_consumption_losses = np.insert(
-            self._c0() - self.time_series[LossType.CONSUMPTION],
+            self._c0() - self.time_series[LossType.CONSUMPTION_LOSS],
             0,
             [self._c0(), self._c0()],
         )
@@ -1224,10 +1557,10 @@ class CommunityUnit:
                 "reconstruction_time": recovery_time(
                     rate=lambdas, rebuilt_per=self.config.simulation.recovery_per
                 ),
-                LossType.RECOVERY: recovery_costs,
-                LossType.INCOME: income_losses,
-                LossType.CONSUMPTION: consumption_losses,
-                LossType.UTILITY: utility_losses,
+                LossType.RECOVERY_COST: recovery_costs,
+                LossType.OWNER_HOUSING_LOSS: income_losses,
+                LossType.CONSUMPTION_LOSS: consumption_losses,
+                LossType.UTILITY_LOSS: utility_losses,
             }
         )
         self.l_opt = df
@@ -1296,24 +1629,24 @@ class CommunityUnit:
         # Make line plots for consumption losses
         sns.lineplot(
             x=x,
-            y=self.l_opt[LossType.RECOVERY],
+            y=self.l_opt[LossType.RECOVERY_COST],
             color="green",
             ax=axs[0],
-            label=LossType.RECOVERY,
+            label=self._label_for(LossType.RECOVERY_COST),
         )
         sns.lineplot(
             x=x,
-            y=self.l_opt[LossType.INCOME],
+            y=self.l_opt[LossType.OWNER_HOUSING_LOSS],
             color="blue",
             ax=axs[0],
-            label=LossType.INCOME,
+            label=self._label_for(LossType.OWNER_HOUSING_LOSS),
         )
         sns.lineplot(
             x=x,
-            y=self.l_opt[LossType.CONSUMPTION],
+            y=self.l_opt[LossType.CONSUMPTION_LOSS],
             color="purple",
             ax=axs[0],
-            label=LossType.CONSUMPTION,
+            label=self._label_for(LossType.CONSUMPTION_LOSS),
         )
         # Add vertical line for optimal lambda
         axs[0].axvline(
@@ -1332,10 +1665,10 @@ class CommunityUnit:
         # Add well-being loss plot
         sns.lineplot(
             x=x,
-            y=self.l_opt[LossType.UTILITY],
+            y=self.l_opt[LossType.UTILITY_LOSS],
             color="black",
             ax=axs[1],
-            label=LossType.UTILITY,
+            label=self._label_for(LossType.UTILITY_LOSS),
         )
         axs[1].axvline(
             x=val, color="red", linestyle="--", label=f"Optimum value: {val:.2f}"
