@@ -394,7 +394,10 @@ def consumption_t(
     c0 : float
         Initial consumption rate per year.
     cmin : float, optional
-        Minimum consumption rate per year. Default is 0.0.
+        Subsistence consumption threshold. Kept for signature compatibility but
+        NOT subtracted here: c(t) = c0 - cl_t. The `cmin` value is enforced as
+        a feasibility constraint inside `opt_lambda` (CRRA utility on c(t);
+        subsistence is a constraint, not an arithmetic floor). Default is 0.0.
     liquidity : float, optional
         Total liquid support available (savings + insurance + external support). Default is 0.0.
     extra_losses : Optional[Sequence[Tuple[float, float]]], optional
@@ -415,7 +418,7 @@ def consumption_t(
         liquidity=liquidity,
         extra_losses=extra_losses,
     )
-    ct = c0 - cl_t - cmin
+    ct = c0 - cl_t
     return ct
 
 
@@ -474,7 +477,9 @@ def utility_loss_t(
         liquidity=liquidity,
         extra_losses=extra_losses,
     )
-    ul_t = utility(consumption=c0 - cmin, eta=eta) - utility(consumption=c_t, eta=eta)
+    # Baseline utility is u(c_0); subsistence c_min is a feasibility
+    # constraint handled in opt_lambda, not a baseline shift.
+    ul_t = utility(consumption=c0, eta=eta) - utility(consumption=c_t, eta=eta)
     return ul_t
 
 
@@ -539,6 +544,7 @@ def opt_lambda(
     eps_flat: float = 1e-3,
     liquidity: float = 0.0,
     extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
+    rho: float = 0.0,
 ) -> dict:
     """
     Optimize the recovery rate (lambda) to minimize utility loss.
@@ -569,14 +575,21 @@ def opt_lambda(
     cmin : float, optional
         Minimum consumption rate per year. Default is 0.0.
     eps_rel : float, optional
-        Relative tolerance for the optimization. If greater than 0, the function will return
-        the smallest lambda within the relative tolerance of the minimum loss.
-        Default is 0.0.
+        Relative tolerance for the optimization. If greater than 0, the
+        function returns the *largest* lambda (fastest recovery) whose welfare
+        loss is still within `loss_opt * (1 + eps_rel)` of the true minimum.
+        The unrelaxed minimum remains available on `l_opt_min` /
+        `loss_opt_min`. Default is 0.0.
     liquidity : float, optional
         Total liquid support available (savings + insurance + external support). Default is 0.0.
     extra_losses : Optional[Sequence[Tuple[float, float]]], optional
         Optional list of (N0, lambda_N) pairs representing additional income-loss
         components, each decaying exponentially as N0 * exp(-lambda_N * t). Defaults to None.
+    rho : float, optional
+        Utility discount rate used inside the objective. Defaults to 0.0 to
+        preserve historical behaviour; set to `SimulationConfig.rho` (e.g. 0.06)
+        for an objective consistent with the discounted wellbeing-loss
+        integral reported by `get_losses`.
 
     Returns
     -------
@@ -633,6 +646,22 @@ def opt_lambda(
         return result
 
     def objective(rec_rate: float) -> float:
+        # Feasibility: reject any lambda that would drop c(t) below c_min.
+        # Peak Δc occurs either at t=0 (no-liquidity case) or at the plateau
+        # γ = Δc(t̂) (liquidity case); consumption_loss_t encodes both, so a
+        # max over the time grid is exact.
+        cl_grid = consumption_loss_t(
+            t=times,
+            rec_rate=rec_rate,
+            v=v,
+            k_str=k_str,
+            pi=pi,
+            liquidity=liquidity,
+            extra_losses=extra_losses,
+        )
+        cl_peak = float(np.max(np.asarray(cl_grid)))
+        if c0 - cl_peak < cmin:
+            return np.inf
         ut_t = UtilityLoss(
             times,
             rec_rate,
@@ -645,7 +674,7 @@ def opt_lambda(
             liquidity,
             extra_losses,
         )
-        loss = ut_t.total(rho=0, method=method)
+        loss = ut_t.total(rho=rho, method=method)
         return loss
 
     def fun(rec_rate):
@@ -672,7 +701,9 @@ def opt_lambda(
     if not res.success:
         l_grid = np.linspace(l_min, l_max, 1000)
         losses = np.array([objective(rec_rate) for rec_rate in l_grid])
-        if np.all(np.isnan(losses)):
+        # Infeasible (c(t) < c_min) points return +inf; consumption_t going
+        # non-positive returns NaN. Either way, no finite optimum exists.
+        if not np.any(np.isfinite(losses)):
             msg = (
                 "Utility loss could not be calculated for any of the reconstruction rates in the given bounds, "
                 "since consumption drops below the threshold."
@@ -722,13 +753,17 @@ def opt_lambda(
             "flat_objective": flat_objective,
         }
     )
-    # Check if a tolerance is provided
-    # TODO Check this part again
+    # Relative-tolerance relabel: among all grid lambdas whose welfare loss
+    # sits inside [loss_opt, loss_opt*(1+eps_rel)] (the near-optimal band),
+    # pick the *largest* lambda — i.e. the fastest recovery that still meets
+    # the tolerance. The true minimum is preserved on `l_opt_min` /
+    # `loss_opt_min`; `l_opt` / `loss_opt` are overwritten with the relabelled
+    # value. Flip to `valid_indices[0]` if the use case wants the slowest
+    # near-optimal schedule instead.
     if eps_rel > 0:
         threshold = loss_opt * (1 + eps_rel)
         l_grid = np.linspace(l_min, l_max, 1000)
         losses = np.array([objective(rec_rate) for rec_rate in l_grid])
-        # Find the smallest lambda where the loss is within the threshold
         valid_indices = np.where(losses <= threshold)[0]
         if valid_indices.size == 0:
             # Keep the original optimum, but flag as not meeting eps_rel tolerance
@@ -929,7 +964,8 @@ class Loss:
                 f_end_2d = np.expand_dims(f_end, axis=0)
                 f_sub = np.concatenate((f_start_2d, f_dis_inside, f_end_2d), axis=0)
 
-            integral = np.trapz(f_sub, x=t_sub, axis=0)
+            # Project pins numpy<2 (see root CLAUDE.md); np.trapz is valid here.
+            integral = np.trapz(f_sub, x=t_sub, axis=0)  # noqa: NPY201
         elif method == "quad":
             # Note: quad integrates scalar-valued functions. For vector-valued rec_rate,
             # prefer method="trapezoid". Here, we keep previous behavior and integrate

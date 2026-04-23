@@ -43,14 +43,11 @@ class CapitalStock(BaseModel):
     recovery_rate: Optional[float] = Field(
         None, description="Recovery rate for the capital stock"
     )
-    pi: Optional[float] = Field(
-        None,
+    pi: float = Field(
+        0.15,
         description=(
-            "Optional per-stock productivity of capital. When set, overrides "
-            "IncomeConfig.pi for this stock in the income-loss, consumption-"
-            "loss extras, and remaining-loss aggregation. Useful when housing "
-            "and firm capital have different productivities (e.g. rent-adjusted "
-            "pi for housing vs GDP-based pi for firms)."
+            "Productivity of capital for this stock. Used wherever the stock "
+            "contributes an income-loss stream"
         ),
     )
 
@@ -64,7 +61,6 @@ class Liquidity(BaseModel):
 class IncomeConfig(BaseModel):
     i_0: float = Field(..., description="Initial income rate per year")
     i_avg: float = Field(..., description="Average income rate per year")
-    pi: float = Field(0.15, description="Productivity of capital")
     i_div: Optional[float] = Field(None, description="Diversified income per year")
 
 
@@ -170,10 +166,8 @@ class CommunityUnit:
         return None
 
     def _stock_pi(self, stock: CapitalStock) -> float:
-        """Resolve the productivity for a given stock: per-stock override or income.pi fallback."""
-        if stock is not None and stock.pi is not None:
-            return float(stock.pi)
-        return float(self.config.income.pi)
+        """Productivity of capital for this stock (see CapitalStock.pi)."""
+        return float(stock.pi)
 
     def _extra_losses(self):
         extra = []
@@ -281,6 +275,25 @@ class CommunityUnit:
             return 0.0
         return (liq.savings or 0.0) + (liq.insurance or 0.0) + (liq.support or 0.0)
 
+    def _liquidity_depleted(self) -> float:
+        """
+        Amount of liquidity stock actually drawn down over the recovery period.
+        """
+        S = self._liquidity()
+        if S <= 0:
+            return 0.0
+        rr = self._rec_rate()
+        if rr is None or rr <= 0:
+            return 0.0
+        owner_pi = self._stock_pi(self.config.owner_housing)
+        v = self.config.owner_housing.v
+        k = self.config.owner_housing.k
+        lifetime = ((owner_pi + rr) * v * k) / rr
+        for n0, lam in self._extra_losses() or []:
+            if lam > 0:
+                lifetime += n0 / lam
+        return float(min(S, lifetime))
+
     def _loss_types_for_run(self):
         types = [
             LossType.RECOVERY,
@@ -295,32 +308,38 @@ class CommunityUnit:
 
     def _unit_recovery_time(self) -> Optional[float]:
         """
-        Recovery time defined from a sum-of-exponentials model.
+        Uses the optimized *household* reconstruction rate alone, since only
+        λ_h is a decision variable in the welfare optimization; rental and
+        labour asset rates are exogenous (literature-based) and would conflate
+        the decision axis with external constraints if mixed in.
 
-        We model the remaining income-loss stream as a sum of exponentials
-        L(t) = Σ_i C_i * exp(-λ_i t), where each component corresponds to the
-        productivity-weighted remaining damaged capital:
-        - Owner housing: C = pi * v_owner * k_owner, λ = λ_owner
-        - Optional rental housing: C = pi * v_rental * k_rental, λ = λ_rental
-        - Each labour asset: C = pi * v_labour * k_labour, λ = λ_labour
+        Returns None if the owner reconstruction rate is not set.
+        For the aggregated multi-mode quantity (the pre-fix behaviour),
+        call `composite_recovery_time`.
+        """
+        rr = self._rec_rate()
+        if rr is None or rr <= 0:
+            return None
+        return float(recovery_time(rr, rebuilt_per=self.config.simulation.recovery_per))
 
-        We solve for the time T at which the remaining loss equals the
-        target fraction of the initial loss, i.e.,
-            Σ_i C_i * exp(-λ_i T) = r * Σ_i C_i,
-        where r = 1 - recovery_per/100.
+    def composite_recovery_time(self) -> Optional[float]:
+        """
+        Aggregate recovery time across owner + rental + labour modes.
+
+        it solves
+            Σᵢ Cᵢ · exp(−λᵢ T) = r · Σᵢ Cᵢ
+        for T, where the sum runs over all configured stocks (owner housing,
+        optional rental housing, each labour asset) with Cᵢ = πᵢ · vᵢ · kᵢ and
+        r = 1 − recovery_per/100. It is useful when callers want a single
+        aggregate horizon that reflects how slow non-household-owned assets
+        constrain the effective recovery profile.
 
         Notes
         -----
-        - This definition ignores liquidity-induced piecewise effects and
-          uses the underlying exponential modes only.
-        - The owner term uses pi * v * k (same shape as rental and labour), so
-          the remaining-loss proxy is homogeneous in lambda. The recovery-cost
-          stream lambda * v * k * exp(-lambda t) belongs to consumption loss,
-          not to the remaining-capital proxy; including it here inflates the
-          owner coefficient roughly (pi + lambda)/pi ~ 20x at lambda=pi*(~20),
-          which makes the aggregate T collapse toward owner's fast mode even
-          for small v_owner and breaks monotonicity of T vs damage.
-        - Requires all involved rates λ_i > 0 and coefficients C_i ≥ 0.
+        - This method is kept for
+          backward compatibility and per-stock diagnostics.
+        - This definition ignores liquidity-induced piecewise effects.
+        - Requires all involved rates λᵢ > 0 and coefficients Cᵢ ≥ 0.
         """
         comps = self._exponential_loss_components()
         if comps is None:
@@ -476,7 +495,6 @@ class CommunityUnit:
             }
         return out
 
-
     def achieved_recovery_percent(
         self, t: Optional[float] = None, realized: bool = False
     ) -> Optional[float]:
@@ -501,6 +519,7 @@ class CommunityUnit:
         -------
         Optional[float]
             Achieved recovery percent in [0, 100]. None if undefined.
+
         """
         if t is None:
             t = float(self.config.simulation.t_max)
@@ -633,7 +652,7 @@ class CommunityUnit:
                         raise ValueError(
                             f"labour_assets['{name}'] must define either recovery_rate or recovery_time"
                         )
-                    l = IncomeLoss(
+                    il = IncomeLoss(
                         self.t,
                         rr,
                         stock.v,
@@ -642,10 +661,10 @@ class CommunityUnit:
                     )
                     # Store per-asset component series and totals
                     asset_key = f"{LossType.LABOUR_INCOME.value} ({name})"
-                    self.time_series[asset_key] = l.losses_t
-                    self.total_losses[asset_key] = l.total(rho=0, method=method)
+                    self.time_series[asset_key] = il.losses_t
+                    self.total_losses[asset_key] = il.total(rho=0, method=method)
                     # Accumulate into aggregate
-                    losses_sum = losses_sum + l.losses_t
+                    losses_sum = losses_sum + il.losses_t
                     total_sum = total_sum + self.total_losses[asset_key]
                 self.time_series[loss_type] = losses_sum
                 self.total_losses[loss_type] = total_sum
@@ -687,8 +706,14 @@ class CommunityUnit:
         else:
             raise ValueError(f"Invalid loss type: {loss_type}")
 
+        # Convention: monetary-unit integrals (RECOVERY, INCOME, CONSUMPTION)
+        # report nominal sums (rho=0). UTILITY is a welfare-theoretic integral
+        # and is discounted at config.simulation.rho so the
+        # utility total here matches what get_losses uses for Wellbeing Loss
+        # and what opt_lambda minimizes.
+        loss_rho = self.config.simulation.rho if loss_type == LossType.UTILITY else 0.0
         self.time_series[loss_type] = loss.losses_t
-        self.total_losses[loss_type] = loss.total(rho=0, method=method)
+        self.total_losses[loss_type] = loss.total(rho=loss_rho, method=method)
 
         return self.total_losses[loss_type]
 
@@ -714,10 +739,7 @@ class CommunityUnit:
             - "Asset Loss": The calculated asset loss.
             - "Equity Weighted Asset Loss": Owner asset loss weighted by the
               inverse-marginal-utility factor `(c0/c_avg)^(-eta)`. Note: this
-              weights the raw asset loss (pre-recovery), not the welfare
-              (wellbeing) loss; rename reflects that honestly. For a welfare-
-              scaled equity metric, multiply `equity_weight(c0, c_avg, eta)` by
-              `"Wellbeing Loss"` yourself.
+              weights the raw asset loss (pre-recovery)
             - Additional keys corresponding to each `LossType` (e.g., "Recovery Costs", "Income Loss").
 
         Notes
@@ -727,42 +749,46 @@ class CommunityUnit:
         - The `wellbeing_loss` and `equity_weight` functions are used to compute the respective metrics.
         - The results are stored in the `time_series` DataFrame and `total_losses` Series attributes.
         """
-        # Calculate losses for configured loss types only
+        # Calculate losses for configured loss types only. calc_loss already
+        # writes total_losses[UTILITY] at rho=config.simulation.rho, so reuse
+        # that value rather than recomputing — avoids two "utility" numbers
+        # disagreeing on which rho they used.
         for loss_type in self._loss_types_for_run():
             self.calc_loss(loss_type, method=method)
 
-        # Calculate equivalent consumption loss
-        ut_t = UtilityLoss(
-            t=self.t,
-            rec_rate=self._rec_rate(),
-            v=self.config.owner_housing.v,
-            k_str=self.config.owner_housing.k,
-            pi=self._stock_pi(self.config.owner_housing),
-            c0=self._c0(),
-            eta=self.config.simulation.eta,
-            cmin=self.config.simulation.c_min,
-            liquidity=self._liquidity(),
-            extra_losses=self._extra_losses(),
-        )
-        du_dis = ut_t.total(rho=self.config.simulation.rho, method=method)
-        well_being_loss = wellbeing_loss(
-            du=du_dis, c_avg=self._c_avg(), eta=self.config.simulation.eta
-        )
+        eta = self.config.simulation.eta
+        c_avg = self._c_avg()
+        du_dis = float(self.total_losses[LossType.UTILITY])
+
+        # first-order correction for the permanent
+        # welfare cost of a depleted liquidity buffer, evaluated at pre-shock
+        # marginal utility du/dc|_{c0} = c0^(-eta). Missing this understates
+        # ΔW for every household that draws on S.
+        du_taylor = (self._c0() ** (-eta)) * self._liquidity_depleted()
+        wbl_integral = wellbeing_loss(du=du_dis, c_avg=c_avg, eta=eta)
+        wbl_taylor = wellbeing_loss(du=du_taylor, c_avg=c_avg, eta=eta)
+        well_being_loss = wbl_integral + wbl_taylor
+
         # Calculate equity weighted loss
         ew_loss = (
-            equity_weight(
-                c=self._c0(), c_avg=self._c_avg(), eta=self.config.simulation.eta
-            )
+            equity_weight(c=self._c0(), c_avg=c_avg, eta=eta)
             * self.config.owner_housing.v
             * self.config.owner_housing.k
         )
 
+        asset_loss = self.config.owner_housing.v * self.config.owner_housing.k
+
         # Update total losses with additional metrics
         self.total_losses["Wellbeing Loss"] = well_being_loss
-        self.total_losses["Asset Loss"] = (
-            self.config.owner_housing.v * self.config.owner_housing.k
-        )
+        self.total_losses["Wellbeing Loss (Integral)"] = wbl_integral
+        self.total_losses["Wellbeing Loss (Liquidity Term)"] = wbl_taylor
+        self.total_losses["Asset Loss"] = asset_loss
         self.total_losses["Equity Weighted Asset Loss"] = ew_loss
+        # resilience R = Δk_h / ΔC_eq. Numerator is owner-housing
+        # asset loss (household-borne); rental/labour are not household-owned
+        self.total_losses["Socio-economic Resilience"] = (
+            asset_loss / well_being_loss if well_being_loss > 0 else float("inf")
+        )
 
         # Expose as primary recovery time attribute for the unit
         self.recovery_time = self._unit_recovery_time()
@@ -1072,6 +1098,7 @@ class CommunityUnit:
         method: str = "trapezoid",
         eps_rel: float = 0.0,
         raise_on_fail: bool = True,
+        rho: Optional[float] = None,
     ) -> None:
         """
         Optimize the recovery rate (lambda) to minimize the total well-being loss.
@@ -1090,12 +1117,19 @@ class CommunityUnit:
             Relative tolerance for the optimization. If greater than 0, the function will return
             the smallest lambda within the relative tolerance of the minimum loss.
             Default is 0.01.
+        rho : float, optional
+            Utility discount rate used in the optimizer's objective. When
+            `None` (default), the configured `SimulationConfig.rho` is used so
+            the optimized λ is consistent with the discounted well-being loss
+            reported by `get_losses`. Pass `rho=0.0` to reproduce the
+            pre-fix undiscounted optimum.
 
         Returns
         -------
         Optional[float]
             The optimal reconstruction rate if found; otherwise None when raise_on_fail=False.
         """
+        opt_rho = float(self.config.simulation.rho if rho is None else rho)
         # Check if the maximum recovery time is provided, else use the maximum time
         if rec_time_max is None:
             rec_time_max = self.t[-1]
@@ -1111,7 +1145,9 @@ class CommunityUnit:
         consumption_losses = []
         utility_losses = []
 
-        # Iterate through each lambda value and calculate losses
+        # Iterate through each lambda value and calculate losses. The utility
+        # grid uses the same `opt_rho` as the optimizer so that plot_opt_lambda
+        # visualizes the same objective the solver actually minimized.
         for lmbd in lambdas:
             recovery_costs.append(
                 RecoveryCost(
@@ -1153,7 +1189,7 @@ class CommunityUnit:
                     cmin=self.config.simulation.c_min,
                     liquidity=self._liquidity(),
                     extra_losses=self._extra_losses(),
-                ).total(rho=0, method=method)
+                ).total(rho=opt_rho, method=method)
             )
 
         # Convert lists to numpy arrays for further processing
@@ -1177,6 +1213,7 @@ class CommunityUnit:
             eps_rel=eps_rel,
             liquidity=self._liquidity(),
             extra_losses=self._extra_losses(),
+            rho=opt_rho,
         )
         self.lambda_opt = opt
 
