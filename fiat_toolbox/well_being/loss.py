@@ -1481,49 +1481,58 @@ class CommunityUnit:
         # Iterate through each lambda value and calculate losses. The utility
         # grid uses the same `opt_rho` as the optimizer so that plot_opt_lambda
         # visualizes the same objective the solver actually minimized.
-        for lmbd in lambdas:
-            recovery_costs.append(
-                RecoveryCost(
-                    t=self.t,
-                    rec_rate=lmbd,
-                    v=self.config.owner_housing.v,
-                    k_str=self.config.owner_housing.k,
-                ).total(rho=0, method=method)
+        # Silence the "Consumption contains zero or negative values" warning —
+        # infeasible candidate λs produce it by design (treated as +∞ in the
+        # solver). User-land methods.utility calls stay unaffected.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Consumption contains zero or negative values",
+                category=UserWarning,
             )
-            income_losses.append(
-                IncomeLoss(
-                    t=self.t,
-                    rec_rate=lmbd,
-                    v=self.config.owner_housing.v,
-                    k_str=self.config.owner_housing.k,
-                    pi=self._stock_pi(self.config.owner_housing),
-                ).total(rho=0, method=method)
-            )
-            consumption_losses.append(
-                ConsumptionLoss(
-                    t=self.t,
-                    rec_rate=lmbd,
-                    v=self.config.owner_housing.v,
-                    k_str=self.config.owner_housing.k,
-                    pi=self._stock_pi(self.config.owner_housing),
-                    liquidity=self._liquidity(),
-                    extra_losses=self._extra_losses(),
-                ).total(rho=0, method=method)
-            )
-            utility_losses.append(
-                UtilityLoss(
-                    t=self.t,
-                    rec_rate=lmbd,
-                    v=self.config.owner_housing.v,
-                    k_str=self.config.owner_housing.k,
-                    pi=self._stock_pi(self.config.owner_housing),
-                    c0=self._c0(),
-                    eta=self.config.simulation.eta,
-                    cmin=self.config.simulation.c_min,
-                    liquidity=self._liquidity(),
-                    extra_losses=self._extra_losses(),
-                ).total(rho=opt_rho, method=method)
-            )
+            for lmbd in lambdas:
+                recovery_costs.append(
+                    RecoveryCost(
+                        t=self.t,
+                        rec_rate=lmbd,
+                        v=self.config.owner_housing.v,
+                        k_str=self.config.owner_housing.k,
+                    ).total(rho=0, method=method)
+                )
+                income_losses.append(
+                    IncomeLoss(
+                        t=self.t,
+                        rec_rate=lmbd,
+                        v=self.config.owner_housing.v,
+                        k_str=self.config.owner_housing.k,
+                        pi=self._stock_pi(self.config.owner_housing),
+                    ).total(rho=0, method=method)
+                )
+                consumption_losses.append(
+                    ConsumptionLoss(
+                        t=self.t,
+                        rec_rate=lmbd,
+                        v=self.config.owner_housing.v,
+                        k_str=self.config.owner_housing.k,
+                        pi=self._stock_pi(self.config.owner_housing),
+                        liquidity=self._liquidity(),
+                        extra_losses=self._extra_losses(),
+                    ).total(rho=0, method=method)
+                )
+                utility_losses.append(
+                    UtilityLoss(
+                        t=self.t,
+                        rec_rate=lmbd,
+                        v=self.config.owner_housing.v,
+                        k_str=self.config.owner_housing.k,
+                        pi=self._stock_pi(self.config.owner_housing),
+                        c0=self._c0(),
+                        eta=self.config.simulation.eta,
+                        cmin=self.config.simulation.c_min,
+                        liquidity=self._liquidity(),
+                        extra_losses=self._extra_losses(),
+                    ).total(rho=opt_rho, method=method)
+                )
 
         # Convert lists to numpy arrays for further processing
         recovery_costs = np.array(recovery_costs)
@@ -1547,6 +1556,7 @@ class CommunityUnit:
             liquidity=self._liquidity(),
             extra_losses=self._extra_losses(),
             rho=opt_rho,
+            recovery_per=self.config.simulation.recovery_per,
         )
         self.lambda_opt = opt
 
@@ -1701,6 +1711,44 @@ class CommunityUnit:
         )
         axs[1].set_ylabel("Total Utility Loss")
         axs[1].set_ylim(ylims)
+
+        # Status annotation: make non-interior outcomes visible on the plot.
+        # Imported lazily to avoid adding a top-level dependency on the
+        # OptLambdaStatus enum's location.
+        from .methods import OptLambdaStatus
+
+        status = self.lambda_opt.get("status") if self.lambda_opt else None
+        if status == OptLambdaStatus.FLAT:
+            # Flat welfare: shade the whole range in the bottom (utility) panel
+            # and add a caption.
+            axs[1].axhspan(
+                ylims[0],
+                ylims[1],
+                facecolor="khaki",
+                alpha=0.25,
+                label="Welfare flat — any λ equivalent",
+            )
+        elif status in (
+            OptLambdaStatus.BOUNDARY_LOWER,
+            OptLambdaStatus.BOUNDARY_UPPER,
+        ):
+            # Optimum at search bound: place a red triangle at the true
+            # minimum (val_min, already in the right x-axis units — λ for
+            # rate plots, T for time plots). BOUNDARY_LOWER in λ-space =
+            # slowest recovery = LONGEST time in the time plot, so we
+            # cannot use `x.iloc[0/-1]` as a proxy: that would flip for
+            # the time axis.
+            side = "slowest" if status == OptLambdaStatus.BOUNDARY_LOWER else "fastest"
+            axs[1].scatter(
+                [val_min],
+                [axs[1].get_ylim()[1]],
+                marker="v",
+                color="red",
+                s=80,
+                zorder=5,
+                label=f"Optimum at {side}-recovery search bound",
+            )
+
         # Move legends outside the figure
         axs[0].legend(loc="upper left", bbox_to_anchor=(1, 1))
         axs[1].legend(loc="upper left", bbox_to_anchor=(1, 1))

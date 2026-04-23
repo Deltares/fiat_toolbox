@@ -1,9 +1,28 @@
 import warnings
+from enum import Enum
 from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 from scipy.integrate import IntegrationWarning, quad
 from scipy.optimize import brentq, minimize
+
+
+class OptLambdaStatus(str, Enum):
+    """Classification of `opt_lambda` outcomes (see `opt_lambda` docstring).
+
+    Priority when multiple conditions would apply (e.g. a flat objective at
+    a boundary): INFEASIBLE > FAILED > FLAT > BOUNDARY_* > INTERIOR.
+    """
+
+    INTERIOR = "interior"
+    FLAT = "flat"
+    BOUNDARY_LOWER = "boundary_lower"
+    BOUNDARY_UPPER = "boundary_upper"
+    INFEASIBLE = "infeasible"
+    FAILED = "failed"
+
+    def __str__(self):
+        return self.value
 
 
 def utility(
@@ -545,76 +564,72 @@ def opt_lambda(
     liquidity: float = 0.0,
     extra_losses: Optional[Sequence[Tuple[float, float]]] = None,
     rho: float = 0.0,
+    recovery_per: float = 95.0,
 ) -> dict:
     """
     Optimize the recovery rate (lambda) to minimize utility loss.
 
     Parameters
     ----------
-    v : float
-        The loss ratio, which is reconstruction cost divided by the total building structure value.
-    k_str : float
-        The total building structure value.
-    c0 : float
-        Initial consumption rate per year.
-    pi : float
-        Average productivity of capital. Can be derived using Penn World Tables.
-    eta : float
-        The elasticity of marginal utility of consumption.
-    l_min : float, optional
-        The minimum recovery rate to consider during optimization, by default 0.3.
-    l_max : float, optional
-        The maximum recovery rate to consider during optimization, by default 10.
+    v, k_str, c0, pi, eta : float
+        Loss ratio, structure value, initial consumption, capital productivity,
+        CRRA elasticity. See module docstrings for details.
+    l_min, l_max : float, optional
+        Search bounds in λ-space. Defaults 0.3 / 10.
     t_max : float, optional
-        Maximum recovery time value. Required if `method` is "quad".
+        Simulation horizon. Required when `method == "quad"`.
     times : np.ndarray, optional
-        Array of time points. Required if `method` is "trapezoid".
+        Time grid. Required when `method == "trapezoid"`.
     method : str, optional
-        The method to use for integration. Can be either "quad" (default) or "trapezoid".
-        "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+        Integration method, `"quad"` (default) or `"trapezoid"`.
     cmin : float, optional
-        Minimum consumption rate per year. Default is 0.0.
+        Subsistence consumption floor — feasibility constraint. Default 0.
     eps_rel : float, optional
-        Relative tolerance for the optimization. If greater than 0, the
-        function returns the *largest* lambda (fastest recovery) whose welfare
-        loss is still within `loss_opt * (1 + eps_rel)` of the true minimum.
-        The unrelaxed minimum remains available on `l_opt_min` /
-        `loss_opt_min`. Default is 0.0.
-    liquidity : float, optional
-        Total liquid support available (savings + insurance + external support). Default is 0.0.
-    extra_losses : Optional[Sequence[Tuple[float, float]]], optional
-        Optional list of (N0, lambda_N) pairs representing additional income-loss
-        components, each decaying exponentially as N0 * exp(-lambda_N * t). Defaults to None.
-    rho : float, optional
-        Utility discount rate used inside the objective. Defaults to 0.0 to
-        preserve historical behaviour; set to `SimulationConfig.rho` (e.g. 0.06)
-        for an objective consistent with the discounted wellbeing-loss
-        integral reported by `get_losses`.
+        Relative tolerance for `l_opt` relabelling. When > 0, `l_opt` is set
+        to the *largest* λ whose welfare loss stays within
+        `loss_opt_min · (1 + eps_rel)`. The unrelaxed minimum remains on
+        `l_opt_min` / `loss_opt_min`. Default 0.
+    eps_flat : float, optional
+        Relative tolerance for detecting a flat welfare surface. Default 1e-3.
+    liquidity, extra_losses, rho : optional
+        Forwarded to the consumption / utility-loss functions.
+    recovery_per : float, optional
+        Percentage of asset rebuilt considered "recovered" (0 ≤ p < 100).
+        Used by the `t_max` diagnostic for `BOUNDARY_LOWER` — if at the
+        optimum `1 − exp(−λ·t_max) < recovery_per/100`, the message flags
+        that the simulation horizon may be the binding constraint rather
+        than the welfare shape. Default 95.
 
     Returns
     -------
     dict
-        A result dictionary with fields:
-        - success: bool indicating whether optimization succeeded and met tolerance
-        - message: str with additional context when not successful (or None)
-        - l_opt_min: float|None optimal lambda at minimum loss (no tolerance)
-        - loss_opt_min: float|None corresponding minimum loss
-        - eps_rel: float the requested relative tolerance
-        - l_opt: float|None lambda meeting tolerance criterion (or l_opt_min when tolerance satisfied)
-        - loss_opt: float|None corresponding loss
-        - C_diff: float change in equivalent consumption due to tolerance relaxation
-        - T_diff: float change in recovery time due to tolerance relaxation
-        - flat_objective: bool True when the utility-loss landscape is numerically
-          flat (range below eps_flat of its scale). In that case the optimizer
-          replaces Nelder-Mead's noisy answer with the coarse-grid argmin to make
-          the result deterministic and flags it for the caller.
+        - `status`: `OptLambdaStatus` — classification of the outcome:
+          `INTERIOR` / `FLAT` / `BOUNDARY_LOWER` / `BOUNDARY_UPPER` /
+          `INFEASIBLE` / `FAILED`. Priority when several apply:
+          INFEASIBLE > FAILED > FLAT > BOUNDARY_* > INTERIOR.
+        - `success`: bool — True for INTERIOR / FLAT / BOUNDARY_*;
+          False for INFEASIBLE / FAILED.
+        - `message`: str | None — case-specific explanation with an
+          actionable hint. None only for INTERIOR (nothing to report).
+        - `l_opt_min`, `loss_opt_min`: the true minimum (eps_rel-agnostic).
+        - `l_opt`, `loss_opt`: `l_opt_min` by default; overwritten with the
+          largest-λ-within-eps_rel when `eps_rel > 0`.
+        - `eps_rel`: the requested tolerance (echoed).
+        - `C_diff`, `T_diff`: equivalent-consumption and recovery-time gap
+          between the true minimum and the eps_rel-relaxed point.
 
     Notes
     -----
-    - This function does not raise on failure; it returns success=False and a message.
+    - This function does not raise on failure; it returns `success=False`
+      and a descriptive message.
+    - The `objective` is evaluated inside a `warnings.catch_warnings()`
+      block that suppresses the `"Consumption contains zero or negative
+      values"` `UserWarning`, since that firing is the normal way
+      infeasible candidates are rejected.
     """
     # Initialize a single result dict and update it throughout
     result: dict = {
+        "status": OptLambdaStatus.FAILED,
         "success": False,
         "message": None,
         "l_opt_min": None,
@@ -624,7 +639,6 @@ def opt_lambda(
         "loss_opt": None,
         "C_diff": None,
         "T_diff": None,
-        "flat_objective": False,
     }
 
     # Validate inputs without raising
@@ -645,42 +659,68 @@ def opt_lambda(
         )
         return result
 
+    # Horizon for the t_max diagnostic — handles both method branches.
+    horizon = float(t_max) if t_max is not None else float(np.asarray(times)[-1])
+
     def objective(rec_rate: float) -> float:
-        # Feasibility: reject any lambda that would drop c(t) below c_min.
-        # Peak Δc occurs either at t=0 (no-liquidity case) or at the plateau
-        # γ = Δc(t̂) (liquidity case); consumption_loss_t encodes both, so a
-        # max over the time grid is exact.
-        cl_grid = consumption_loss_t(
-            t=times,
-            rec_rate=rec_rate,
-            v=v,
-            k_str=k_str,
-            pi=pi,
-            liquidity=liquidity,
-            extra_losses=extra_losses,
-        )
-        cl_peak = float(np.max(np.asarray(cl_grid)))
-        if c0 - cl_peak < cmin:
-            return np.inf
-        ut_t = UtilityLoss(
-            times,
-            rec_rate,
-            v,
-            k_str,
-            pi,
-            c0,
-            eta,
-            cmin,
-            liquidity,
-            extra_losses,
-        )
-        loss = ut_t.total(rho=rho, method=method)
-        return loss
+        # Infeasible candidates are the normal way to reject bad λs during
+        # search; utility() emits "Consumption contains zero or negative
+        # values" UserWarning when that happens. Silence it within the
+        # objective — callers that use methods.utility directly still see it.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Consumption contains zero or negative values",
+                category=UserWarning,
+            )
+            # Feasibility: reject any lambda that would drop c(t) below c_min.
+            # Peak Δc occurs either at t=0 (no-liquidity case) or at the plateau
+            # γ = Δc(t̂) (liquidity case); consumption_loss_t encodes both, so a
+            # max over the time grid is exact.
+            cl_grid = consumption_loss_t(
+                t=times,
+                rec_rate=rec_rate,
+                v=v,
+                k_str=k_str,
+                pi=pi,
+                liquidity=liquidity,
+                extra_losses=extra_losses,
+            )
+            cl_peak = float(np.max(np.asarray(cl_grid)))
+            if c0 - cl_peak < cmin:
+                return np.inf
+            ut_t = UtilityLoss(
+                times,
+                rec_rate,
+                v,
+                k_str,
+                pi,
+                c0,
+                eta,
+                cmin,
+                liquidity,
+                extra_losses,
+            )
+            loss = ut_t.total(rho=rho, method=method)
+            return loss
 
     def fun(rec_rate):
         return objective(rec_rate)
 
-    res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
+    # Silence Nelder-Mead's "invalid value encountered in subtract"
+    # RuntimeWarning: it fires inside scipy's termination check when the
+    # simplex contains +inf entries from infeasible candidate λs. The
+    # objective already handles those correctly (treated as +∞ and
+    # rejected); the warning is exploration chatter, not a real problem.
+    # This filter sits outside the objective because scipy's check runs
+    # outside it.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="invalid value encountered in subtract",
+            category=RuntimeWarning,
+        )
+        res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
 
     # Probe the full range to detect flat / plateau objectives. Nelder-Mead
     # on a flat landscape "converges" at an arbitrary point (dependent on the
@@ -690,34 +730,47 @@ def opt_lambda(
     l_probe = np.linspace(l_min, l_max, 21)
     probe_losses = np.array([objective(lm) for lm in l_probe])
     finite_mask = np.isfinite(probe_losses)
-    if finite_mask.any():
+    # FLAT detection needs at least two comparable points — a single feasible
+    # point trivially has range 0 but that is infeasibility in disguise, not
+    # flatness. The INFEASIBLE / BOUNDARY branches pick those cases up.
+    if finite_mask.sum() >= 2:
         finite = probe_losses[finite_mask]
         loss_range = float(finite.max() - finite.min())
         loss_scale = float(max(abs(finite.max()), abs(finite.min()), 1e-300))
-        flat_objective = loss_range <= eps_flat * loss_scale
+        is_flat = loss_range <= eps_flat * loss_scale
     else:
-        flat_objective = True  # nothing finite -> degenerate
+        is_flat = False
+        loss_range = 0.0  # placeholder for messages below when never consulted
 
-    if not res.success:
-        l_grid = np.linspace(l_min, l_max, 1000)
-        losses = np.array([objective(rec_rate) for rec_rate in l_grid])
-        # Infeasible (c(t) < c_min) points return +inf; consumption_t going
-        # non-positive returns NaN. Either way, no finite optimum exists.
-        if not np.any(np.isfinite(losses)):
-            msg = (
-                "Utility loss could not be calculated for any of the reconstruction rates in the given bounds, "
-                "since consumption drops below the threshold."
-            )
-        else:
-            msg = f"Minimize function: '{res.message}'"
+    # --- Classification (priority: INFEASIBLE > FAILED > FLAT > BOUNDARY > INTERIOR) ---
 
+    # INFEASIBLE: no feasible λ anywhere in the probe.
+    if not finite_mask.any():
         result.update(
             {
+                "status": OptLambdaStatus.INFEASIBLE,
+                "success": False,
                 "message": (
-                    f"An optimal reconstruction rate could not be found in the given bounds [{l_min}, {l_max}]. "
-                    + msg
+                    f"No feasible reconstruction rate in [{l_min:.3g}, {l_max:.3g}]: "
+                    f"every λ pushes c(t) below c_min={cmin:g}. "
+                    "Hint: reduce damage v, lower c_min, add liquidity, or "
+                    "narrow the search to slower rates."
                 ),
-                "flat_objective": flat_objective,
+            }
+        )
+        return result
+
+    # FAILED: NM did not converge and probe has finite points (so it isn't
+    # global infeasibility — something else went wrong).
+    if not res.success:
+        result.update(
+            {
+                "status": OptLambdaStatus.FAILED,
+                "success": False,
+                "message": (
+                    f"Solver did not converge on [{l_min:.3g}, {l_max:.3g}]: "
+                    f"{res.message}. Hint: widen bounds or adjust tolerances."
+                ),
             }
         )
         return result
@@ -725,32 +778,75 @@ def opt_lambda(
     l_opt = res.x[0]
     loss_opt = res.fun
 
-    if flat_objective:
+    # FLAT: welfare function is numerically constant across the range.
+    if is_flat:
         # Deterministic fallback: pick the grid argmin. np.argmin picks the
-        # first occurrence, so ties break toward the smallest lambda (slowest
+        # first occurrence, so ties break toward the smallest λ (slowest
         # recovery) — the most conservative choice when welfare is indifferent.
         probe_for_argmin = np.where(finite_mask, probe_losses, np.inf)
         idx = int(np.argmin(probe_for_argmin))
         l_opt = float(l_probe[idx])
         loss_opt = float(probe_losses[idx])
-        flat_msg = (
-            f"Flat objective: utility-loss range is {loss_range:.3e} across "
-            f"lambda in [{l_min:.3g}, {l_max:.3g}] (within eps_flat={eps_flat:g} "
-            "of the loss scale). Returned l_opt is the coarse-grid argmin."
+        message = (
+            f"Welfare function is flat across λ ∈ [{l_min:.3g}, {l_max:.3g}] "
+            f"(loss range {loss_range:.3e}, within eps_flat={eps_flat:g} of "
+            "loss scale). Every λ gives essentially the same welfare loss; "
+            f"returned λ={l_opt:.3g} is the coarse-grid argmin (ties toward "
+            "slowest recovery). The household is effectively indifferent to "
+            "reconstruction speed in this regime (e.g. zero damage, or "
+            "liquidity covers all losses)."
         )
+        status = OptLambdaStatus.FLAT
     else:
-        flat_msg = None
+        # BOUNDARY vs INTERIOR on the true (unrelaxed) minimum.
+        bound_tol = max(1e-9, 1e-6 * (l_max - l_min))
+        at_lower = abs(l_opt - l_min) <= bound_tol
+        at_upper = abs(l_opt - l_max) <= bound_tol
+
+        if at_lower:
+            status = OptLambdaStatus.BOUNDARY_LOWER
+            # t_max diagnostic: at the slow-recovery end, check whether the
+            # simulation horizon is the binding constraint rather than the
+            # welfare shape.
+            fraction = 1.0 - float(np.exp(-l_opt * horizon))
+            t_max_hint = ""
+            if fraction < recovery_per / 100.0:
+                t_max_hint = (
+                    f" Recovery is only {fraction:.0%} complete by "
+                    f"t_max={horizon:g}y, below recovery_per={recovery_per}%. "
+                    "The slow-λ preference may be an artefact of the "
+                    "simulation horizon — consider increasing t_max."
+                )
+            message = (
+                f"Minimum at lower λ bound ({l_opt:.3g} ≈ l_min), "
+                "i.e. the slowest recovery / longest reconstruction time "
+                "in the search range. Welfare may keep improving beyond "
+                "this bound. Hint: widen the search (increase rec_time_max "
+                "on CommunityUnit.opt_lambda)." + t_max_hint
+            )
+        elif at_upper:
+            status = OptLambdaStatus.BOUNDARY_UPPER
+            message = (
+                f"Minimum at upper λ bound ({l_opt:.3g} ≈ l_max), "
+                "i.e. the fastest recovery / shortest reconstruction time "
+                "in the search range. Welfare may keep improving beyond "
+                "this bound. Hint: widen the search (decrease rec_time_min "
+                "on CommunityUnit.opt_lambda)."
+            )
+        else:
+            status = OptLambdaStatus.INTERIOR
+            message = None
 
     # Populate result with successful optimum values
     result.update(
         {
+            "status": status,
             "success": True,
-            "message": flat_msg,
+            "message": message,
             "l_opt_min": l_opt,
             "loss_opt_min": loss_opt,
             "l_opt": l_opt,
             "loss_opt": loss_opt,
-            "flat_objective": flat_objective,
         }
     )
     # Relative-tolerance relabel: among all grid lambdas whose welfare loss
@@ -759,7 +855,8 @@ def opt_lambda(
     # the tolerance. The true minimum is preserved on `l_opt_min` /
     # `loss_opt_min`; `l_opt` / `loss_opt` are overwritten with the relabelled
     # value. Flip to `valid_indices[0]` if the use case wants the slowest
-    # near-optimal schedule instead.
+    # near-optimal schedule instead. The status continues to reflect the
+    # unrelaxed minimum (l_opt_min), not the relabelled l_opt.
     if eps_rel > 0:
         threshold = loss_opt * (1 + eps_rel)
         l_grid = np.linspace(l_min, l_max, 1000)
@@ -769,8 +866,12 @@ def opt_lambda(
             # Keep the original optimum, but flag as not meeting eps_rel tolerance
             result.update(
                 {
+                    "status": OptLambdaStatus.FAILED,
                     "success": False,
-                    "message": f"No lambda found within the relative tolerance of {eps_rel} from the minimum loss.",
+                    "message": (
+                        f"No lambda found within the relative tolerance of "
+                        f"{eps_rel} from the minimum loss."
+                    ),
                 }
             )
             return result

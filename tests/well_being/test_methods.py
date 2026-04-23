@@ -275,7 +275,7 @@ def test_opt_lambda_rejects_infeasible_lambda_at_cmin():
 
 def test_opt_lambda_infeasible_everywhere_fails_gracefully():
     # When every λ in the search range is infeasible, the result dict must
-    # report success=False and flag the cmin cause in the message.
+    # report status=INFEASIBLE, success=False, and name c_min in the message.
     times = np.linspace(0, 5, 50)
     res = methods.opt_lambda(
         v=0.9,  # huge loss
@@ -290,8 +290,8 @@ def test_opt_lambda_infeasible_everywhere_fails_gracefully():
         cmin=15000.0,
     )
     assert not res["success"]
-    # The message uses the "drops below the threshold" phrasing.
-    assert "threshold" in (res["message"] or "").lower()
+    assert res["status"] == methods.OptLambdaStatus.INFEASIBLE
+    assert "c_min" in (res["message"] or "")
 
 
 def test_opt_lambda_rho_threads_into_objective():
@@ -377,4 +377,185 @@ def test_quad_integration_does_not_leak_warning_filter():
         _w.warn("leak-check", IntegrationWarning)
     assert any("leak-check" in str(w.message) for w in caught), (
         "warnings.filterwarnings(IntegrationWarning) leaked out of Loss.total"
+    )
+
+
+# ---------------------------------------------------------------------------
+# OptLambdaStatus: six-way outcome classification (+ warning leak)
+# ---------------------------------------------------------------------------
+
+
+def test_opt_lambda_status_interior():
+    # A normal case with a plausible interior optimum — the classification
+    # must be INTERIOR, success=True, and message=None.
+    times = np.linspace(0, 10, 200)
+    res = methods.opt_lambda(
+        v=0.3,
+        k_str=80000.0,
+        c0=50000.0,
+        pi=0.15,
+        eta=1.5,
+        l_min=0.3,
+        l_max=10.0,
+        times=times,
+        method="trapezoid",
+        cmin=0.0,
+        liquidity=0.0,
+        rho=0.06,
+    )
+    assert res["success"] is True
+    assert res["status"] == methods.OptLambdaStatus.INTERIOR
+    # Interior means l_opt_min is strictly inside (l_min, l_max).
+    bound_tol = 1e-6 * (10.0 - 0.3)
+    assert res["l_opt_min"] > 0.3 + bound_tol
+    assert res["l_opt_min"] < 10.0 - bound_tol
+    assert res["message"] is None
+
+
+def test_opt_lambda_status_flat():
+    # Zero damage → welfare identically 0 across every λ. Must flag FLAT and
+    # pick the coarse-grid argmin (ties toward smallest λ).
+    times = np.linspace(0, 10, 100)
+    res = methods.opt_lambda(
+        v=0.0,
+        k_str=100000.0,
+        c0=20000.0,
+        pi=0.1,
+        eta=1.5,
+        l_min=0.3,
+        l_max=10.0,
+        times=times,
+        method="trapezoid",
+    )
+    assert res["success"] is True
+    assert res["status"] == methods.OptLambdaStatus.FLAT
+    # Returned l_opt is the smallest grid point on the 21-point probe.
+    assert res["l_opt_min"] <= 0.3 + 1e-9
+    assert "flat" in (res["message"] or "").lower()
+
+
+def test_opt_lambda_status_boundary_lower():
+    # Notebook-4-like tight-feasibility config: heavy damage pushes the
+    # feasible λ range to the slow end; the optimum lands near l_min.
+    # The t_max diagnostic should fire because recovery is incomplete in 10y.
+    times = np.linspace(0, 10, 520)
+    res = methods.opt_lambda(
+        v=0.7,
+        k_str=120000.0,
+        c0=65000.0,
+        pi=0.15,
+        eta=1.5,
+        l_min=0.3,
+        l_max=10.0,
+        times=times,
+        method="trapezoid",
+        cmin=5000.0,
+        liquidity=0.0,
+        rho=0.06,
+        recovery_per=95.0,
+    )
+    assert res["success"] is True
+    assert res["status"] == methods.OptLambdaStatus.BOUNDARY_LOWER
+    assert abs(res["l_opt_min"] - 0.3) < 1e-4
+    msg = res["message"] or ""
+    assert "lower λ bound" in msg
+    # t_max hint should fire: 1 - exp(-0.3 * 10) ≈ 0.95, may or may not trip.
+    # If the fraction is strictly below recovery_per, the hint appears.
+
+
+def test_opt_lambda_status_boundary_upper():
+    # Narrow the search range so that the natural interior optimum is above
+    # l_max — NM lands at l_max → BOUNDARY_UPPER.
+    times = np.linspace(0, 10, 200)
+    res = methods.opt_lambda(
+        v=0.1,
+        k_str=100000.0,
+        c0=40000.0,
+        pi=0.15,
+        eta=1.5,
+        l_min=0.3,
+        l_max=0.4,  # tight upper bound
+        times=times,
+        method="trapezoid",
+        cmin=0.0,
+        liquidity=0.0,
+        rho=0.06,
+    )
+    assert res["success"] is True
+    # Either BOUNDARY_UPPER (NM lands at l_max) or FLAT (welfare ≈ constant
+    # over this narrow range). Both are acceptable; this test asserts it's
+    # not INTERIOR and not a lower-bound hit.
+    assert res["status"] in (
+        methods.OptLambdaStatus.BOUNDARY_UPPER,
+        methods.OptLambdaStatus.FLAT,
+    )
+    if res["status"] == methods.OptLambdaStatus.BOUNDARY_UPPER:
+        assert abs(res["l_opt_min"] - 0.4) < 1e-4
+        assert "upper λ bound" in (res["message"] or "")
+
+
+def test_opt_lambda_status_infeasible():
+    # Same setup as test_opt_lambda_infeasible_everywhere_fails_gracefully
+    # but focused on the new status field explicitly.
+    times = np.linspace(0, 5, 50)
+    res = methods.opt_lambda(
+        v=0.9,
+        k_str=100000.0,
+        c0=20000.0,
+        pi=0.1,
+        eta=1.5,
+        l_min=1.0,
+        l_max=5.0,
+        times=times,
+        method="trapezoid",
+        cmin=15000.0,
+    )
+    assert res["success"] is False
+    assert res["status"] == methods.OptLambdaStatus.INFEASIBLE
+
+
+def test_opt_lambda_no_leaked_consumption_warning():
+    # Infeasible λ candidates inside the solver emit
+    # "Consumption contains zero or negative values" from utility().
+    # The objective now suppresses that filter scope; the solver still
+    # rejects the candidate via +∞, but no UserWarning should reach the
+    # caller.
+    import warnings as _w
+
+    times = np.linspace(0, 10, 100)
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        methods.opt_lambda(
+            v=0.7,
+            k_str=120000.0,
+            c0=65000.0,
+            pi=0.15,
+            eta=1.5,
+            l_min=0.3,
+            l_max=10.0,
+            times=times,
+            method="trapezoid",
+            cmin=5000.0,
+            liquidity=0.0,
+            rho=0.06,
+        )
+    leaked = [
+        w
+        for w in caught
+        if "Consumption contains zero or negative values" in str(w.message)
+    ]
+    assert leaked == [], (
+        f"UserWarning leaked out of opt_lambda: {[str(w.message) for w in leaked]}"
+    )
+    # Also check the scipy RuntimeWarning doesn't leak. Nelder-Mead's
+    # termination check computes fsim[0] - fsim[1:] on the simplex; when a
+    # simplex vertex holds +inf from an infeasible candidate, numpy emits
+    # "invalid value encountered in subtract". This is exploration chatter,
+    # not a user-facing issue.
+    scipy_leaks = [
+        w for w in caught if "invalid value encountered in subtract" in str(w.message)
+    ]
+    assert scipy_leaks == [], (
+        f"scipy RuntimeWarning leaked out of opt_lambda: "
+        f"{[str(w.message) for w in scipy_leaks]}"
     )

@@ -232,8 +232,10 @@ def test_plot_opt_lambda():
 
 def test_opt_lambda_flags_flat_objective_on_zero_damage():
     # With v=0, utility loss is identically 0 across all lambdas; the
-    # optimizer must detect this and report flat_objective=True rather than
-    # returning arbitrary Nelder-Mead noise.
+    # optimizer must classify status=FLAT rather than returning arbitrary
+    # Nelder-Mead noise.
+    from fiat_toolbox.well_being.methods import OptLambdaStatus
+
     config = WellBeingConfig(
         owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
         income=IncomeConfig(i_0=20000.0, i_avg=20000.0),
@@ -242,8 +244,8 @@ def test_opt_lambda_flags_flat_objective_on_zero_damage():
     hh = CommunityUnit(config)
     opt = hh.opt_lambda(no_steps=10)
     assert opt["success"] is True
-    assert opt["flat_objective"] is True, (
-        "zero-damage case should be flagged as flat_objective=True"
+    assert opt["status"] == OptLambdaStatus.FLAT, (
+        "zero-damage case should be classified as FLAT"
     )
 
 
