@@ -33,6 +33,24 @@ class FiatColumns(BaseModel):
     risk_ead: str
     segment_length: str  # TODO should this be here since it is not a FIAT attribute?
 
+    def get_fields(self, is_risk: bool) -> list[str]:
+        """Returns the set of field names related to risk (damage and EAD)."""
+        if is_risk:
+            return [
+                self.damage_rp,
+                self.total_damage_rp,
+                self.inundation_depth_rp,
+                self.reduction_factor_rp,
+                self.risk_ead,
+            ]
+        else:
+            return [
+                self.damage,
+                self.total_damage,
+                self.inundation_depth,
+                self.reduction_factor,
+            ]
+
 
 def get_fiat_columns(fiat_version: str = "0.2") -> FiatColumns:
     """
