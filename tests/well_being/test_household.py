@@ -694,13 +694,78 @@ def test_income_stream_mixed_with_capital_stock():
     assert abs(pc["labour/Public"]["coefficient"] - is_income * is_v) < 1e-9
 
 
+def test_income_stream_zero_income_is_noop():
+    # IncomeStream with income=0 is accepted and drops out of the calculation:
+    # - construction does not raise;
+    # - aggregate LABOUR_INCOME_LOSS equals the contribution of the nonzero
+    #   asset only;
+    # - recovery_time_per_component omits the zero-income component (the
+    #   `_exponential_loss_components_labelled` filter keeps only coefficients > 0);
+    # - total losses match those of an otherwise-identical config where the
+    #   zero stream is simply absent.
+    nz_income, nz_v, nz_rt = 9000.0, 0.3, 3.0
+    owner = {"k": 100000.0, "v": 0.1, "recovery_rate": 0.5, "pi": 0.1}
+    sim = {"t_max": 10, "dt": 0.1, "recovery_per": 95.0}
+
+    cfg_with_zero = WellBeingConfig(
+        owner_housing=CapitalStock(**owner),
+        labour_assets={
+            "Formal": IncomeStream(income=nz_income, v=nz_v, recovery_time=nz_rt),
+            "Informal": IncomeStream(income=0.0, v=0.5, recovery_time=2.0),
+        },
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(**sim),
+    )
+    hh_with_zero = CommunityUnit(cfg_with_zero)
+    hh_with_zero.get_losses("trapezoid")
+
+    cfg_without = WellBeingConfig(
+        owner_housing=CapitalStock(**owner),
+        labour_assets={
+            "Formal": IncomeStream(income=nz_income, v=nz_v, recovery_time=nz_rt),
+        },
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(**sim),
+    )
+    hh_without = CommunityUnit(cfg_without)
+    hh_without.get_losses("trapezoid")
+
+    # LABOUR_INCOME_LOSS aggregates across labour_assets — the zero entry
+    # contributes nothing, so totals must match the single-asset config.
+    assert (
+        abs(
+            hh_with_zero.total_losses[str(LossType.LABOUR_INCOME_LOSS)]
+            - hh_without.total_losses[str(LossType.LABOUR_INCOME_LOSS)]
+        )
+        < 1e-9
+    )
+
+    # Per-component recovery dict must not carry a key for the zero stream
+    # (filtered out at the coefficient > 0 guard).
+    pc = hh_with_zero.recovery_time_per_component
+    assert pc is not None
+    assert "labour/Formal" in pc
+    assert "labour/Informal" not in pc
+
+    # Full wellbeing-loss functional equivalence.
+    assert (
+        abs(
+            hh_with_zero.total_losses["Wellbeing Loss"]
+            - hh_without.total_losses["Wellbeing Loss"]
+        )
+        < 1e-9
+    )
+
+
 def test_income_stream_negative_income_rejected():
-    # IncomeStream.income must be > 0 — pydantic-level constraint fires at
-    # IncomeStream(...), before WellBeingConfig or CommunityUnit even see it.
+    # IncomeStream.income must be ≥ 0 — negative values still rejected at the
+    # pydantic layer (fires at IncomeStream(...), before WellBeingConfig or
+    # CommunityUnit see it). Zero is allowed; see
+    # `test_income_stream_zero_income_is_noop` for the positive path.
     import pytest
     from pydantic import ValidationError
 
-    with pytest.raises(ValidationError, match="greater than 0"):
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
         IncomeStream(income=-1.0, v=0.1, recovery_time=1.0)
 
 
@@ -869,9 +934,10 @@ def test_numeric_field_bounds_raise_on_invalid():
     with pytest.raises(ValidationError, match="greater than 0"):
         CapitalStock(k=100.0, v=0.1, recovery_rate=0.5, pi=0)
 
-    # IncomeStream: income must be > 0.
-    with pytest.raises(ValidationError, match="greater than 0"):
-        IncomeStream(income=0, v=0.1, recovery_time=1.0)
+    # IncomeStream: income must be ≥ 0. Negative rejected; zero is allowed
+    # as a no-op stream (covered by test_income_stream_zero_income_is_noop).
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        IncomeStream(income=-1.0, v=0.1, recovery_time=1.0)
 
     # SimulationConfig: recovery_per >= 100 rejected.
     with pytest.raises(ValidationError, match="less than 100"):

@@ -89,16 +89,23 @@ class IncomeStream(BaseModel):
     recovery cost on this stream — only income loss `income · v · exp(-λt)`
     is generated, so `IncomeStream` is never valid for `owner_housing`
     (which drives RecoveryCost and needs `k` directly).
+
+    `income=0` is accepted and contributes zero to all losses — the stream
+    is effectively omitted from the calculation (useful for placeholder
+    slots or programmatically generated configs where a quintile share
+    collapses to zero).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     income: float = Field(
         ...,
-        gt=0,
+        ge=0,
         description=(
             "Baseline income flow (per year) from this stream, pre-computed. "
-            "Equivalent to π·k under a CapitalStock specification. Must be > 0."
+            "Equivalent to π·k under a CapitalStock specification. Must be ≥ 0; "
+            "income=0 is accepted and contributes zero to all losses (the stream "
+            "is effectively omitted from the calculation)."
         ),
     )
     v: float = Field(
