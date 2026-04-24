@@ -181,11 +181,11 @@ def test_plot_loss_all_types():
     hh = CommunityUnit(config)
     for lt in hh._loss_types_for_run():
         hh.calc_loss(lt)
-        # Test with no ax provided
+        # No ax provided: a new Figure is created internally and returned.
         fig = hh.plot_loss(lt)
-        assert fig is None or hasattr(fig, "savefig")
-        # Test with ax provided
-        fig2, ax2 = plt.subplots()
+        assert fig is not None and hasattr(fig, "savefig")
+        # ax provided: plot draws into the caller's axes and returns None.
+        _, ax2 = plt.subplots()
         result = hh.plot_loss(lt, ax=ax2)
         assert result is None
 
@@ -199,18 +199,16 @@ def test_plot_consumption():
     config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
     hh = CommunityUnit(config)
     hh.get_losses()
-    # Test with no ax, plot_cmin False
+    # No ax: each call creates and returns a Figure.
     fig = hh.plot_consumption()
-    assert fig is None or hasattr(fig, "savefig")
-    # Test with no ax, plot_cmin True
+    assert fig is not None and hasattr(fig, "savefig")
     fig2 = hh.plot_consumption(plot_cmin=True)
-    assert fig2 is None or hasattr(fig2, "savefig")
-    # Test with ax provided
-    fig3, ax3 = plt.subplots()
+    assert fig2 is not None and hasattr(fig2, "savefig")
+    # ax provided: returns None in both plot_cmin modes.
+    _, ax3 = plt.subplots()
     result = hh.plot_consumption(ax=ax3)
     assert result is None
-    # Test with ax and plot_cmin True
-    fig4, ax4 = plt.subplots()
+    _, ax4 = plt.subplots()
     result2 = hh.plot_consumption(ax=ax4, plot_cmin=True)
     assert result2 is None
 
@@ -219,15 +217,40 @@ def test_plot_opt_lambda():
     import matplotlib
 
     matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
     hh = CommunityUnit(config)
     hh.opt_lambda(no_steps=10)
-    # Test with default x_type ("rate")
+    # Default path: no axs, returns a Figure.
     fig = hh.plot_opt_lambda()
-    assert fig is None or hasattr(fig, "savefig")
-    # Test with x_type="time"
+    assert fig is not None and hasattr(fig, "savefig")
     fig2 = hh.plot_opt_lambda(x_type="time")
-    assert fig2 is None or hasattr(fig2, "savefig")
+    assert fig2 is not None and hasattr(fig2, "savefig")
+    # User-supplied axs: plot into them, return None (mirrors plot_consumption).
+    parent_fig, (ax_top, ax_bot) = plt.subplots(2, 1)
+    result = hh.plot_opt_lambda(axs=(ax_top, ax_bot))
+    assert result is None
+    # Each panel's legend must carry the expected, human-readable labels —
+    # not empty strings, not LossType enum reprs. This pins the regression
+    # where sns.lineplot's label-kwarg propagation broke under some
+    # seaborn versions when x/y were pandas Series with LossType names.
+    top_texts = {t.get_text() for t in ax_top.get_legend().get_texts()}
+    assert {
+        "Recovery Costs",
+        "Loss of Housing Services",
+        "Consumption Loss",
+    } <= top_texts, f"top panel legend missing expected labels; got {top_texts}"
+    bot_texts = {t.get_text() for t in ax_bot.get_legend().get_texts()}
+    assert "Utility Loss" in bot_texts, (
+        f"bottom panel legend missing 'Utility Loss'; got {bot_texts}"
+    )
+    # Supplying the wrong number of axes must raise a clear ValueError.
+    import pytest
+
+    _, single_ax = plt.subplots()
+    with pytest.raises(ValueError, match=r"requires exactly 2 axes"):
+        hh.plot_opt_lambda(axs=(single_ax,))
 
 
 def test_currency_decimals_defaults_to_zero():

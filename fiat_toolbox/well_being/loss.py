@@ -1,6 +1,6 @@
 import warnings
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -1233,6 +1233,8 @@ class CommunityUnit:
             raise ValueError(f"{loss_type} losses have not been calculated.")
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 6))
+        else:
+            fig = None
 
         sns.lineplot(x="time", y=loss_type, data=self.time_series, ax=ax)
         # Shade area under curve with consistent x-axis as in plot_consumption
@@ -1274,8 +1276,7 @@ class CommunityUnit:
         # Add legend consistently
         ax.legend()
 
-        if ax is None:
-            return fig
+        return fig
 
     def plot_consumption(
         self, ax: Optional[plt.Axes] = None, plot_cmin=True
@@ -1305,6 +1306,8 @@ class CommunityUnit:
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 6))
+        else:
+            fig = None
 
         # Prepare component series
         time = self.time_series["time"]
@@ -1499,8 +1502,7 @@ class CommunityUnit:
         # Add legend
         ax.legend()
 
-        if ax is None:
-            return fig
+        return fig
 
     def opt_lambda(
         self,
@@ -1673,7 +1675,11 @@ class CommunityUnit:
 
         return opt
 
-    def plot_opt_lambda(self, x_type: Literal["rate", "time"] = "rate") -> plt.Figure:
+    def plot_opt_lambda(
+        self,
+        x_type: Literal["rate", "time"] = "rate",
+        axs: Optional[Sequence[plt.Axes]] = None,
+    ) -> Optional[plt.Figure]:
         """
         Plot the optimization results for the reconstruction rate (lambda) or recovery time.
 
@@ -1681,24 +1687,37 @@ class CommunityUnit:
         ----------
         x_type : Literal["rate", "time"], optional
             The type of x-axis to use for the plot. Can be "rate" for reconstruction rate or "time" for recovery time. Default is "rate".
+        axs : Sequence[matplotlib.axes.Axes], optional
+            Pair of axes `(top, bottom)` to draw into: top panel holds currency-valued losses (recovery / owner housing / consumption), bottom holds utility loss. If None, a new 2×1 figure is created internally. Mirrors the `ax` parameter of `plot_consumption` / `plot_loss`.
 
         Returns
         -------
-        plt.Figure
-            The matplotlib figure object containing the plots.
+        Optional[matplotlib.figure.Figure]
+            The figure when `axs` is None (caller can save / display it); `None` when `axs` is supplied (caller manages the layout).
 
         Raises
         ------
         ValueError
-            If the optimal lambda has not been calculated.
+            If the optimal lambda has not been calculated, or if `axs` is supplied with length ≠ 2.
         """
         if not hasattr(self, "l_opt"):
             raise ValueError(
                 "Optimal lambda has not been calculated. Run the 'opt_lambda' method first."
             )
 
-        # Create a 2x2 subplot
-        fig, axs = plt.subplots(2, 1, figsize=(5, 8), sharex=True)
+        if axs is None:
+            # Wider than strictly needed for the axes — the extra width
+            # reserves room for the external legend so its labels stay
+            # inside the figure's bounding box (Jupyter inline and default
+            # savefig both crop to that box).
+            fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+        else:
+            if len(axs) != 2:
+                raise ValueError(
+                    f"plot_opt_lambda requires exactly 2 axes (top for currency "
+                    f"losses, bottom for utility loss); got {len(axs)}."
+                )
+            fig = None
         # Check how x axis should be configured
         if x_type == "rate":
             x = self.l_opt["lambda"]
@@ -1715,27 +1734,29 @@ class CommunityUnit:
             leg = "Reconstruction time (years)"
             # axs[0].set_xscale('log')
         axs[1].set_xlabel(leg)
-        # Make line plots for consumption losses
-        sns.lineplot(
-            x=x,
-            y=self.l_opt[LossType.RECOVERY_COST],
+        # Use plain ax.plot instead of sns.lineplot: these are simple (x, y)
+        # lines with no hue / estimator / CI, and sns.lineplot's label-kwarg
+        # propagation has been inconsistent across seaborn 0.12–0.14 when x/y
+        # are passed as pandas Series (the Series.name — here a LossType enum
+        # — can shadow the explicit `label=`). Explicit str() casts on the
+        # label ensure matplotlib receives a plain string regardless.
+        axs[0].plot(
+            x,
+            self.l_opt[LossType.RECOVERY_COST],
             color="green",
-            ax=axs[0],
-            label=self._label_for(LossType.RECOVERY_COST),
+            label=str(self._label_for(LossType.RECOVERY_COST)),
         )
-        sns.lineplot(
-            x=x,
-            y=self.l_opt[LossType.OWNER_HOUSING_LOSS],
+        axs[0].plot(
+            x,
+            self.l_opt[LossType.OWNER_HOUSING_LOSS],
             color="blue",
-            ax=axs[0],
-            label=self._label_for(LossType.OWNER_HOUSING_LOSS),
+            label=str(self._label_for(LossType.OWNER_HOUSING_LOSS)),
         )
-        sns.lineplot(
-            x=x,
-            y=self.l_opt[LossType.CONSUMPTION_LOSS],
+        axs[0].plot(
+            x,
+            self.l_opt[LossType.CONSUMPTION_LOSS],
             color="purple",
-            ax=axs[0],
-            label=self._label_for(LossType.CONSUMPTION_LOSS),
+            label=str(self._label_for(LossType.CONSUMPTION_LOSS)),
         )
         # Add vertical line for optimal lambda
         axs[0].axvline(
@@ -1752,13 +1773,13 @@ class CommunityUnit:
         )
         axs[0].set_ylabel(f"Total Loss ({self.config.simulation.currency})")
         axs[0].set_ylim(ylims)
-        # Add well-being loss plot
-        sns.lineplot(
-            x=x,
-            y=self.l_opt[LossType.UTILITY_LOSS],
+        # Add well-being loss plot (plain ax.plot — see note above the top
+        # panel's plot calls for why we bypass sns.lineplot here).
+        axs[1].plot(
+            x,
+            self.l_opt[LossType.UTILITY_LOSS],
             color="black",
-            ax=axs[1],
-            label=self._label_for(LossType.UTILITY_LOSS),
+            label=str(self._label_for(LossType.UTILITY_LOSS)),
         )
         axs[1].axvline(
             x=val, color="red", linestyle="--", label=f"Optimum value: {val:.2f}"
@@ -1829,8 +1850,22 @@ class CommunityUnit:
                 label=f"Optimum at {side}-recovery search bound",
             )
 
-        # Move legends outside the figure
-        axs[0].legend(loc="upper left", bbox_to_anchor=(1, 1))
-        axs[1].legend(loc="upper left", bbox_to_anchor=(1, 1))
+        # Legends rendered to the right of each panel. `bbox_to_anchor=(1.02, 1)`
+        # with `borderaxespad=0` anchors the legend just outside the axes'
+        # upper-right corner. When we created the figure ourselves, we pair
+        # this with `fig.subplots_adjust(right=0.68)` below so the legend
+        # stays inside the figure's bounding box — otherwise Jupyter's inline
+        # backend (and savefig without `bbox_inches="tight"`) crops the label
+        # text off the right edge while leaving the swatches visible, which
+        # looks like "a legend with no labels".
+        axs[0].legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+        axs[1].legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+        if fig is not None:
+            # Only adjust the layout when we own the figure. When the caller
+            # supplied `axs`, they manage their own figure sizing — if their
+            # parent figure is narrow, they may need a similar
+            # `fig.subplots_adjust(right=…)` call or `bbox_inches="tight"` on
+            # savefig to avoid legend clipping.
+            fig.subplots_adjust(right=0.6)
 
         return fig
