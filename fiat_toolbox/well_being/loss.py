@@ -149,17 +149,27 @@ class Liquidity(BaseModel):
 
 
 class IncomeConfig(BaseModel):
+    """Baseline income and committed-payment configuration.
+
+    `c0 = asset_income + (i_div or 0) − (payments or 0)`, where
+    `asset_income` is `Σ π·k` derived from the configured stocks, or
+    `i_0` when supplied as an override. `i_div` and `payments` are
+    always applied separately on top of / underneath `asset_income`;
+    they are never meant to be folded into `i_0`.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     i_0: Optional[float] = Field(
         None,
         ge=0,
         description=(
-            "Optional explicit baseline-income override (≥ 0). When omitted "
-            "(the default), c0 is derived as Σ π·k + (i_div or 0) across all "
-            "configured capital stocks. When supplied, c0 = i_0 + (i_div or 0) "
-            "and a UserWarning is emitted at CommunityUnit construction if "
-            "i_0 differs from Σ π·k."
+            "Optional explicit override for the asset-income component only "
+            "(≥ 0; equivalent to Σ π·k across stocks). When omitted (the "
+            "default), this term is derived from the configured stocks. Do "
+            "NOT include i_div or payments here — those are applied "
+            "separately in c0. A UserWarning is emitted at CommunityUnit "
+            "construction if i_0 differs from Σ π·k."
         ),
     )
     i_avg: float = Field(..., gt=0, description="Average income rate per year (> 0)")
@@ -168,7 +178,21 @@ class IncomeConfig(BaseModel):
         ge=0,
         description=(
             "Residual non-asset-based income (≥ 0; remittances, transfers, "
-            "pensions, …) added to c0 on top of the stock-derived baseline."
+            "pensions, …) ADDED to c0 on top of the asset-income baseline. "
+            "Always additive to i_0 / Σ π·k; never part of i_0."
+        ),
+    )
+    payments: Optional[float] = Field(
+        None,
+        ge=0,
+        description=(
+            "Committed household outflows (≥ 0; mortgage, taxes, insurance "
+            "premiums, …) SUBTRACTED from c0. Treated as fixed obligations "
+            "that continue through recovery — i.e. they shift the pre-shock "
+            "baseline down but leave the loss curve Δc(t) unchanged. Does "
+            "not affect i_avg / c_avg or the i_0 consistency check. A "
+            "UserWarning is emitted at CommunityUnit construction if "
+            "payments would drive c0 ≤ 0."
         ),
     )
 
@@ -353,6 +377,8 @@ class CommunityUnit:
         # Warn (once per instance) if an explicit i_0 override disagrees with
         # the stock-derived baseline Σ π·k; this is otherwise silent.
         self._check_i0_consistency()
+        # Warn (once per instance) if committed payments would drive c0 ≤ 0.
+        self._check_payments_feasibility()
 
     def _get_time_array(self):
         t_max = self.config.simulation.t_max
@@ -564,15 +590,45 @@ class CommunityUnit:
         return float(total)
 
     def _c0(self) -> float:
-        # Baseline consumption by the usual assumption c = income.
-        # Default: derive from the configured stocks (Σ π·k + i_div) so c(t)
-        # and the pre-shock c0 live in the same units. If the user supplied
-        # an explicit i_0, it wins as an override (any mismatch with Σ π·k
-        # is flagged via a UserWarning at construction).
+        # Baseline consumption: asset_income + i_div - payments.
+        # Default: asset_income derived from the configured stocks (Σ π·k)
+        # so c(t) and the pre-shock c0 live in the same units. If the user
+        # supplied an explicit i_0, it replaces the asset_income term only
+        # (any mismatch with Σ π·k is flagged via a UserWarning at
+        # construction). i_div is always additive; payments are always
+        # subtracted.
         i_div = self.config.income.i_div or 0.0
+        payments = self.config.income.payments or 0.0
         if self.config.income.i_0 is not None:
-            return float(self.config.income.i_0) + i_div
-        return self._stock_income_sum() + i_div
+            asset_income = float(self.config.income.i_0)
+        else:
+            asset_income = self._stock_income_sum()
+        return asset_income + i_div - payments
+
+    def _check_payments_feasibility(self) -> None:
+        """Warn if `payments` drives the pre-shock baseline `c0` to ≤ 0.
+
+        Fires once from `__init__`. A non-positive `c0` breaks CRRA utility
+        (log / fractional-power of a non-positive number), so downstream
+        calculations will produce NaNs — this surfaces the root cause early.
+        """
+        payments = self.config.income.payments
+        if payments is None or payments <= 0:
+            return
+        c0 = self._c0()
+        if c0 > 0:
+            return
+        warnings.warn(
+            (
+                f"IncomeConfig.payments={float(payments):g} drives the "
+                f"baseline consumption c0 to {c0:g} (≤ 0). CRRA utility is "
+                "undefined at non-positive consumption, so utility and "
+                "well-being losses will be NaN. Reduce payments or increase "
+                "the asset-income / i_div inputs."
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
 
     def _check_i0_consistency(self) -> None:
         """Warn if an explicit `i_0` disagrees with the stock-derived Σ π·k.

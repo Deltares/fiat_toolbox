@@ -613,6 +613,90 @@ def test_c0_override_silent_when_consistent():
     assert hh._c0() == pi_h * k_h
 
 
+def test_c0_payments_subtracted_from_baseline():
+    # payments are subtracted from c0 on top of the asset-income + i_div
+    # baseline, in both the stock-derived and i_0-override paths.
+    pi_h, k_h = 0.10, 100000.0  # Σ π·k = 10000
+    i_div = 2000.0
+    payments = 1500.0
+
+    # Stock-derived path.
+    cfg_stock = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        income=IncomeConfig(i_avg=20000.0, i_div=i_div, payments=payments),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh_stock = CommunityUnit(cfg_stock)
+    assert abs(hh_stock._c0() - (pi_h * k_h + i_div - payments)) < 1e-9
+
+    # i_0 override path.
+    cfg_override = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        income=IncomeConfig(
+            i_0=pi_h * k_h, i_avg=20000.0, i_div=i_div, payments=payments
+        ),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh_override = CommunityUnit(cfg_override)
+    assert abs(hh_override._c0() - (pi_h * k_h + i_div - payments)) < 1e-9
+
+
+def test_c0_payments_default_none_is_noop():
+    # Omitting payments leaves c0 identical to the pre-existing behaviour.
+    pi_h, k_h = 0.10, 100000.0
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        income=IncomeConfig(i_avg=20000.0, i_div=2000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh = CommunityUnit(cfg)
+    assert abs(hh._c0() - (pi_h * k_h + 2000.0)) < 1e-9
+
+
+def test_c0_payments_warns_when_c0_nonpositive():
+    # payments large enough to drive c0 ≤ 0 fire a UserWarning at
+    # construction so the NaN-producing regime surfaces early.
+    import pytest
+
+    pi_h, k_h = 0.10, 100000.0  # Σ π·k = 10000
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        income=IncomeConfig(i_avg=20000.0, payments=12000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    with pytest.warns(UserWarning, match=r"drives the baseline consumption c0"):
+        hh = CommunityUnit(cfg)
+    assert hh._c0() == 10000.0 - 12000.0
+
+
+def test_c0_payments_silent_when_c0_positive():
+    # Normal case: payments < asset_income + i_div → no warning.
+    import warnings as _w
+
+    pi_h, k_h = 0.10, 100000.0
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=k_h, v=0.1, recovery_rate=0.5, pi=pi_h),
+        income=IncomeConfig(i_avg=20000.0, payments=500.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        CommunityUnit(cfg)
+    payment_warnings = [
+        w for w in caught if "drives the baseline consumption c0" in str(w.message)
+    ]
+    assert payment_warnings == []
+
+
+def test_c0_payments_negative_rejected():
+    # payments must be ≥ 0 — pydantic rejects negatives at IncomeConfig(...).
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        IncomeConfig(i_avg=20000.0, payments=-1.0)
+
+
 def _analytical_income_integral(
     baseline: float, v: float, lam: float, t_max: float
 ) -> float:
