@@ -780,17 +780,18 @@ def opt_lambda(
 
     # FLAT: welfare function is numerically constant across the range.
     if is_flat:
-        # Deterministic fallback: pick the grid argmin with ties breaking
-        # toward the *largest* λ (fastest recovery). Picking fastest is
-        # consistent with the eps_rel relabel convention (which also picks
-        # the largest λ within the near-optimal band) and matches the
-        # intuitive "return to normal sooner" default when welfare is
-        # indifferent. We find argmin on the reversed array (which gives
-        # the first hit from the fast end) and translate back to the
-        # original index.
-        probe_for_argmin = np.where(finite_mask, probe_losses, np.inf)
-        idx_rev = int(np.argmin(probe_for_argmin[::-1]))
-        idx = len(probe_for_argmin) - 1 - idx_rev
+        # Pick the *largest* λ (fastest recovery) whose probe loss is within
+        # eps_flat · loss_scale of the global min — i.e. reuse the same
+        # tolerance budget that just classified the landscape as flat. This
+        # makes "fastest recovery wins" unconditional: sub-tolerance noise
+        # (quad error, floating-point accumulation) cannot tilt the choice
+        # toward slow recovery even when the true argmin happens to land on
+        # the low-λ end. Consistent with the eps_rel relabel convention
+        # which also picks the largest near-optimal λ.
+        finite_min = float(finite.min())
+        tol = eps_flat * loss_scale
+        within = finite_mask & (probe_losses <= finite_min + tol)
+        idx = int(np.flatnonzero(within).max())
         l_opt = float(l_probe[idx])
         loss_opt = float(probe_losses[idx])
         message = (

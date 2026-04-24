@@ -437,6 +437,55 @@ def test_opt_lambda_status_flat():
     assert "fastest" in (res["message"] or "").lower()
 
 
+def test_opt_lambda_flat_prefers_fastest_under_low_lambda_tilt(monkeypatch):
+    # Regression for the FLAT tie-break: under a sub-tolerance monotone slope
+    # that favours low λ (slow recovery), FLAT classification must still pick
+    # the *largest* λ (fastest recovery). The prior reversed-argmin only broke
+    # ties toward fast-recovery when probe losses were bit-for-bit equal; any
+    # real-world noise tilted toward slow would slip through.
+    base = 100.0
+    tilt = 1e-6  # Δ(loss)/Δλ — tiny positive slope → low λ slightly cheaper.
+
+    def tilted_total(self, rho=0.0, method="quad", t1=None, t2=None):
+        rr = float(np.ravel(self.rec_rate)[0])
+        return base + rr * tilt
+
+    monkeypatch.setattr(methods.UtilityLoss, "total", tilted_total)
+
+    # v=0 keeps consumption_loss_t identically zero for every probe λ, so
+    # the feasibility guard at methods.opt_lambda's objective (`c0 - cl_peak
+    # < cmin → +∞`) does NOT reject any candidate. That lets the patched
+    # UtilityLoss.total drive the probe losses cleanly — the sub-tolerance
+    # low-λ tilt is then the only signal the FLAT branch has to work with.
+    l_min, l_max = 0.3, 10.0
+    times = np.linspace(0, 10, 100)
+    res = methods.opt_lambda(
+        v=0.0,
+        k_str=100000.0,
+        c0=20000.0,
+        pi=0.1,
+        eta=1.5,
+        l_min=l_min,
+        l_max=l_max,
+        times=times,
+        method="trapezoid",
+    )
+    # loss_range ≈ (l_max − l_min) · tilt ≈ 9.7e-6; loss_scale ≈ base = 100.
+    # eps_flat · loss_scale = 1e-3 · 100 = 0.1  ≫  loss_range, so FLAT fires.
+    assert res["status"] == methods.OptLambdaStatus.FLAT, (
+        f"expected FLAT classification, got {res['status']} — "
+        f"tilt/base ratio may have broken the eps_flat budget"
+    )
+    # The bug case: true argmin is at the smallest λ (= l_min). The fix picks
+    # the largest λ whose loss is within eps_flat · loss_scale of the min,
+    # which — given the flat classification — is every finite point. So the
+    # returned λ must be at l_max (fastest recovery), NOT at l_min.
+    assert res["l_opt_min"] >= l_max - 1e-9, (
+        f"FLAT branch returned λ={res['l_opt_min']:.6g}; expected ≈ {l_max} "
+        "(fastest recovery). Low-λ tilt slipped through the tie-break."
+    )
+
+
 def test_opt_lambda_status_boundary_lower():
     # Notebook-4-like tight-feasibility config: heavy damage pushes the
     # feasible λ range to the slow end; the optimum lands near l_min.
