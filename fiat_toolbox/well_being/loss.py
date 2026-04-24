@@ -207,6 +207,17 @@ class SimulationConfig(BaseModel):
     t_max: float = Field(10, gt=0, description="Maximum simulation time (> 0)")
     dt: float = Field(1 / 52, gt=0, description="Time step (> 0)")
     currency: str = Field("$", description="Currency symbol")
+    currency_decimals: int = Field(
+        0,
+        ge=0,
+        description=(
+            "Number of decimal places used when formatting currency values in "
+            "plots (total labels, y-axis tick formatters). Default 0 preserves "
+            "historical 'round to whole units' behaviour; raise (e.g. 2) when "
+            "using coarse-grained currency units such as millions IDR or "
+            "billions JPY where sub-unit precision is meaningful."
+        ),
+    )
     c_min: float = Field(
         0.0, ge=0, description="Minimum consumption rate per year (≥ 0)"
     )
@@ -1230,9 +1241,8 @@ class CommunityUnit:
         if isinstance(loss_type, LossType) and loss_type == LossType.UTILITY_LOSS:
             label_total = f"Total {display}: {total_val:.2f}"
         else:
-            label_total = (
-                f"Total {display}: {total_val:,.0f} {self.config.simulation.currency}"
-            )
+            decimals = self.config.simulation.currency_decimals
+            label_total = f"Total {display}: {total_val:,.{decimals}f} {self.config.simulation.currency}"
         ax.fill_between(
             self.time_series["time"],
             0,
@@ -1244,8 +1254,11 @@ class CommunityUnit:
         ax.set_xlabel("Time after disaster (years)")
         # Align y-axis formatting and units with plot_consumption
         if not (isinstance(loss_type, LossType) and loss_type == LossType.UTILITY_LOSS):
+            decimals = self.config.simulation.currency_decimals
             ax.yaxis.set_major_formatter(
-                ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
+                ticker.FuncFormatter(
+                    lambda x, pos, decimals=decimals: f"{x:,.{decimals}f}"
+                )
             )
             ax.set_ylabel(f"{display} ({self.config.simulation.currency}/year)")
         else:
@@ -1336,10 +1349,11 @@ class CommunityUnit:
             labour_sum = 0
         rental_series = rental if rental is not None else 0
 
+        decimals = self.config.simulation.currency_decimals
         # Bottom layer: Recovery
         label_recon = (
             f"Total {self._label_for(LossType.RECOVERY_COST)}: "
-            f"{self.total_losses[LossType.RECOVERY_COST]:,.0f} "
+            f"{self.total_losses[LossType.RECOVERY_COST]:,.{decimals}f} "
             f"{self.config.simulation.currency}"
         )
         ax.fill_between(
@@ -1354,7 +1368,7 @@ class CommunityUnit:
         # Next layer: Income
         label_income = (
             f"Total {self._label_for(LossType.OWNER_HOUSING_LOSS)}: "
-            f"{self.total_losses[LossType.OWNER_HOUSING_LOSS]:,.0f} "
+            f"{self.total_losses[LossType.OWNER_HOUSING_LOSS]:,.{decimals}f} "
             f"{self.config.simulation.currency}"
         )
         ax.fill_between(
@@ -1370,7 +1384,7 @@ class CommunityUnit:
         if rental is not None:
             label_rental = (
                 f"Total {self._label_for(LossType.RENTAL_HOUSING_LOSS)}: "
-                f"{self.total_losses[LossType.RENTAL_HOUSING_LOSS]:,.0f} "
+                f"{self.total_losses[LossType.RENTAL_HOUSING_LOSS]:,.{decimals}f} "
                 f"{self.config.simulation.currency}"
             )
             ax.fill_between(
@@ -1392,7 +1406,7 @@ class CommunityUnit:
             total_val = self.total_losses.get(col, float(series.to_numpy().sum()))
             label_lab = (
                 f"Total {self._label_for(col)}: "
-                f"{total_val:,.0f} {self.config.simulation.currency}"
+                f"{total_val:,.{decimals}f} {self.config.simulation.currency}"
             )
             ax.fill_between(
                 time,
@@ -1407,7 +1421,7 @@ class CommunityUnit:
         if self._has_liquidity():
             label3 = (
                 f"Total Liquidity: "
-                f"{self._liquidity():,.0f} "
+                f"{self._liquidity():,.{decimals}f} "
                 f"{self.config.simulation.currency}"
             )
             # Add hatch by drawing again with no fill color, only hatch
@@ -1459,7 +1473,7 @@ class CommunityUnit:
                 linestyle="--",
                 alpha=1,
                 label=(
-                    f"Minimum consumption: {self.config.simulation.c_min:,.0f} "
+                    f"Minimum consumption: {self.config.simulation.c_min:,.{decimals}f} "
                     f"{self.config.simulation.currency}"
                 ),
             )
@@ -1479,7 +1493,9 @@ class CommunityUnit:
         # Plot consumption losses
         ax.set_xlabel("Time after disaster (years)")
         ax.set_ylabel(f"Consumption rate ({self.config.simulation.currency}/year)")
-        ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{int(x):,}"))
+        ax.yaxis.set_major_formatter(
+            ticker.FuncFormatter(lambda x, pos, decimals=decimals: f"{x:,.{decimals}f}")
+        )
         # Add legend
         ax.legend()
 
@@ -1730,8 +1746,9 @@ class CommunityUnit:
         axs[0].fill_between(
             x, ylims[0], ylims[1], color="steelblue", alpha=0.3, label="Tested range"
         )
+        decimals = self.config.simulation.currency_decimals
         axs[0].yaxis.set_major_formatter(
-            ticker.FuncFormatter(lambda x, pos: f"{int(x):,}")
+            ticker.FuncFormatter(lambda x, pos, decimals=decimals: f"{x:,.{decimals}f}")
         )
         axs[0].set_ylabel(f"Total Loss ({self.config.simulation.currency})")
         axs[0].set_ylim(ylims)

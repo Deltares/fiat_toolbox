@@ -230,6 +230,74 @@ def test_plot_opt_lambda():
     assert fig2 is None or hasattr(fig2, "savefig")
 
 
+def test_currency_decimals_defaults_to_zero():
+    # Default SimulationConfig.currency_decimals is 0 — round to whole units,
+    # preserving pre-existing plot output.
+    cfg = SimulationConfig()
+    assert cfg.currency_decimals == 0
+
+
+def test_currency_decimals_applies_to_consumption_plot():
+    # With currency_decimals=2 (e.g. millions IDR), consumption-plot legend
+    # entries for currency-valued totals must carry two decimal places,
+    # and the y-axis tick formatter must render floats with two decimals.
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=1500.5, v=0.1, recovery_rate=0.5, pi=0.1),
+        income=IncomeConfig(i_avg=200.0),
+        simulation=SimulationConfig(
+            t_max=5, dt=0.1, currency="M IDR", currency_decimals=2
+        ),
+    )
+    hh = CommunityUnit(cfg)
+    hh.get_losses("trapezoid")
+    fig, ax = plt.subplots()
+    hh.plot_consumption(ax=ax)
+    # Legend must carry formatted currency totals with 2 decimals.
+    legend_texts = [t.get_text() for t in ax.get_legend().get_texts()]
+    assert any(
+        "Total " in txt and " M IDR" in txt and "." in txt.split("M IDR")[0]
+        for txt in legend_texts
+    ), f"no currency total with decimals found in legend: {legend_texts}"
+    # Y-axis formatter must render with 2 decimals.
+    sample = ax.yaxis.get_major_formatter()(1234.5, 0)
+    assert sample == "1,234.50", f"y-axis tick '{sample}' != '1,234.50'"
+
+
+def test_currency_decimals_default_rounds_to_whole_units():
+    # currency_decimals=0 (default) must keep the historical ':,.0f' /
+    # 'int' formatting — no decimals in the legend, no decimal point on
+    # the y-axis ticks.
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.1, recovery_rate=0.5, pi=0.1),
+        income=IncomeConfig(i_avg=20000.0),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh = CommunityUnit(cfg)
+    hh.get_losses("trapezoid")
+    fig, ax = plt.subplots()
+    hh.plot_consumption(ax=ax)
+    sample = ax.yaxis.get_major_formatter()(1234.0, 0)
+    assert sample == "1,234", f"y-axis tick '{sample}' != '1,234'"
+
+
+def test_currency_decimals_negative_rejected():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        SimulationConfig(currency_decimals=-1)
+
+
 def test_opt_lambda_flags_flat_objective_on_zero_damage():
     # With v=0, utility loss is identically 0 across all lambdas; the
     # optimizer must classify status=FLAT rather than returning arbitrary
