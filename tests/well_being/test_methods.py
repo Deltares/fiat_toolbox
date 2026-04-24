@@ -413,9 +413,37 @@ def test_opt_lambda_status_interior():
 
 
 def test_opt_lambda_status_flat():
-    # Zero damage → welfare identically 0 across every λ. Must flag FLAT and
-    # pick the coarse-grid argmin with ties toward the *largest* λ (fastest
-    # recovery — consistent with eps_rel's convention).
+    # There IS physical damage (v=0.2) but liquidity covers every cent of the
+    # integrated loss for every λ, so welfare is λ-invariant at zero. Must
+    # flag FLAT (not NO_RECOVERY_NEEDED — the household has something to
+    # rebuild; welfare is just indifferent to speed). Pick the coarse-grid
+    # argmin with ties toward the *largest* λ (fastest recovery — consistent
+    # with eps_rel's convention).
+    times = np.linspace(0, 10, 100)
+    res = methods.opt_lambda(
+        v=0.2,
+        k_str=100000.0,
+        c0=20000.0,
+        pi=0.1,
+        eta=1.5,
+        l_min=0.3,
+        l_max=10.0,
+        times=times,
+        method="trapezoid",
+        liquidity=1e9,
+    )
+    assert res["success"] is True
+    assert res["status"] == methods.OptLambdaStatus.FLAT
+    # Ties toward fastest recovery → returned l_opt is at the largest grid
+    # point (= l_max).
+    assert res["l_opt_min"] >= 10.0 - 1e-9
+    assert "flat" in (res["message"] or "").lower()
+    assert "fastest" in (res["message"] or "").lower()
+
+
+def test_opt_lambda_status_no_recovery_needed():
+    # Owner has no physical damage → NO_RECOVERY_NEEDED, not FLAT. No λ is
+    # reported; loss_opt is the extras-only constant (0.0 when no extras).
     times = np.linspace(0, 10, 100)
     res = methods.opt_lambda(
         v=0.0,
@@ -428,13 +456,76 @@ def test_opt_lambda_status_flat():
         times=times,
         method="trapezoid",
     )
+    assert res["status"] == methods.OptLambdaStatus.NO_RECOVERY_NEEDED
     assert res["success"] is True
-    assert res["status"] == methods.OptLambdaStatus.FLAT
-    # Ties toward fastest recovery → returned l_opt is at the largest grid
-    # point (= l_max).
-    assert res["l_opt_min"] >= 10.0 - 1e-9
-    assert "flat" in (res["message"] or "").lower()
-    assert "fastest" in (res["message"] or "").lower()
+    assert res["l_opt"] is None
+    assert res["l_opt_min"] is None
+    assert res["loss_opt"] == 0.0
+    assert res["loss_opt_min"] == 0.0
+    assert "no physical damage" in (res["message"] or "").lower()
+
+
+def test_opt_lambda_status_no_recovery_needed_k_zero():
+    # k=0 is the other disjunct of v·k == 0. Same outcome.
+    times = np.linspace(0, 10, 100)
+    res = methods.opt_lambda(
+        v=0.5,
+        k_str=0.0,
+        c0=20000.0,
+        pi=0.1,
+        eta=1.5,
+        l_min=0.3,
+        l_max=10.0,
+        times=times,
+        method="trapezoid",
+    )
+    assert res["status"] == methods.OptLambdaStatus.NO_RECOVERY_NEEDED
+    assert res["l_opt"] is None
+
+
+def test_opt_lambda_no_recovery_needed_with_extras():
+    # v=0 but rental/labour extras contribute a λ-independent constant. The
+    # status is still NO_RECOVERY_NEEDED (owner has nothing to recover), but
+    # loss_opt reflects the extras' integrated utility loss.
+    times = np.linspace(0, 10, 100)
+    res = methods.opt_lambda(
+        v=0.0,
+        k_str=100000.0,
+        c0=20000.0,
+        pi=0.1,
+        eta=1.5,
+        l_min=0.3,
+        l_max=10.0,
+        times=times,
+        method="trapezoid",
+        extra_losses=[(1000.0, 0.5)],
+    )
+    assert res["status"] == methods.OptLambdaStatus.NO_RECOVERY_NEEDED
+    assert res["success"] is True
+    assert res["l_opt"] is None
+    assert res["loss_opt"] > 0.0  # extras contribute a nonzero constant
+
+
+def test_opt_lambda_no_recovery_needed_demoted_to_infeasible():
+    # v=0 but extras are catastrophic enough to push c(t) below c_min. The
+    # early-return block must detect infeasibility and demote to INFEASIBLE
+    # (honours priority: INFEASIBLE > FAILED > NO_RECOVERY_NEEDED > FLAT > ...).
+    times = np.linspace(0, 10, 100)
+    res = methods.opt_lambda(
+        v=0.0,
+        k_str=100000.0,
+        c0=1000.0,
+        pi=0.1,
+        eta=1.5,
+        l_min=0.3,
+        l_max=10.0,
+        times=times,
+        method="trapezoid",
+        cmin=500.0,
+        extra_losses=[(900.0, 0.1)],
+    )
+    assert res["status"] == methods.OptLambdaStatus.INFEASIBLE
+    assert res["success"] is False
 
 
 def test_opt_lambda_flat_prefers_fastest_under_low_lambda_tilt(monkeypatch):
@@ -452,18 +543,19 @@ def test_opt_lambda_flat_prefers_fastest_under_low_lambda_tilt(monkeypatch):
 
     monkeypatch.setattr(methods.UtilityLoss, "total", tilted_total)
 
-    # v=0 keeps consumption_loss_t identically zero for every probe λ, so
-    # the feasibility guard at methods.opt_lambda's objective (`c0 - cl_peak
-    # < cmin → +∞`) does NOT reject any candidate. That lets the patched
+    # Tiny but nonzero v keeps owner damage real (so NO_RECOVERY_NEEDED's
+    # v·k==0 early-return does NOT intercept) while still allowing the
+    # feasibility guard at methods.opt_lambda's objective (`c0 - cl_peak
+    # < cmin → +∞`) to accept every probe λ. That lets the patched
     # UtilityLoss.total drive the probe losses cleanly — the sub-tolerance
     # low-λ tilt is then the only signal the FLAT branch has to work with.
     l_min, l_max = 0.3, 10.0
     times = np.linspace(0, 10, 100)
     res = methods.opt_lambda(
-        v=0.0,
-        k_str=100000.0,
+        v=0.01,
+        k_str=1000.0,
         c0=20000.0,
-        pi=0.1,
+        pi=0.01,
         eta=1.5,
         l_min=l_min,
         l_max=l_max,

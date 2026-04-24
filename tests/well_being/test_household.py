@@ -321,10 +321,10 @@ def test_currency_decimals_negative_rejected():
         SimulationConfig(currency_decimals=-1)
 
 
-def test_opt_lambda_flags_flat_objective_on_zero_damage():
-    # With v=0, utility loss is identically 0 across all lambdas; the
-    # optimizer must classify status=FLAT rather than returning arbitrary
-    # Nelder-Mead noise.
+def test_opt_lambda_flags_no_recovery_needed_on_zero_damage():
+    # With v=0, the owner has no physical damage to rebuild. The optimizer
+    # must classify status=NO_RECOVERY_NEEDED, leave the config recovery
+    # fields untouched, and skip the 1000-point grid entirely.
     from fiat_toolbox.well_being.methods import OptLambdaStatus
 
     config = WellBeingConfig(
@@ -335,9 +335,88 @@ def test_opt_lambda_flags_flat_objective_on_zero_damage():
     hh = CommunityUnit(config)
     opt = hh.opt_lambda(no_steps=10)
     assert opt["success"] is True
-    assert opt["status"] == OptLambdaStatus.FLAT, (
-        "zero-damage case should be classified as FLAT"
+    assert opt["status"] == OptLambdaStatus.NO_RECOVERY_NEEDED
+    assert opt["l_opt"] is None
+    assert opt["l_opt_min"] is None
+    # Config must not be mutated when there's nothing to recover.
+    assert hh.config.owner_housing.recovery_rate is None
+    assert hh.config.owner_housing.recovery_time is None
+    # Grid is skipped entirely.
+    assert hh.l_opt is None
+
+
+def test_get_losses_end_to_end_with_zero_owner_damage():
+    # Owner has no damage; a labour asset still has damage. get_losses must
+    # complete without requiring an owner recovery rate — owner-driven
+    # series are zero, labour-driven series are nonzero.
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
+        labour_assets={"firm": CapitalStock(k=50000, v=0.1, recovery_time=4.0, pi=0.1)},
+        income=IncomeConfig(i_0=15000, i_avg=15000),
+        simulation=SimulationConfig(t_max=10, dt=0.1),
     )
+    hh = CommunityUnit(config)
+    losses = hh.get_losses()
+    assert losses[LossType.RECOVERY_COST] == 0.0
+    assert losses[LossType.OWNER_HOUSING_LOSS] == 0.0
+    assert losses[LossType.LABOUR_INCOME_LOSS] > 0.0
+    assert hh.recovery_time is None
+    # Labour component must still be reported; owner should be absent.
+    assert hh.recovery_time_per_component is not None
+    assert "owner" not in hh.recovery_time_per_component
+    assert "labour/firm" in hh.recovery_time_per_component
+
+
+def test_calc_loss_zero_owner_damage_does_not_raise():
+    # Without owner.v=0 and no opt_lambda call, calc_loss must not raise on
+    # owner-touched loss types — even though _rec_rate() is None.
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
+        income=IncomeConfig(i_0=15000, i_avg=15000),
+        simulation=SimulationConfig(t_max=10, dt=0.1),
+    )
+    hh = CommunityUnit(config)
+    assert hh.calc_loss(LossType.RECOVERY_COST) == 0.0
+    assert hh.calc_loss(LossType.OWNER_HOUSING_LOSS) == 0.0
+    assert hh.calc_loss(LossType.CONSUMPTION_LOSS) == 0.0
+    assert hh.calc_loss(LossType.UTILITY_LOSS) == 0.0
+
+
+def test_plot_consumption_handles_none_recovery_time():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
+        income=IncomeConfig(i_0=15000, i_avg=15000),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh = CommunityUnit(config)
+    hh.get_losses("trapezoid")
+    assert hh.recovery_time is None
+    fig, ax = plt.subplots()
+    hh.plot_consumption(ax=ax)  # must not raise
+    legend = ax.get_legend()
+    labels = [t.get_text() for t in legend.get_texts()] if legend else []
+    assert not any("Recovery time" in lbl for lbl in labels)
+    plt.close(fig)
+
+
+def test_plot_opt_lambda_raises_on_no_recovery_needed():
+    import pytest
+
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
+        income=IncomeConfig(i_0=15000, i_avg=15000),
+        simulation=SimulationConfig(t_max=5, dt=0.1),
+    )
+    hh = CommunityUnit(config)
+    hh.opt_lambda()
+    assert hh.l_opt is None
+    with pytest.raises(ValueError, match="NO_RECOVERY_NEEDED"):
+        hh.plot_opt_lambda()
 
 
 def test_exponential_loss_components_owner_uses_pi_only():

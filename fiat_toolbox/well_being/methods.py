@@ -11,11 +11,13 @@ class OptLambdaStatus(str, Enum):
     """Classification of `opt_lambda` outcomes (see `opt_lambda` docstring).
 
     Priority when multiple conditions would apply (e.g. a flat objective at
-    a boundary): INFEASIBLE > FAILED > FLAT > BOUNDARY_* > INTERIOR.
+    a boundary):
+    INFEASIBLE > FAILED > NO_RECOVERY_NEEDED > FLAT > BOUNDARY_* > INTERIOR.
     """
 
     INTERIOR = "interior"
     FLAT = "flat"
+    NO_RECOVERY_NEEDED = "no_recovery_needed"
     BOUNDARY_LOWER = "boundary_lower"
     BOUNDARY_UPPER = "boundary_upper"
     INFEASIBLE = "infeasible"
@@ -604,11 +606,12 @@ def opt_lambda(
     -------
     dict
         - `status`: `OptLambdaStatus` — classification of the outcome:
-          `INTERIOR` / `FLAT` / `BOUNDARY_LOWER` / `BOUNDARY_UPPER` /
-          `INFEASIBLE` / `FAILED`. Priority when several apply:
-          INFEASIBLE > FAILED > FLAT > BOUNDARY_* > INTERIOR.
-        - `success`: bool — True for INTERIOR / FLAT / BOUNDARY_*;
-          False for INFEASIBLE / FAILED.
+          `INTERIOR` / `FLAT` / `NO_RECOVERY_NEEDED` / `BOUNDARY_LOWER` /
+          `BOUNDARY_UPPER` / `INFEASIBLE` / `FAILED`. Priority when several
+          apply:
+          INFEASIBLE > FAILED > NO_RECOVERY_NEEDED > FLAT > BOUNDARY_* > INTERIOR.
+        - `success`: bool — True for INTERIOR / FLAT / NO_RECOVERY_NEEDED /
+          BOUNDARY_*; False for INFEASIBLE / FAILED.
         - `message`: str | None — case-specific explanation with an
           actionable hint. None only for INTERIOR (nothing to report).
         - `l_opt_min`, `loss_opt_min`: the true minimum (eps_rel-agnostic).
@@ -661,6 +664,77 @@ def opt_lambda(
 
     # Horizon for the t_max diagnostic — handles both method branches.
     horizon = float(t_max) if t_max is not None else float(np.asarray(times)[-1])
+
+    # NO_RECOVERY_NEEDED: owner has no physical damage (v·k == 0), so owner's
+    # λ does not enter the objective. Reporting a λ here would be meaningless —
+    # the downstream FLAT branch would otherwise pick the largest probe point
+    # arbitrarily. Evaluate the objective once at a placeholder λ (any λ>0
+    # works because owner's λ-dependent terms carry a v·k=0 prefactor) so the
+    # extras-only constant is reported honestly. If the feasibility constraint
+    # fails at that placeholder, demote to INFEASIBLE to honour the priority
+    # INFEASIBLE > FAILED > NO_RECOVERY_NEEDED > FLAT > ...
+    if v * k_str == 0:
+        placeholder_lambda = max(float(l_min), 1.0)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Consumption contains zero or negative values",
+                category=UserWarning,
+            )
+            cl_grid = consumption_loss_t(
+                t=times,
+                rec_rate=placeholder_lambda,
+                v=v,
+                k_str=k_str,
+                pi=pi,
+                liquidity=liquidity,
+                extra_losses=extra_losses,
+            )
+            cl_peak = float(np.max(np.asarray(cl_grid)))
+            if c0 - cl_peak < cmin:
+                result.update(
+                    {
+                        "status": OptLambdaStatus.INFEASIBLE,
+                        "success": False,
+                        "message": (
+                            f"No feasible reconstruction rate in [{l_min:.3g}, {l_max:.3g}]: "
+                            f"owner has no physical damage (v·k == 0) but extras push "
+                            f"c(t) below c_min={cmin:g}. Hint: add liquidity or reduce "
+                            "extra loss magnitudes."
+                        ),
+                    }
+                )
+                return result
+            ut_t = UtilityLoss(
+                times,
+                placeholder_lambda,
+                v,
+                k_str,
+                pi,
+                c0,
+                eta,
+                cmin,
+                liquidity,
+                extra_losses,
+            )
+            loss_val = float(ut_t.total(rho=rho, method=method))
+        result.update(
+            {
+                "status": OptLambdaStatus.NO_RECOVERY_NEEDED,
+                "success": True,
+                "message": (
+                    "Owner has no physical damage (v·k == 0); λ is undefined "
+                    "for owner housing. Extras (if any) contribute a "
+                    f"λ-independent constant loss of {loss_val:.3g}. "
+                    "Returned l_opt=None — do not report a recovery time."
+                ),
+                "l_opt_min": None,
+                "loss_opt_min": loss_val,
+                "l_opt": None,
+                "loss_opt": loss_val,
+            }
+        )
+        return result
 
     def objective(rec_rate: float) -> float:
         # Infeasible candidates are the normal way to reject bad λs during
@@ -801,8 +875,9 @@ def opt_lambda(
             f"returned λ={l_opt:.3g} is the coarse-grid argmin (ties toward "
             "fastest recovery — consistent with the eps_rel convention). "
             "The household is effectively indifferent to reconstruction "
-            "speed in this regime (e.g. zero damage, or liquidity covers "
-            "all losses)."
+            "speed in this regime (e.g. liquidity covers all losses, or "
+            "tilt is sub-tolerance). The owner still has physical damage "
+            "to rebuild — for the no-damage case see NO_RECOVERY_NEEDED."
         )
         status = OptLambdaStatus.FLAT
     else:

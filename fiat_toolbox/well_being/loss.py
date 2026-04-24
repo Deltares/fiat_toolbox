@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .methods import (
     ConsumptionLoss,
     IncomeLoss,
+    OptLambdaStatus,
     RecoveryCost,
     UtilityLoss,
     equity_weight,
@@ -439,6 +440,17 @@ class CommunityUnit:
     def _recovery_time(self) -> Optional[float]:
         return self._reconstruction_time()
 
+    def _owner_has_physical_damage(self) -> bool:
+        """True when owner housing has something to physically recover.
+
+        Used to gate the `calc_loss` recovery-rate guard and the
+        `opt_lambda` NO_RECOVERY_NEEDED short-circuit. When this is False,
+        owner-driven loss terms carry a `v·k = 0` prefactor and collapse to
+        zero regardless of λ.
+        """
+        oh = self.config.owner_housing
+        return oh.v > 0 and oh.k > 0
+
     def _stock_rec_rate(self, stock: CapitalStock) -> Optional[float]:
         if stock.recovery_rate is not None:
             return stock.recovery_rate
@@ -825,24 +837,32 @@ class CommunityUnit:
     def _exponential_loss_components_labelled(self):
         """Same as _exponential_loss_components but keeps a label per term.
 
-        Returns [(name, C_i, lambda_i), ...] or None if owner rate missing.
-        Names are "owner", "rental", "labour/<key>". Each term's `C_i` is
-        `baseline_income · v` so both `CapitalStock` (π·k·v) and
-        `IncomeStream` (income·v) contribute consistently.
+        Returns [(name, C_i, lambda_i), ...] or None if owner rate missing
+        *while owner has physical damage*. Names are "owner", "rental",
+        "labour/<key>". Each term's `C_i` is `baseline_income · v` so both
+        `CapitalStock` (π·k·v) and `IncomeStream` (income·v) contribute
+        consistently.
+
+        When `owner_housing.v*k == 0` (no physical damage), the owner term is
+        skipped entirely — the missing owner rate is *not* fatal, and extras
+        (if any) still populate the labelled list. This keeps
+        `recovery_time_per_component` useful in the NO_RECOVERY_NEEDED case.
         """
         rr_owner = self._rec_rate()
-        if rr_owner is None or rr_owner <= 0:
+        owner_contributes = self._owner_has_physical_damage()
+        if owner_contributes and (rr_owner is None or rr_owner <= 0):
             return None
 
         labelled: List[Tuple[str, float, float]] = []
 
-        c_base = self._baseline_income(self.config.owner_housing) * (
-            self.config.owner_housing.v
-        )
-        if c_base < 0:
-            return None
-        if c_base > 0:
-            labelled.append(("owner", float(c_base), float(rr_owner)))
+        if owner_contributes:
+            c_base = self._baseline_income(self.config.owner_housing) * (
+                self.config.owner_housing.v
+            )
+            if c_base < 0:
+                return None
+            if c_base > 0:
+                labelled.append(("owner", float(c_base), float(rr_owner)))
 
         if self.config.rental_housing is not None:
             stock = self.config.rental_housing
@@ -1009,24 +1029,53 @@ class CommunityUnit:
             LossType.CONSUMPTION_LOSS,
             LossType.UTILITY_LOSS,
         )
-        if owner_touched and self._rec_rate() is None:
+        # Only require an owner recovery rate when owner has physical damage.
+        # When v=0 or k=0, owner-driven loss terms carry a v·k=0 prefactor and
+        # collapse to zero regardless of λ, so a missing rate is harmless —
+        # see NO_RECOVERY_NEEDED in methods.opt_lambda.
+        if (
+            owner_touched
+            and self._rec_rate() is None
+            and self._owner_has_physical_damage()
+        ):
             raise ValueError(
                 f"Cannot compute {loss_type}: owner_housing has no recovery_rate "
                 "or recovery_time set. Call opt_lambda() first to optimize the "
                 "housing recovery rate, or specify one on CapitalStock."
             )
 
+        # Placeholder λ used only when owner has no physical damage and no
+        # recovery_rate is set. Any positive value yields identical output for
+        # owner-driven terms (v·k=0 prefactor); CONSUMPTION/UTILITY residuals
+        # from extras are λ-independent in this regime too.
+        _rr = self._rec_rate() if self._rec_rate() is not None else 1.0
+
+        # Owner-driven losses short-circuit to zero when owner has no damage.
+        if (
+            owner_touched
+            and not self._owner_has_physical_damage()
+            and loss_type
+            in (
+                LossType.RECOVERY_COST,
+                LossType.OWNER_HOUSING_LOSS,
+            )
+        ):
+            zero_series = np.zeros_like(self.t, dtype=float)
+            self.time_series[loss_type] = zero_series
+            self.total_losses[loss_type] = 0.0
+            return 0.0
+
         if loss_type == LossType.RECOVERY_COST:
             loss = RecoveryCost(
                 self.t,
-                self._rec_rate(),
+                _rr,
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
             )
         elif loss_type == LossType.OWNER_HOUSING_LOSS:
             loss = IncomeLoss(
                 self.t,
-                self._rec_rate(),
+                _rr,
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
                 self._stock_pi(self.config.owner_housing),
@@ -1072,7 +1121,7 @@ class CommunityUnit:
         elif loss_type == LossType.CONSUMPTION_LOSS:
             loss = ConsumptionLoss(
                 self.t,
-                self._rec_rate(),
+                _rr,
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
                 self._stock_pi(self.config.owner_housing),
@@ -1082,7 +1131,7 @@ class CommunityUnit:
             if self._has_liquidity():
                 loss_no_liq = ConsumptionLoss(
                     self.t,
-                    self._rec_rate(),
+                    _rr,
                     self.config.owner_housing.v,
                     self.config.owner_housing.k,
                     self._stock_pi(self.config.owner_housing),
@@ -1093,7 +1142,7 @@ class CommunityUnit:
         elif loss_type == LossType.UTILITY_LOSS:
             loss = UtilityLoss(
                 self.t,
-                self._rec_rate(),
+                _rr,
                 self.config.owner_housing.v,
                 self.config.owner_housing.k,
                 self._stock_pi(self.config.owner_housing),
@@ -1548,6 +1597,32 @@ class CommunityUnit:
         if rec_time_max is None:
             rec_time_max = self.t[-1]
 
+        # NO_RECOVERY_NEEDED short-circuit: owner has no physical damage, so
+        # owner's λ is undefined. Skip the 1000-point grid (nothing meaningful
+        # to plot) and do not mutate owner_housing.recovery_rate/time.
+        if not self._owner_has_physical_damage():
+            opt = {
+                "status": OptLambdaStatus.NO_RECOVERY_NEEDED,
+                "success": True,
+                "message": (
+                    "Owner has no physical damage (v=0 or k=0); no "
+                    "reconstruction rate is reported. "
+                    "owner_housing.recovery_rate / recovery_time left as "
+                    "None. Owner-driven losses are zero; extras (if any) "
+                    "are independent of owner's λ."
+                ),
+                "l_opt_min": None,
+                "loss_opt_min": 0.0,
+                "eps_rel": eps_rel,
+                "l_opt": None,
+                "loss_opt": 0.0,
+                "C_diff": None,
+                "T_diff": None,
+            }
+            self.lambda_opt = opt
+            self.l_opt = None
+            return opt
+
         # Create array of lambda values to check
         times = np.linspace(rec_time_min, rec_time_max, no_steps)
         lambdas = recovery_rate(times, rebuilt_per=self.config.simulation.recovery_per)
@@ -1703,6 +1778,12 @@ class CommunityUnit:
         if not hasattr(self, "l_opt"):
             raise ValueError(
                 "Optimal lambda has not been calculated. Run the 'opt_lambda' method first."
+            )
+        if self.l_opt is None:
+            raise ValueError(
+                "plot_opt_lambda: no λ grid available. opt_lambda reported "
+                "status=NO_RECOVERY_NEEDED (owner has no physical damage); "
+                "inspect self.lambda_opt['message']."
             )
 
         if axs is None:
