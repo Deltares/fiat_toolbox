@@ -187,7 +187,7 @@ class IncomeConfig(BaseModel):
         None,
         ge=0,
         description=(
-            "Committed household outflows (≥ 0; mortgage, taxes, insurance "
+            "Committed household outflows (≥ 0; mortgage, insurance "
             "premiums, …) SUBTRACTED from c0. Treated as fixed obligations "
             "that continue through recovery — i.e. they shift the pre-shock "
             "baseline down but leave the loss curve Δc(t) unchanged. Does "
@@ -1236,10 +1236,17 @@ class CommunityUnit:
         self.total_losses["Asset Loss"] = asset_loss
         self.total_losses["Equity Weighted Asset Loss"] = ew_loss
         # resilience R = Δk_h / ΔC_eq. Numerator is owner-housing
-        # asset loss (household-borne); rental/labour are not household-owned
-        self.total_losses["Socio-economic Resilience"] = (
-            asset_loss / well_being_loss if well_being_loss > 0 else float("inf")
-        )
+        # asset loss (household-borne); rental/labour are not household-owned.
+        # asset_loss == 0 → NaN (ratio undefined; nothing to be resilient about,
+        # even when rental/labour drive a non-zero wellbeing loss).
+        # asset_loss > 0 and well_being_loss == 0 → inf (shock fully absorbed).
+        if asset_loss == 0:
+            resilience = float("nan")
+        elif well_being_loss > 0:
+            resilience = asset_loss / well_being_loss
+        else:
+            resilience = float("inf")
+        self.total_losses["Socio-economic Resilience"] = resilience
 
         # Expose as primary recovery time attribute for the unit
         self.recovery_time = self._unit_recovery_time()

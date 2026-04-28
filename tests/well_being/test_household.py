@@ -1,3 +1,5 @@
+import math
+
 from fiat_toolbox.well_being.loss import (
     CapitalStock,
     CommunityUnit,
@@ -653,6 +655,24 @@ def test_resilience_metric_equals_asset_over_wellbeing():
     losses = hh.get_losses()
     expected = losses["Asset Loss"] / losses["Wellbeing Loss"]
     assert abs(losses["Socio-economic Resilience"] - expected) < 1e-9
+
+
+def test_resilience_is_nan_when_asset_loss_is_zero():
+    # Owner intact, labour-asset damage drives a non-zero wellbeing loss. The
+    # asset→wellbeing conversion ratio is undefined when there is no asset
+    # loss, so the metric must be NaN (not 0, which the old `wbl > 0`-only
+    # guard produced).
+    config = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
+        labour_assets={"firm": CapitalStock(k=50000, v=0.1, recovery_time=4.0, pi=0.1)},
+        income=IncomeConfig(i_0=15000, i_avg=15000),
+        simulation=SimulationConfig(t_max=10, dt=0.1),
+    )
+    hh = CommunityUnit(config)
+    losses = hh.get_losses()
+    assert losses["Asset Loss"] == 0.0
+    assert losses["Wellbeing Loss"] > 0
+    assert math.isnan(losses["Socio-economic Resilience"])
 
 
 def test_opt_lambda_rho_defaults_to_config_rho():
