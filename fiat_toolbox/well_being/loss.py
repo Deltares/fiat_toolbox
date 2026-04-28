@@ -248,23 +248,20 @@ class WellBeingConfig(BaseModel):
     rental_housing: Optional[Union[CapitalStock, IncomeStream]] = Field(
         None,
         description=(
-            "Rental housing stream. Models the landlord's structural capital "
-            "affecting tenant housing services (paper's k^rent_str / "
-            "Δi^rent(t) stream): the household, as tenant, loses housing "
-            "services while the landlord's damaged building is reconstructed. "
-            "Household does NOT bear recovery cost (landlord assumed outside "
-            "the study area). Only an IncomeLoss stream is produced. "
-            "Supply as CapitalStock (π·k decomposition) or IncomeStream "
-            "(income directly)."
+            "Rental housing stream. Models the landlord's structural capital: "
+            "the household, as tenant, loses housing services while the "
+            "landlord's damaged building is reconstructed. Household does NOT "
+            "bear recovery cost (landlord assumed outside the study area). "
+            "Only an IncomeLoss stream is produced. Supply as CapitalStock "
+            "(π·k decomposition) or IncomeStream (income directly)."
         ),
     )
     labour_assets: Optional[Dict[str, Union[CapitalStock, IncomeStream]]] = Field(
         None,
         description=(
-            "Productive assets that generate household labour income (paper's "
-            "k^pub, k^firm). Each entry drives an IncomeLoss stream; no "
-            "household-borne recovery cost. Supply as CapitalStock or "
-            "IncomeStream per entry."
+            "Productive assets that generate household labour income. Each "
+            "entry drives an IncomeLoss stream; no household-borne recovery "
+            "cost. Supply as CapitalStock or IncomeStream per entry."
         ),
     )
     income: IncomeConfig
