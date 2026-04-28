@@ -1,0 +1,4 @@
+[default.extend-words]
+# numpy API — `arange` is the canonical spelling and must not be "corrected"
+# to `arrange` by typos.
+arange = "arange"
