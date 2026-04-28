@@ -588,11 +588,11 @@ def opt_lambda(
         Subsistence consumption floor — feasibility constraint. Default 0.
     eps_rel : float, optional
         Relative tolerance for `l_opt` relabelling. When > 0, `l_opt` is set
-        to the *largest* λ whose welfare loss stays within
+        to the *largest* λ whose wellbeing loss stays within
         `loss_opt_min · (1 + eps_rel)`. The unrelaxed minimum remains on
         `l_opt_min` / `loss_opt_min`. Default 0.
     eps_flat : float, optional
-        Relative tolerance for detecting a flat welfare surface. Default 1e-3.
+        Relative tolerance for detecting a flat wellbeing surface. Default 1e-3.
     liquidity, extra_losses, rho : optional
         Forwarded to the consumption / utility-loss functions.
     recovery_per : float, optional
@@ -600,7 +600,7 @@ def opt_lambda(
         Used by the `t_max` diagnostic for `BOUNDARY_LOWER` — if at the
         optimum `1 − exp(−λ·t_max) < recovery_per/100`, the message flags
         that the simulation horizon may be the binding constraint rather
-        than the welfare shape. Default 95.
+        than the wellbeing shape. Default 95.
 
     Returns
     -------
@@ -852,7 +852,7 @@ def opt_lambda(
     l_opt = res.x[0]
     loss_opt = res.fun
 
-    # FLAT: welfare function is numerically constant across the range.
+    # FLAT: wellbeing function is numerically constant across the range.
     if is_flat:
         # Pick the *largest* λ (fastest recovery) whose probe loss is within
         # eps_flat · loss_scale of the global min — i.e. reuse the same
@@ -869,9 +869,9 @@ def opt_lambda(
         l_opt = float(l_probe[idx])
         loss_opt = float(probe_losses[idx])
         message = (
-            f"Welfare function is flat across λ ∈ [{l_min:.3g}, {l_max:.3g}] "
+            f"Wellbeing function is flat across λ ∈ [{l_min:.3g}, {l_max:.3g}] "
             f"(loss range {loss_range:.3e}, within eps_flat={eps_flat:g} of "
-            "loss scale). Every λ gives essentially the same welfare loss; "
+            "loss scale). Every λ gives essentially the same wellbeing loss; "
             f"returned λ={l_opt:.3g} is the coarse-grid argmin (ties toward "
             "fastest recovery — consistent with the eps_rel convention). "
             "The household is effectively indifferent to reconstruction "
@@ -890,7 +890,7 @@ def opt_lambda(
             status = OptLambdaStatus.BOUNDARY_LOWER
             # t_max diagnostic: at the slow-recovery end, check whether the
             # simulation horizon is the binding constraint rather than the
-            # welfare shape.
+            # wellbeing shape.
             fraction = 1.0 - float(np.exp(-l_opt * horizon))
             t_max_hint = ""
             if fraction < recovery_per / 100.0:
@@ -903,7 +903,7 @@ def opt_lambda(
             message = (
                 f"Minimum at lower λ bound ({l_opt:.3g} ≈ l_min), "
                 "i.e. the slowest recovery / longest reconstruction time "
-                "in the search range. Welfare may keep improving beyond "
+                "in the search range. Wellbeing may keep improving beyond "
                 "this bound. Hint: widen the search (increase rec_time_max "
                 "on CommunityUnit.opt_lambda)." + t_max_hint
             )
@@ -912,7 +912,7 @@ def opt_lambda(
             message = (
                 f"Minimum at upper λ bound ({l_opt:.3g} ≈ l_max), "
                 "i.e. the fastest recovery / shortest reconstruction time "
-                "in the search range. Welfare may keep improving beyond "
+                "in the search range. Wellbeing may keep improving beyond "
                 "this bound. Hint: widen the search (decrease rec_time_min "
                 "on CommunityUnit.opt_lambda)."
             )
@@ -932,7 +932,7 @@ def opt_lambda(
             "loss_opt": loss_opt,
         }
     )
-    # Relative-tolerance relabel: among all grid lambdas whose welfare loss
+    # Relative-tolerance relabel: among all grid lambdas whose wellbeing loss
     # sits inside [loss_opt, loss_opt*(1+eps_rel)] (the near-optimal band),
     # pick the *largest* lambda — i.e. the fastest recovery that still meets
     # the tolerance. The true minimum is preserved on `l_opt_min` /

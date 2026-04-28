@@ -695,7 +695,7 @@ def test_opt_lambda_rho_defaults_to_config_rho():
 
     # The objective values at the optimum must differ when rho != 0 is
     # actually applied; boundary-landing Nelder-Mead can return the same
-    # lambda even as rho shifts the welfare function, so compare the loss
+    # lambda even as rho shifts the wellbeing function, so compare the loss
     # value rather than the argmin.
     import math
 

@@ -727,7 +727,7 @@ class CommunityUnit:
     def _unit_recovery_time(self) -> Optional[float]:
         """
         Uses the optimized *household* reconstruction rate alone, since only
-        λ_h is a decision variable in the welfare optimization; rental and
+        λ_h is a decision variable in the wellbeing optimization; rental and
         labour asset rates are exogenous (literature-based) and would conflate
         the decision axis with external constraints if mixed in.
 
@@ -1156,7 +1156,7 @@ class CommunityUnit:
             raise ValueError(f"Invalid loss type: {loss_type}")
 
         # Convention: monetary-unit integrals (RECOVERY, INCOME, CONSUMPTION)
-        # report nominal sums (rho=0). UTILITY is a welfare-theoretic integral
+        # report nominal sums (rho=0). UTILITY is a wellbeing-theoretic integral
         # and is discounted at config.simulation.rho so the
         # utility total here matches what get_losses uses for Wellbeing Loss
         # and what opt_lambda minimizes.
@@ -1212,7 +1212,7 @@ class CommunityUnit:
         du_dis = float(self.total_losses[LossType.UTILITY_LOSS])
 
         # first-order correction for the permanent
-        # welfare cost of a depleted liquidity buffer, evaluated at pre-shock
+        # wellbeing cost of a depleted liquidity buffer, evaluated at pre-shock
         # marginal utility du/dc|_{c0} = c0^(-eta). Missing this understates
         # ΔW for every household that draws on S.
         du_taylor = (self._c0() ** (-eta)) * self._liquidity_depleted()
@@ -1901,14 +1901,14 @@ class CommunityUnit:
 
         status = self.lambda_opt.get("status") if self.lambda_opt else None
         if status == OptLambdaStatus.FLAT:
-            # Flat welfare: shade the whole range in the bottom (utility) panel
+            # Flat wellbeing: shade the whole range in the bottom (utility) panel
             # and add a caption.
             axs[1].axhspan(
                 ylims[0],
                 ylims[1],
                 facecolor="khaki",
                 alpha=0.25,
-                label="Welfare flat — any λ equivalent",
+                label="Wellbeing flat — any λ equivalent",
             )
         elif status in (
             OptLambdaStatus.BOUNDARY_LOWER,

@@ -414,9 +414,9 @@ def test_opt_lambda_status_interior():
 
 def test_opt_lambda_status_flat():
     # There IS physical damage (v=0.2) but liquidity covers every cent of the
-    # integrated loss for every λ, so welfare is λ-invariant at zero. Must
+    # integrated loss for every λ, so wellbeing is λ-invariant at zero. Must
     # flag FLAT (not NO_RECOVERY_NEEDED — the household has something to
-    # rebuild; welfare is just indifferent to speed). Pick the coarse-grid
+    # rebuild; wellbeing is just indifferent to speed). Pick the coarse-grid
     # argmin with ties toward the *largest* λ (fastest recovery — consistent
     # with eps_rel's convention).
     times = np.linspace(0, 10, 100)
@@ -626,7 +626,7 @@ def test_opt_lambda_status_boundary_upper():
         rho=0.06,
     )
     assert res["success"] is True
-    # Either BOUNDARY_UPPER (NM lands at l_max) or FLAT (welfare ≈ constant
+    # Either BOUNDARY_UPPER (NM lands at l_max) or FLAT (wellbeing ≈ constant
     # over this narrow range). Both are acceptable; this test asserts it's
     # not INTERIOR and not a lower-bound hit.
     assert res["status"] in (
