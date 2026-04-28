@@ -1560,6 +1560,7 @@ class CommunityUnit:
         no_steps: float = 1000,
         method: str = "trapezoid",
         eps_rel: float = 0.0,
+        eps_flat: float = 1e-3,
         raise_on_fail: bool = True,
         rho: Optional[float] = None,
     ) -> None:
@@ -1580,6 +1581,9 @@ class CommunityUnit:
             Relative tolerance for the optimization. If greater than 0, the function will return
             the smallest lambda within the relative tolerance of the minimum loss.
             Default is 0.01.
+        eps_flat : float, optional
+            Relative tolerance for detecting a flat wellbeing surface across
+            the λ range. Forwarded to `methods.opt_lambda`. Default is 1e-3.
         rho : float, optional
             Utility discount rate used in the optimizer's objective. When
             `None` (default), the configured `SimulationConfig.rho` is used so
@@ -1709,6 +1713,7 @@ class CommunityUnit:
             method=method,
             cmin=self.config.simulation.c_min,
             eps_rel=eps_rel,
+            eps_flat=eps_flat,
             liquidity=self._liquidity(),
             extra_losses=self._extra_losses(),
             rho=opt_rho,

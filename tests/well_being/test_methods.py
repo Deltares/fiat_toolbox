@@ -578,6 +578,62 @@ def test_opt_lambda_flat_prefers_fastest_under_low_lambda_tilt(monkeypatch):
     )
 
 
+def test_opt_lambda_cliff_bounded_plateau_picks_fastest(monkeypatch):
+    # Regression for the cliff-bounded plateau: utility loss is identically
+    # zero across most of the search range (e.g. liquidity covers all losses)
+    # but spikes sharply at the slowest-λ end (feasibility cliff / liquidity
+    # exhaustion). Without the plateau-at-min tie-break, Nelder-Mead — started
+    # at l_min on the cliff — walks down-gradient and stops at the cliff
+    # edge: the *slowest* λ in the plateau, opposite of the convention.
+    # The fix: detect the plateau via "loss within eps_flat · loss_scale of
+    # the minimum" and re-pick l_opt to the largest λ in it. Classification
+    # is BOUNDARY_UPPER (not FLAT) because the plateau touches only the
+    # upper bound — the cliff at l_min keeps it from being globally flat.
+    cliff_height = 3.5e-5
+
+    def cliff_then_flat(self, rho=0.0, method="quad", t1=None, t2=None):
+        rr = float(np.ravel(self.rec_rate)[0])
+        # Sharp ramp on the slow-λ end (rr < 0.5), zero everywhere else.
+        if rr < 0.5:
+            return cliff_height * (0.5 - rr) / (0.5 - 0.3)
+        return 0.0
+
+    monkeypatch.setattr(methods.UtilityLoss, "total", cliff_then_flat)
+
+    # Tiny v keeps owner damage real (so v·k != 0 → NO_RECOVERY_NEEDED's
+    # early-return doesn't intercept) while letting the patched
+    # UtilityLoss.total drive the probe losses cleanly.
+    l_min, l_max = 0.3, 10.0
+    times = np.linspace(0, 10, 100)
+    res = methods.opt_lambda(
+        v=0.01,
+        k_str=1000.0,
+        c0=20000.0,
+        pi=0.01,
+        eta=1.5,
+        l_min=l_min,
+        l_max=l_max,
+        times=times,
+        method="trapezoid",
+    )
+    # Plateau touches l_max but not l_min (cliff there), so classification
+    # is BOUNDARY_UPPER, not FLAT. The pre-fix path stopped NM at the cliff
+    # edge and reported BOUNDARY_LOWER (or an interior cliff-edge λ).
+    assert res["status"] == methods.OptLambdaStatus.BOUNDARY_UPPER, (
+        f"expected BOUNDARY_UPPER (plateau touches only l_max), "
+        f"got {res['status']}"
+    )
+    # The plateau hint must be appended to the BOUNDARY_UPPER message so
+    # callers see that the surface is flat all the way back to ~λ=0.5.
+    assert "plateau" in (res["message"] or "").lower()
+    # Tie-break must pick the largest λ in the plateau (= l_max), NOT the
+    # cliff-side edge near λ ≈ 0.5 where Nelder-Mead would otherwise stop.
+    assert res["l_opt_min"] >= l_max - 1e-9, (
+        f"plateau tie-break returned λ={res['l_opt_min']:.6g}; expected "
+        f"≈ {l_max} (fastest recovery in plateau). NM stalled at the cliff edge."
+    )
+
+
 def test_opt_lambda_status_boundary_lower():
     # Notebook-4-like tight-feasibility config: heavy damage pushes the
     # feasible λ range to the slow end; the optimum lands near l_min.

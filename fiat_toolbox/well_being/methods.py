@@ -796,25 +796,18 @@ def opt_lambda(
         )
         res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
 
-    # Probe the full range to detect flat / plateau objectives. Nelder-Mead
-    # on a flat landscape "converges" at an arbitrary point (dependent on the
-    # initial simplex and `l_min`), which is misleading — downstream code
-    # treats it as a true minimum. A cheap 21-point grid tells us whether any
-    # lambda actually beats any other within `eps_flat` of the loss scale.
+    # Probe the full range to detect plateaus near the minimum. Nelder-Mead
+    # has no gradient inside a plateau and "converges" at an arbitrary point
+    # (dependent on the initial simplex and `l_min`); in particular, when the
+    # plateau is bounded by a feasibility cliff at one end, NM started at
+    # `l_min` walks down-gradient and stops at the cliff edge — the *slowest*
+    # recovery in the plateau, opposite of the FLAT tie-break promise. A
+    # cheap 21-point probe lets us identify all λs whose loss is within
+    # `eps_flat · loss_scale` of the best observed minimum and pick the
+    # largest one (fastest recovery), regardless of where NM landed.
     l_probe = np.linspace(l_min, l_max, 21)
     probe_losses = np.array([objective(lm) for lm in l_probe])
     finite_mask = np.isfinite(probe_losses)
-    # FLAT detection needs at least two comparable points — a single feasible
-    # point trivially has range 0 but that is infeasibility in disguise, not
-    # flatness. The INFEASIBLE / BOUNDARY branches pick those cases up.
-    if finite_mask.sum() >= 2:
-        finite = probe_losses[finite_mask]
-        loss_range = float(finite.max() - finite.min())
-        loss_scale = float(max(abs(finite.max()), abs(finite.min()), 1e-300))
-        is_flat = loss_range <= eps_flat * loss_scale
-    else:
-        is_flat = False
-        loss_range = 0.0  # placeholder for messages below when never consulted
 
     # --- Classification (priority: INFEASIBLE > FAILED > FLAT > BOUNDARY > INTERIOR) ---
 
@@ -852,73 +845,100 @@ def opt_lambda(
     l_opt = res.x[0]
     loss_opt = res.fun
 
-    # FLAT: wellbeing function is numerically constant across the range.
-    if is_flat:
-        # Pick the *largest* λ (fastest recovery) whose probe loss is within
-        # eps_flat · loss_scale of the global min — i.e. reuse the same
-        # tolerance budget that just classified the landscape as flat. This
-        # makes "fastest recovery wins" unconditional: sub-tolerance noise
-        # (quad error, floating-point accumulation) cannot tilt the choice
-        # toward slow recovery even when the true argmin happens to land on
-        # the low-λ end. Consistent with the eps_rel relabel convention
-        # which also picks the largest near-optimal λ.
-        finite_min = float(finite.min())
-        tol = eps_flat * loss_scale
-        within = finite_mask & (probe_losses <= finite_min + tol)
+    # Plateau detection. Tolerance scales to the absolute loss magnitude
+    # (`eps_flat · loss_scale`), which handles zero-valued minima cleanly —
+    # `eps_rel`'s `loss_opt · (1+eps_rel)` band collapses to zero when
+    # `loss_opt = 0` and would not break ties at all in that regime. Use the
+    # better of NM and probe minima as the reference, since NM can stall at
+    # a sub-optimum on a flat surface. The tie-break (largest λ in plateau)
+    # always fires — it is conceptually the same as `eps_rel`'s relabel,
+    # just with an absolute tolerance — but classification depends on where
+    # the plateau and the picked l_opt land:
+    #   FLAT          : plateau touches both bounds (globally flat).
+    #   BOUNDARY_*    : l_opt sits at a boundary; if a plateau exists, its
+    #                   extent is reported as a hint. This covers both
+    #                   monotone shapes and cliff-bounded plateaus.
+    #   INTERIOR      : l_opt is strictly interior and the plateau (if any)
+    #                   does not touch a boundary.
+    finite = probe_losses[finite_mask]
+    loss_range = float(finite.max() - finite.min())
+    loss_scale = float(max(abs(finite.max()), abs(finite.min()), 1e-300))
+    tol = eps_flat * loss_scale
+    ref_min = min(loss_opt, float(finite.min()))
+    within = finite_mask & (probe_losses <= ref_min + tol)
+    plateau_count = int(within.sum())
+    if plateau_count >= 2:
+        plateau_l_lo = float(l_probe[within].min())
+        plateau_l_hi = float(l_probe[within].max())
+        # Tie-break toward fastest recovery: pick the largest λ in the
+        # plateau. Consistent with the eps_rel relabel convention.
         idx = int(np.flatnonzero(within).max())
         l_opt = float(l_probe[idx])
         loss_opt = float(probe_losses[idx])
-        message = (
-            f"Wellbeing function is flat across λ ∈ [{l_min:.3g}, {l_max:.3g}] "
-            f"(loss range {loss_range:.3e}, within eps_flat={eps_flat:g} of "
-            "loss scale). Every λ gives essentially the same wellbeing loss; "
-            f"returned λ={l_opt:.3g} is the coarse-grid argmin (ties toward "
-            "fastest recovery — consistent with the eps_rel convention). "
-            "The household is effectively indifferent to reconstruction "
-            "speed in this regime (e.g. liquidity covers all losses, or "
-            "tilt is sub-tolerance). The owner still has physical damage "
-            "to rebuild — for the no-damage case see NO_RECOVERY_NEEDED."
-        )
-        status = OptLambdaStatus.FLAT
     else:
-        # BOUNDARY vs INTERIOR on the true (unrelaxed) minimum.
-        bound_tol = max(1e-9, 1e-6 * (l_max - l_min))
-        at_lower = abs(l_opt - l_min) <= bound_tol
-        at_upper = abs(l_opt - l_max) <= bound_tol
+        plateau_l_lo = plateau_l_hi = float(l_opt)
 
-        if at_lower:
-            status = OptLambdaStatus.BOUNDARY_LOWER
-            # t_max diagnostic: at the slow-recovery end, check whether the
-            # simulation horizon is the binding constraint rather than the
-            # wellbeing shape.
-            fraction = 1.0 - float(np.exp(-l_opt * horizon))
-            t_max_hint = ""
-            if fraction < recovery_per / 100.0:
-                t_max_hint = (
-                    f" Recovery is only {fraction:.0%} complete by "
-                    f"t_max={horizon:g}y, below recovery_per={recovery_per}%. "
-                    "The slow-λ preference may be an artefact of the "
-                    "simulation horizon — consider increasing t_max."
-                )
-            message = (
-                f"Minimum at lower λ bound ({l_opt:.3g} ≈ l_min), "
-                "i.e. the slowest recovery / longest reconstruction time "
-                "in the search range. Wellbeing may keep improving beyond "
-                "this bound. Hint: widen the search (increase rec_time_max "
-                "on CommunityUnit.opt_lambda)." + t_max_hint
+    bound_tol = max(1e-9, 1e-6 * (l_max - l_min))
+    at_lower = abs(l_opt - l_min) <= bound_tol
+    at_upper = abs(l_opt - l_max) <= bound_tol
+    plateau_touches_min = plateau_count >= 2 and abs(plateau_l_lo - l_min) <= bound_tol
+    plateau_touches_max = plateau_count >= 2 and abs(plateau_l_hi - l_max) <= bound_tol
+    is_globally_flat = plateau_touches_min and plateau_touches_max
+    plateau_hint = ""
+    if plateau_count >= 2 and not is_globally_flat:
+        plateau_hint = (
+            f" A near-optimal plateau extends across "
+            f"λ ∈ [{plateau_l_lo:.3g}, {plateau_l_hi:.3g}] "
+            f"(loss within eps_flat={eps_flat:g} of the minimum)."
+        )
+
+    if is_globally_flat:
+        status = OptLambdaStatus.FLAT
+        message = (
+            f"Wellbeing function is flat across the full search range "
+            f"λ ∈ [{l_min:.3g}, {l_max:.3g}] (loss range {loss_range:.3e} "
+            f"within eps_flat={eps_flat:g} of loss scale). Every λ gives "
+            f"essentially the same wellbeing loss; returned λ={l_opt:.3g} "
+            "is the largest λ in the plateau (fastest recovery — "
+            "consistent with the eps_rel convention). The household is "
+            "indifferent to reconstruction speed in this regime (e.g. "
+            "liquidity covers all losses, or tilt is sub-tolerance). "
+            "The owner still has physical damage to rebuild — for the "
+            "no-damage case see NO_RECOVERY_NEEDED."
+        )
+    elif at_lower:
+        status = OptLambdaStatus.BOUNDARY_LOWER
+        # t_max diagnostic: at the slow-recovery end, check whether the
+        # simulation horizon is the binding constraint rather than the
+        # wellbeing shape.
+        fraction = 1.0 - float(np.exp(-l_opt * horizon))
+        t_max_hint = ""
+        if fraction < recovery_per / 100.0:
+            t_max_hint = (
+                f" Recovery is only {fraction:.0%} complete by "
+                f"t_max={horizon:g}y, below recovery_per={recovery_per}%. "
+                "The slow-λ preference may be an artefact of the "
+                "simulation horizon — consider increasing t_max."
             )
-        elif at_upper:
-            status = OptLambdaStatus.BOUNDARY_UPPER
-            message = (
-                f"Minimum at upper λ bound ({l_opt:.3g} ≈ l_max), "
-                "i.e. the fastest recovery / shortest reconstruction time "
-                "in the search range. Wellbeing may keep improving beyond "
-                "this bound. Hint: widen the search (decrease rec_time_min "
-                "on CommunityUnit.opt_lambda)."
-            )
-        else:
-            status = OptLambdaStatus.INTERIOR
-            message = None
+        message = (
+            f"Minimum at lower λ bound ({l_opt:.3g} ≈ l_min), "
+            "i.e. the slowest recovery / longest reconstruction time "
+            "in the search range. Wellbeing may keep improving beyond "
+            "this bound. Hint: widen the search (increase rec_time_max "
+            "on CommunityUnit.opt_lambda)." + t_max_hint + plateau_hint
+        )
+    elif at_upper:
+        status = OptLambdaStatus.BOUNDARY_UPPER
+        message = (
+            f"Minimum at upper λ bound ({l_opt:.3g} ≈ l_max), "
+            "i.e. the fastest recovery / shortest reconstruction time "
+            "in the search range. Wellbeing may keep improving beyond "
+            "this bound. Hint: widen the search (decrease rec_time_min "
+            "on CommunityUnit.opt_lambda)." + plateau_hint
+        )
+    else:
+        status = OptLambdaStatus.INTERIOR
+        message = None
 
     # Populate result with successful optimum values
     result.update(
