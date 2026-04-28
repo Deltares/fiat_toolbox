@@ -629,11 +629,11 @@ class CommunityUnit:
         return asset_income + i_div - payments
 
     def _check_payments_feasibility(self) -> None:
-        """Warn if `payments` drives the pre-shock baseline `c0` to ≤ 0.
+        """Raise if `payments` drives the pre-shock baseline `c0` to ≤ 0.
 
-        Fires once from `__init__`. A non-positive `c0` breaks CRRA utility
-        (log / fractional-power of a non-positive number), so downstream
-        calculations will produce NaNs — this surfaces the root cause early.
+        CRRA utility is undefined at `c ≤ 0` (NaN), and a once-per-process
+        warning is easy to miss in vectorised pipelines that construct many
+        `CommunityUnit`s, so reject the configuration at construction.
         """
         payments = self.config.income.payments
         if payments is None or payments <= 0:
@@ -641,16 +641,11 @@ class CommunityUnit:
         c0 = self._c0()
         if c0 > 0:
             return
-        warnings.warn(
-            (
-                f"IncomeConfig.payments={float(payments):g} drives the "
-                f"baseline consumption c0 to {c0:g} (≤ 0). CRRA utility is "
-                "undefined at non-positive consumption, so utility and "
-                "well-being losses will be NaN. Reduce payments or increase "
-                "the asset-income / i_div inputs."
-            ),
-            UserWarning,
-            stacklevel=2,
+        raise ValueError(
+            f"IncomeConfig.payments={float(payments):g} drives the "
+            f"baseline consumption c0 to {c0:g} (≤ 0). CRRA utility is "
+            "undefined at non-positive consumption. Reduce payments or "
+            "increase the asset-income / i_div inputs."
         )
 
     def _check_i0_consistency(self) -> None:
@@ -696,20 +691,36 @@ class CommunityUnit:
     def _liquidity_depleted(self) -> float:
         """
         Amount of liquidity stock actually drawn down over the recovery period.
+
+        `min(S, lifetime_loss_integral)` where the lifetime integral sums the
+        owner contribution `(π_h + λ_h)·v·k / λ_h` (when owner has physical
+        damage) plus each extra component `Nᵢ / λᵢ`. When the owner has no
+        physical damage but extras exist, only the extras contribute — savings
+        are still drawn down to smooth the rental / labour streams, and the
+        Taylor term in `get_losses` should reflect that.
         """
         S = self._liquidity()
         if S <= 0:
             return 0.0
-        rr = self._rec_rate()
-        if rr is None or rr <= 0:
-            return 0.0
-        owner_pi = self._stock_pi(self.config.owner_housing)
-        v = self.config.owner_housing.v
-        k = self.config.owner_housing.k
-        lifetime = ((owner_pi + rr) * v * k) / rr
+
+        lifetime = 0.0
+        if self._owner_has_physical_damage():
+            rr = self._rec_rate()
+            if rr is None or rr <= 0:
+                # Owner has damage but no rate set — caller should run
+                # opt_lambda first; nothing safe to compute here.
+                return 0.0
+            owner_pi = self._stock_pi(self.config.owner_housing)
+            v = self.config.owner_housing.v
+            k = self.config.owner_housing.k
+            lifetime = ((owner_pi + rr) * v * k) / rr
+
         for n0, lam in self._extra_losses() or []:
             if lam > 0:
                 lifetime += n0 / lam
+
+        if lifetime <= 0:
+            return 0.0
         return float(min(S, lifetime))
 
     def _loss_types_for_run(self):

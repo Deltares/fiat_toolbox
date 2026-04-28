@@ -324,14 +324,18 @@ def consumption_loss_t(
         t=0, rec_rate=rec_rate, v=v, k_str=k_str, pi=pi
     ) + recovery_cost_t(t=0, rec_rate=rec_rate, v=v, k_str=k_str)
 
-    if rec_rate <= 0 or liquidity <= 0:
-        # No recovery or no liquidity: follow the baseline Δc(t)
+    has_owner = rec_rate > 0 and alpha_base > 0
+    has_extras = bool(extra_losses)
+    if liquidity <= 0 or not (has_owner or has_extras):
+        # No liquidity to apply, or no loss stream to smooth.
         t_hat = 0
         cl_t = c_loss(t)
     else:
-        # Compute the total integral of Δc(t) over [0, ∞) to check if liquidity covers all losses
-        # Use α_base for the exp(-rec_rate * t) component to avoid double-counting extra losses
-        total_integral_inf = alpha_base / rec_rate
+        # Compute the total integral of Δc(t) over [0, ∞) to check if liquidity
+        # covers all losses. Only sum components that actually contribute, so
+        # the extras-only case (α_base = 0) is handled correctly without a
+        # spurious 0/rec_rate term.
+        total_integral_inf = (alpha_base / rec_rate) if has_owner else 0.0
         if extra_losses:
             for N0, lam in extra_losses:
                 total_integral_inf += N0 / lam
@@ -344,7 +348,11 @@ def consumption_loss_t(
             # Solve for t̂ from: Δc(t̂) * t̂ + liquidity = ∫₀^{t̂} Δc(s) ds
             def integral_to_t(th: float) -> float:
                 # Integral of the base component plus each extra loss component
-                val = alpha_base * (1 - np.exp(-rec_rate * th)) / rec_rate
+                val = (
+                    (alpha_base * (1 - np.exp(-rec_rate * th)) / rec_rate)
+                    if has_owner
+                    else 0.0
+                )
                 if extra_losses:
                     for N0, lam in extra_losses:
                         val += N0 * (1 - np.exp(-lam * th)) / lam
@@ -353,11 +361,15 @@ def consumption_loss_t(
             def objective_t_hat(th: float) -> float:
                 return c_loss(th) * th + liquidity - integral_to_t(th)
 
-            # Find a suitable upper bracket where the function is negative
-            rates = [rec_rate] + (
-                [lam for _, lam in extra_losses] if extra_losses else []
-            )
-            min_rate = min(rates) if rates else rec_rate
+            # Find a suitable upper bracket where the function is negative.
+            # Build min_rate from contributing components only — when α_base = 0
+            # rec_rate doesn't drive a loss, so it shouldn't size the bracket.
+            rates = []
+            if has_owner:
+                rates.append(rec_rate)
+            if extra_losses:
+                rates.extend(lam for _, lam in extra_losses)
+            min_rate = min(rates)
             upper = max(10.0 / min_rate, 1.0)
             f_upper = objective_t_hat(upper)
             # Expand the bracket if needed

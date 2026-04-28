@@ -620,8 +620,7 @@ def test_opt_lambda_cliff_bounded_plateau_picks_fastest(monkeypatch):
     # is BOUNDARY_UPPER, not FLAT. The pre-fix path stopped NM at the cliff
     # edge and reported BOUNDARY_LOWER (or an interior cliff-edge λ).
     assert res["status"] == methods.OptLambdaStatus.BOUNDARY_UPPER, (
-        f"expected BOUNDARY_UPPER (plateau touches only l_max), "
-        f"got {res['status']}"
+        f"expected BOUNDARY_UPPER (plateau touches only l_max), got {res['status']}"
     )
     # The plateau hint must be appended to the BOUNDARY_UPPER message so
     # callers see that the surface is flat all the way back to ~λ=0.5.
@@ -759,3 +758,30 @@ def test_opt_lambda_no_leaked_consumption_warning():
         f"scipy RuntimeWarning leaked out of opt_lambda: "
         f"{[str(w.message) for w in scipy_leaks]}"
     )
+
+
+def test_consumption_loss_t_liquidity_smooths_extras_when_alpha_base_zero():
+    # When the owner term is zero (v·k = 0) but extras drive a non-zero loss
+    # stream, liquidity must still smooth the extras. Previously the guard
+    # at line 327 dropped the liquidity branch whenever rec_rate ≤ 0, and a
+    # symmetric trap held for the v·k = 0 + placeholder rec_rate path inside
+    # CommunityUnit. With the fix, the t̂ logic handles α_base = 0 directly.
+    t = np.linspace(0, 5, 51)
+    extra = [(1000.0, 1.5)]  # N0 = 1000, lam = 1.5 → lifetime ≈ 666.7
+    # liquidity below lifetime so we expect a non-trivial t̂ plateau
+    cl = methods.consumption_loss_t(
+        t,
+        rec_rate=1.0,
+        v=0.0,
+        k_str=100000,
+        pi=0.1,
+        liquidity=200.0,
+        extra_losses=extra,
+    )
+    # Without the fix, the function falls through to the unsupported path and
+    # cl[0] equals N0 = 1000. With the fix, liquidity smooths the early loss
+    # so cl[0] is the plateau Δc(t̂) < 1000.
+    assert cl[0] < 1000.0
+    # Plateau then exponential decay → overall non-increasing.
+    diffs = np.diff(cl)
+    assert np.all(diffs <= 1e-9)

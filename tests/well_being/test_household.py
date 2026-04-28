@@ -648,6 +648,65 @@ def test_liquidity_depleted_equals_min_S_and_lifetime():
     assert abs(hh2._liquidity_depleted() - 1000.0) < 1e-6
 
 
+def test_liquidity_depleted_extras_only_with_no_owner_damage():
+    # Owner has no physical damage but a labour-asset damage stream exists.
+    # Liquidity should still be drawn down to smooth the extras, and
+    # _liquidity_depleted must equal min(S, lifetime) where lifetime is the
+    # extras-only integral Σ Nᵢ/λᵢ (no owner term contributes).
+    pi_lab, k_lab, v_lab, T_lab = 0.1, 20000.0, 0.5, 2.0
+    cfg_template = {
+        "owner_housing": CapitalStock(k=100000.0, v=0.0, pi=0.1),
+        "labour_assets": {
+            "firm": CapitalStock(k=k_lab, v=v_lab, recovery_time=T_lab, pi=pi_lab)
+        },
+        "income": IncomeConfig(i_0=15000, i_avg=15000),
+        "simulation": SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    }
+
+    # Lifetime extras-only integral: N0/λ where N0 = pi·v·k, λ from time/per
+    n0 = pi_lab * v_lab * k_lab  # 1000
+    lam = math.log(1 / (1 - 0.95)) / T_lab  # ≈ 1.498
+    lifetime = n0 / lam  # ≈ 668
+
+    # Case A: S > lifetime → depleted == lifetime
+    cfg_big_S = WellBeingConfig(
+        liquidity=Liquidity(savings=10**6),
+        **cfg_template,
+    )
+    hh_big = CommunityUnit(cfg_big_S)
+    assert abs(hh_big._liquidity_depleted() - lifetime) < 1e-6
+
+    # Case B: S < lifetime → depleted == S
+    cfg_small_S = WellBeingConfig(
+        liquidity=Liquidity(savings=200.0),
+        **cfg_template,
+    )
+    hh_small = CommunityUnit(cfg_small_S)
+    assert abs(hh_small._liquidity_depleted() - 200.0) < 1e-6
+
+
+def test_get_losses_extras_only_with_liquidity_taylor_term_nonzero():
+    # Same shape as the test above: owner has no physical damage, labour
+    # asset drives a non-zero loss stream, household has savings. The
+    # Wellbeing Loss (Liquidity Term) must fire — previously it was
+    # silently zero because _liquidity_depleted dropped on owner-no-damage.
+    cfg = WellBeingConfig(
+        owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
+        labour_assets={"firm": CapitalStock(k=20000, v=0.5, recovery_time=2.0, pi=0.1)},
+        income=IncomeConfig(i_0=15000, i_avg=15000),
+        liquidity=Liquidity(savings=200.0),
+        simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
+    )
+    hh = CommunityUnit(cfg)
+    losses = hh.get_losses()
+    assert losses["Wellbeing Loss (Liquidity Term)"] > 0
+    # And Wellbeing Loss is the sum of integral + Taylor.
+    expected = (
+        losses["Wellbeing Loss (Integral)"] + losses["Wellbeing Loss (Liquidity Term)"]
+    )
+    assert abs(losses["Wellbeing Loss"] - expected) < 1e-9
+
+
 def test_resilience_metric_equals_asset_over_wellbeing():
     # Socio-economic resilience: R = Δk_h / ΔC_eq.
     config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
@@ -843,9 +902,10 @@ def test_c0_payments_default_none_is_noop():
     assert abs(hh._c0() - (pi_h * k_h + 2000.0)) < 1e-9
 
 
-def test_c0_payments_warns_when_c0_nonpositive():
-    # payments large enough to drive c0 ≤ 0 fire a UserWarning at
-    # construction so the NaN-producing regime surfaces early.
+def test_c0_payments_raises_when_c0_nonpositive():
+    # payments large enough to drive c0 ≤ 0 must raise at construction.
+    # CRRA utility is undefined at c ≤ 0, and a once-per-process warning is
+    # easy to miss when many CommunityUnits run in a vectorised pipeline.
     import pytest
 
     pi_h, k_h = 0.10, 100000.0  # Σ π·k = 10000
@@ -854,9 +914,8 @@ def test_c0_payments_warns_when_c0_nonpositive():
         income=IncomeConfig(i_avg=20000.0, payments=12000.0),
         simulation=SimulationConfig(t_max=5, dt=0.1),
     )
-    with pytest.warns(UserWarning, match=r"drives the baseline consumption c0"):
-        hh = CommunityUnit(cfg)
-    assert hh._c0() == 10000.0 - 12000.0
+    with pytest.raises(ValueError, match=r"drives the baseline consumption c0"):
+        CommunityUnit(cfg)
 
 
 def test_c0_payments_silent_when_c0_positive():
