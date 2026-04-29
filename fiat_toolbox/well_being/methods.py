@@ -5,6 +5,10 @@ import numpy as np
 from scipy.integrate import IntegrationWarning, quad
 from scipy.optimize import brentq, minimize
 
+# np.trapz was removed in NumPy 2.0 in favor of np.trapezoid (added in 2.0).
+# Use whichever is available so the code works on both NumPy 1.x and 2.x.
+_trapezoid = getattr(np, "trapezoid", None) or np.trapz
+
 
 def utility(
     consumption: Union[float, np.ndarray], eta: float, normalize: bool = False
@@ -480,7 +484,7 @@ def opt_lambda(
         Array of time points. Required if `method` is "trapezoid".
     method : str, optional
         The method to use for integration. Can be either "quad" (default) or "trapezoid".
-        "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+        "trapezoid" uses the numpy.trapezoid function, while "quad" uses scipy.integrate.quad.
     cmin : float, optional
         Minimum consumption rate per year. Default is 0.0.
     eps_rel : float, optional
@@ -515,7 +519,7 @@ def opt_lambda(
         return loss
 
     def fun(rec_rate):
-        return objective(rec_rate)
+        return objective(float(np.asarray(rec_rate).item()))
 
     res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
 
@@ -655,7 +659,7 @@ class Loss:
             Discount rate for the integration. Defaults to 0.
         method : str, optional
             Integration method to use. Can be either "trapezoid" (default) or "quad".
-            "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+            "trapezoid" uses the numpy.trapezoid function, while "quad" uses scipy.integrate.quad.
 
         Returns
         -------
@@ -677,7 +681,7 @@ class Loss:
                 )
             f_t = self._fun(self.t, self.rec_rate)
             f_t_dis = f_t * np.exp(-rho * self.t)
-            integral = np.trapz(f_t_dis, x=self.t, axis=0)
+            integral = _trapezoid(f_t_dis, x=self.t, axis=0)
         elif method == "quad":
             warnings.filterwarnings("ignore", category=IntegrationWarning)
             integral = np.array(
