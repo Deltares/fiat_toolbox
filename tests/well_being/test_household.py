@@ -26,14 +26,13 @@ def _make_config(
     currency="€",
     cmin=1000,
     recovery_per=90.0,
-    savings=5000,
-    insurance=2000,
-    support=1000,
+    internal=5000,
+    external=3000,
 ):
     return WellBeingConfig(
         owner_housing=CapitalStock(k=k, v=v, recovery_rate=rec_rate, pi=pi),
         income=IncomeConfig(i_0=i0, i_avg=iavg),
-        liquidity=Liquidity(savings=savings, insurance=insurance, support=support),
+        liquidity=Liquidity(internal=internal, external=external),
         simulation=SimulationConfig(
             eta=eta,
             rho=rho,
@@ -57,7 +56,7 @@ def test_household_initialization():
     assert hh.config.owner_housing.k == 100000
     assert hh._c0() == 10000
     assert hh.config.simulation.currency == "€"
-    assert hh._liquidity() == 5000 + 2000 + 1000
+    assert hh._liquidity() == 5000 + 3000
 
     # Override path: i_0 supplied and ≠ Σ π·k → override in effect with warning.
     override_config = _make_config(i0=20000)
@@ -133,9 +132,8 @@ def test_achieved_recovery_percent_exponential_and_realized():
         rec_rate=0.7,
         i0=15000,
         iavg=14000,
-        savings=1000,
-        insurance=500,
-        support=0,
+        internal=1000,
+        external=500,
     )
     base.rental_housing = CapitalStock(k=30000, v=0.15, recovery_rate=0.5)
     hh = CommunityUnit(base)
@@ -605,9 +603,8 @@ def test_wellbeing_loss_no_taylor_when_liquidity_zero():
         rec_rate=0.5,
         i0=20000,
         iavg=20000,
-        savings=0,
-        insurance=0,
-        support=0,
+        internal=0,
+        external=0,
     )
     hh = CommunityUnit(config)
     losses = hh.get_losses()
@@ -623,9 +620,8 @@ def test_liquidity_depleted_equals_min_S_and_lifetime():
         rec_rate=0.5,
         i0=20000,
         iavg=20000,
-        savings=10**9,
-        insurance=0,
-        support=0,  # huge S -> capped by lifetime
+        internal=10**9,
+        external=0,  # huge S -> capped by lifetime
     )
     hh = CommunityUnit(config)
     depleted_huge_S = hh._liquidity_depleted()
@@ -640,9 +636,8 @@ def test_liquidity_depleted_equals_min_S_and_lifetime():
         rec_rate=0.5,
         i0=20000,
         iavg=20000,
-        savings=1000,
-        insurance=0,
-        support=0,
+        internal=1000,
+        external=0,
     )
     hh2 = CommunityUnit(config2)
     assert abs(hh2._liquidity_depleted() - 1000.0) < 1e-6
@@ -670,7 +665,7 @@ def test_liquidity_depleted_extras_only_with_no_owner_damage():
 
     # Case A: S > lifetime → depleted == lifetime
     cfg_big_S = WellBeingConfig(
-        liquidity=Liquidity(savings=10**6),
+        liquidity=Liquidity(internal=10**6),
         **cfg_template,
     )
     hh_big = CommunityUnit(cfg_big_S)
@@ -678,7 +673,7 @@ def test_liquidity_depleted_extras_only_with_no_owner_damage():
 
     # Case B: S < lifetime → depleted == S
     cfg_small_S = WellBeingConfig(
-        liquidity=Liquidity(savings=200.0),
+        liquidity=Liquidity(internal=200.0),
         **cfg_template,
     )
     hh_small = CommunityUnit(cfg_small_S)
@@ -694,7 +689,7 @@ def test_get_losses_extras_only_with_liquidity_taylor_term_nonzero():
         owner_housing=CapitalStock(k=100000.0, v=0.0, pi=0.1),
         labour_assets={"firm": CapitalStock(k=20000, v=0.5, recovery_time=2.0, pi=0.1)},
         income=IncomeConfig(i_0=15000, i_avg=15000),
-        liquidity=Liquidity(savings=200.0),
+        liquidity=Liquidity(internal=200.0),
         simulation=SimulationConfig(t_max=10, dt=0.1, recovery_per=95.0),
     )
     hh = CommunityUnit(cfg)
@@ -705,6 +700,80 @@ def test_get_losses_extras_only_with_liquidity_taylor_term_nonzero():
         losses["Wellbeing Loss (Integral)"] + losses["Wellbeing Loss (Liquidity Term)"]
     )
     assert abs(losses["Wellbeing Loss"] - expected) < 1e-9
+
+
+def test_liquidity_external_only_no_taylor_term():
+    # External-only liquidity (insurance/aid). Spent first, no wellbeing
+    # cost when depleted: the Taylor term is 0 even though consumption is
+    # smoothed exactly as if the same amount sat in `internal`.
+    config = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=0.5,
+        i0=20000,
+        iavg=20000,
+        internal=0,
+        external=8000,
+    )
+    hh = CommunityUnit(config)
+    losses = hh.get_losses()
+    assert hh._liquidity_depleted() == 0.0
+    assert losses["Wellbeing Loss (Liquidity Term)"] == 0.0
+    assert losses["Wellbeing Loss"] == losses["Wellbeing Loss (Integral)"]
+
+
+def test_liquidity_external_first_then_internal():
+    # External is consumed before internal. Lifetime integral L for the
+    # default fixture: (pi+λ)·v·k/λ = (0.1+0.5)·0.2·100000/0.5 = 24000.
+    L = 24000.0
+
+    common = {"v": 0.2, "k": 100000, "rec_rate": 0.5, "i0": 20000, "iavg": 20000}
+
+    # Both buckets partial; external alone < lifetime, total > lifetime.
+    cfg_a = _make_config(**common, external=L * 0.4, internal=L * 0.4)
+    hh_a = CommunityUnit(cfg_a)
+    # total_drawn = min(L, 0.8L) = 0.8L; external_drawn = 0.4L; internal_drawn = 0.4L
+    assert abs(hh_a._liquidity_depleted() - L * 0.4) < 1e-6
+
+    # External alone covers everything → internal_drawn = 0.
+    cfg_b = _make_config(**common, external=L * 1.5, internal=L * 0.4)
+    hh_b = CommunityUnit(cfg_b)
+    assert hh_b._liquidity_depleted() == 0.0
+
+    # External partial, internal kicks in for the residual.
+    cfg_c = _make_config(**common, external=L * 0.2, internal=L * 0.4)
+    hh_c = CommunityUnit(cfg_c)
+    # total_drawn = min(L, 0.6L) = 0.6L; external_drawn = 0.2L; internal_drawn = 0.4L
+    assert abs(hh_c._liquidity_depleted() - L * 0.4) < 1e-6
+
+
+def test_liquidity_consumption_smoothing_independent_of_split():
+    # Same total S, two splits: consumption smoothing is identical because
+    # consumption_loss_t only sees the total. Only the Taylor term differs.
+    common = {"v": 0.2, "k": 100000, "rec_rate": 0.5, "i0": 20000, "iavg": 20000}
+    S = 8000.0
+
+    hh_int = CommunityUnit(_make_config(**common, internal=S, external=0.0))
+    hh_ext = CommunityUnit(_make_config(**common, internal=0.0, external=S))
+
+    losses_int = hh_int.get_losses()
+    losses_ext = hh_ext.get_losses()
+
+    # Consumption smoothing identical (same total S in consumption_loss_t).
+    series_int = hh_int.time_series[LossType.CONSUMPTION_LOSS]
+    series_ext = hh_ext.time_series[LossType.CONSUMPTION_LOSS]
+    assert (series_int.values == series_ext.values).all()
+    assert (
+        abs(
+            losses_int[LossType.CONSUMPTION_LOSS]
+            - losses_ext[LossType.CONSUMPTION_LOSS]
+        )
+        < 1e-9
+    )
+
+    # Taylor term: full for internal, zero for external.
+    assert losses_int["Wellbeing Loss (Liquidity Term)"] > 0
+    assert losses_ext["Wellbeing Loss (Liquidity Term)"] == 0.0
 
 
 def test_resilience_metric_equals_asset_over_wellbeing():
@@ -747,9 +816,8 @@ def test_opt_lambda_rho_defaults_to_config_rho():
         i0=20000,
         iavg=20000,
         rho=0.06,
-        savings=0,
-        insurance=0,
-        support=0,
+        internal=0,
+        external=0,
         cmin=0,
     )
     hh_disc = CommunityUnit(cfg_disc)
@@ -763,9 +831,8 @@ def test_opt_lambda_rho_defaults_to_config_rho():
         i0=20000,
         iavg=20000,
         rho=0.06,
-        savings=0,
-        insurance=0,
-        support=0,
+        internal=0,
+        external=0,
         cmin=0,
     )
     hh_zero = CommunityUnit(cfg_zero)
@@ -1239,7 +1306,7 @@ def test_extra_fields_forbidden_on_all_config_models():
     with pytest.raises(ValidationError, match=r"[Ee]xtra"):
         IncomeStream(income=100.0, v=0.1, recovery_time=1.0, bogus=1)
     with pytest.raises(ValidationError, match=r"[Ee]xtra"):
-        Liquidity(savings=100, bogus=True)
+        Liquidity(internal=100, bogus=True)
     with pytest.raises(ValidationError, match=r"[Ee]xtra"):
         IncomeConfig(i_avg=1000.0, typo_field=1)
     with pytest.raises(ValidationError, match=r"[Ee]xtra"):
@@ -1282,9 +1349,9 @@ def test_numeric_field_bounds_raise_on_invalid():
     with pytest.raises(ValidationError, match="greater than 0"):
         SimulationConfig(eta=0)
 
-    # Liquidity: negative savings rejected.
+    # Liquidity: negative internal rejected.
     with pytest.raises(ValidationError, match="greater than or equal to 0"):
-        Liquidity(savings=-1)
+        Liquidity(internal=-1)
 
     # IncomeConfig: i_avg must be > 0.
     with pytest.raises(ValidationError, match="greater than 0"):

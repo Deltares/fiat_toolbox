@@ -142,11 +142,33 @@ class IncomeStream(BaseModel):
 
 
 class Liquidity(BaseModel):
+    """Household liquidity buffer used to smooth post-shock consumption.
+
+    `external` (insurance payouts, government / community aid, …) is spent
+    first; depleting it incurs no wellbeing penalty. `internal` (own
+    savings) is drawn only after `external` is exhausted, and depleting it
+    does contribute to the Wellbeing-Losses.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
-    savings: float = Field(0.0, ge=0, description="Household savings (≥ 0)")
-    insurance: float = Field(0.0, ge=0, description="Insurance payout (≥ 0)")
-    support: float = Field(0.0, ge=0, description="External support (≥ 0)")
+    internal: float = Field(
+        0.0,
+        ge=0,
+        description=(
+            "Household-owned liquidity (savings, ≥ 0). Depleting it incurs "
+            "a wellbeing loss."
+        ),
+    )
+    external: float = Field(
+        0.0,
+        ge=0,
+        description=(
+            "Externally-provided liquidity (insurance payouts, government "
+            "or community support, ≥ 0). Spent first; depleting it incurs "
+            "no wellbeing loss."
+        ),
+    )
 
 
 class IncomeConfig(BaseModel):
@@ -683,19 +705,21 @@ class CommunityUnit:
         liq = self.config.liquidity
         if not liq:
             return 0.0
-        return (liq.savings or 0.0) + (liq.insurance or 0.0) + (liq.support or 0.0)
+        return (liq.internal or 0.0) + (liq.external or 0.0)
 
     def _liquidity_depleted(self) -> float:
         """
-        Amount of liquidity stock actually drawn down over the recovery period.
+        Internal liquidity actually drawn down over the recovery period —
+        the only portion that contributes to the Wellbeing-Loss Taylor term.
 
-        `min(S, lifetime_loss_integral)` where the lifetime integral sums the
-        owner contribution `(π_h + λ_h)·v·k / λ_h` (when owner has physical
-        damage) plus each extra component `Nᵢ / λᵢ`. When the owner has no
-        physical damage but extras exist, only the extras contribute — savings
-        are still drawn down to smooth the rental / labour streams, and the
-        Taylor term in `get_losses` should reflect that.
+        External liquidity is spent first (insurance, aid; depleting it has
+        no wellbeing loss). Whatever the household needs *beyond* the
+        external buffer comes from internal savings.
+        Returns `max(0, total_drawn − external)`.
         """
+        liq = self.config.liquidity
+        if not liq:
+            return 0.0
         S = self._liquidity()
         if S <= 0:
             return 0.0
@@ -718,7 +742,10 @@ class CommunityUnit:
 
         if lifetime <= 0:
             return 0.0
-        return float(min(S, lifetime))
+
+        total_drawn = min(S, lifetime)
+        external = liq.external or 0.0
+        return float(max(0.0, total_drawn - external))
 
     def _loss_types_for_run(self):
         types = [
