@@ -480,7 +480,7 @@ def opt_lambda(
         Array of time points. Required if `method` is "trapezoid".
     method : str, optional
         The method to use for integration. Can be either "quad" (default) or "trapezoid".
-        "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+        "trapezoid" uses the numpy.trapezoid function, while "quad" uses scipy.integrate.quad.
     cmin : float, optional
         Minimum consumption rate per year. Default is 0.0.
     eps_rel : float, optional
@@ -515,7 +515,7 @@ def opt_lambda(
         return loss
 
     def fun(rec_rate):
-        return objective(rec_rate)
+        return objective(float(np.asarray(rec_rate).item()))
 
     res = minimize(fun, l_min, bounds=[(l_min, l_max)], method="Nelder-Mead")
 
@@ -655,7 +655,7 @@ class Loss:
             Discount rate for the integration. Defaults to 0.
         method : str, optional
             Integration method to use. Can be either "trapezoid" (default) or "quad".
-            "trapezoid" uses the numpy.trapz function, while "quad" uses scipy.integrate.quad.
+            "trapezoid" uses the numpy.trapezoid function, while "quad" uses scipy.integrate.quad.
 
         Returns
         -------
@@ -677,7 +677,7 @@ class Loss:
                 )
             f_t = self._fun(self.t, self.rec_rate)
             f_t_dis = f_t * np.exp(-rho * self.t)
-            integral = np.trapz(f_t_dis, x=self.t, axis=0)
+            integral = np.trapezoid(f_t_dis, x=self.t, axis=0)
         elif method == "quad":
             warnings.filterwarnings("ignore", category=IntegrationWarning)
             integral = np.array(

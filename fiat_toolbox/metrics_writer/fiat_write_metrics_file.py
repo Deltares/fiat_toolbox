@@ -199,13 +199,18 @@ class MetricsFileWriter(IMetricsFileWriter):
         if sql_command.groupby:
             sql_query += f" GROUP BY {sql_command.groupby}"
 
-        # Register the dataframe as a DuckDB table
-        duckdb.unregister("df_results")
-        duckdb.register("df_results", df_results)
+        # Convert pandas StringDtype columns to object so DuckDB can handle them
+        df_results = df_results.copy()
+        for col in df_results.columns:
+            if pd.api.types.is_string_dtype(df_results[col]) and isinstance(
+                df_results[col].dtype, pd.StringDtype
+            ):
+                df_results[col] = df_results[col].astype(object)
 
-        # Execute the query. If the query is invalid, an error PandaSQLException will be raised
+        # Execute the query. If the query is invalid, an error will be raised.
+        # DuckDB can directly reference local Python variables by name in SQL.
         sql_query = sql_query.replace("`", '"')
-        result = duckdb.query(sql_query).df()
+        result = duckdb.sql(sql_query).df()
 
         # If the command contains a groupby statement, return a dictionary with the groupby variables as keys and the metric as value
         if sql_command.groupby:

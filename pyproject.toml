@@ -18,10 +18,10 @@ classifiers = [
     "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
     "Topic :: Scientific/Engineering :: Hydrology",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.14"
 dynamic = ["version"]
 dependencies = [
-    "numpy < 2.0",
+    "numpy>=2.0",
     "pandas",
     "tomli",
     "toml",
@@ -33,7 +33,6 @@ dependencies = [
     "pydantic",
     "pillow",
     "matplotlib",
-    "numpy",
     "scipy",
     "seaborn"
 ]
