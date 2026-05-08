@@ -5,10 +5,6 @@ import numpy as np
 from scipy.integrate import IntegrationWarning, quad
 from scipy.optimize import brentq, minimize
 
-# np.trapz was removed in NumPy 2.0 in favor of np.trapezoid (added in 2.0).
-# Use whichever is available so the code works on both NumPy 1.x and 2.x.
-_trapezoid = getattr(np, "trapezoid", None) or np.trapz
-
 
 def utility(
     consumption: Union[float, np.ndarray], eta: float, normalize: bool = False
@@ -681,7 +677,7 @@ class Loss:
                 )
             f_t = self._fun(self.t, self.rec_rate)
             f_t_dis = f_t * np.exp(-rho * self.t)
-            integral = _trapezoid(f_t_dis, x=self.t, axis=0)
+            integral = np.trapezoid(f_t_dis, x=self.t, axis=0)
         elif method == "quad":
             warnings.filterwarnings("ignore", category=IntegrationWarning)
             integral = np.array(
