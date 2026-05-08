@@ -40,14 +40,17 @@ dependencies = [
 [dependency-groups]
 dev = [
   {include-group = "lint"},
-  {include-group = "test"}
+  {include-group = "test"},
+  {include-group = "build"},
 ]
 test = ["pytest", "pytest-cov"]
 lint = ["pre-commit", "ruff"]
+build = ["setuptools", "wheel", "build"]
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov"]
 lint = ["pre-commit", "ruff"]
+build = ["setuptools", "wheel", "build"]
 
 [project.urls]
 Source = "https://github.com/Deltares/fiat_toolbox"
