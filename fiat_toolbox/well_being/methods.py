@@ -1,6 +1,6 @@
 import warnings
 from enum import Enum
-from typing import Optional, Sequence, Tuple, Union
+from typing import Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from scipy.integrate import IntegrationWarning, quad
@@ -571,6 +571,7 @@ def opt_lambda(
     l_max: float = 10,
     t_max: Optional[float] = None,
     times: Optional[np.ndarray] = None,
+    loss_horizon: Optional[Union[float, Literal["recovery_time"]]] = None,
     method: str = "quad",
     cmin: float = 0.0,
     eps_rel: float = 0.0,
@@ -594,6 +595,11 @@ def opt_lambda(
         Simulation horizon. Required when `method == "quad"`.
     times : np.ndarray, optional
         Time grid. Required when `method == "trapezoid"`.
+    loss_horizon : float or {"recovery_time"}, optional
+        End time through which to integrate the optimizer objective and
+        feasibility check. If omitted, uses the full simulation horizon. If
+        `"recovery_time"`, each candidate lambda is integrated through its own
+        implied recovery time.
     method : str, optional
         Integration method, `"quad"` (default) or `"trapezoid"`.
     cmin : float, optional
@@ -674,8 +680,68 @@ def opt_lambda(
         )
         return result
 
-    # Horizon for the t_max diagnostic — handles both method branches.
-    horizon = float(t_max) if t_max is not None else float(np.asarray(times)[-1])
+    available_horizon = (
+        float(t_max) if method == "quad" else float(np.asarray(times, dtype=float)[-1])
+    )
+    candidate_recovery_horizon = loss_horizon == "recovery_time"
+    if candidate_recovery_horizon:
+        horizon = None
+    elif isinstance(loss_horizon, str):
+        result.update(
+            {
+                "message": (
+                    "loss_horizon must be None, a positive finite value, or "
+                    "'recovery_time'."
+                ),
+            }
+        )
+        return result
+    elif loss_horizon is None:
+        horizon = available_horizon
+    else:
+        horizon = float(loss_horizon)
+        if not np.isfinite(horizon) or horizon <= 0:
+            result.update({"message": "loss_horizon must be a positive finite value."})
+            return result
+        if horizon > available_horizon:
+            result.update(
+                {
+                    "message": (
+                        "loss_horizon must be less than or equal to the available "
+                        "simulation horizon."
+                    ),
+                }
+            )
+            return result
+
+    times_arr = np.asarray(times, dtype=float)
+
+    def candidate_horizon(rec_rate: float) -> float:
+        if candidate_recovery_horizon:
+            return float(recovery_time(rate=rec_rate, rebuilt_per=recovery_per))
+        return float(horizon)
+
+    if candidate_recovery_horizon:
+        max_candidate_horizon = candidate_horizon(l_min)
+        if max_candidate_horizon > available_horizon:
+            result.update(
+                {
+                    "message": (
+                        "loss_horizon='recovery_time' requires all candidate "
+                        "recovery times to be within the available simulation "
+                        "horizon. Increase t_max/times or increase l_min."
+                    ),
+                }
+            )
+            return result
+
+    def times_for_horizon(eval_horizon: float) -> np.ndarray:
+        if method == "quad":
+            return np.array([0.0, eval_horizon])
+        mask_inside = (times_arr > times_arr[0]) & (times_arr < eval_horizon)
+        return np.concatenate(
+            ([float(times_arr[0])], times_arr[mask_inside], [eval_horizon])
+        )
 
     # NO_RECOVERY_NEEDED: owner has no physical damage (v·k == 0), so owner's
     # λ does not enter the objective. Reporting a λ here would be meaningless —
@@ -687,6 +753,8 @@ def opt_lambda(
     # INFEASIBLE > FAILED > NO_RECOVERY_NEEDED > FLAT > ...
     if v * k_str == 0:
         placeholder_lambda = max(float(l_min), 1.0)
+        eval_horizon = candidate_horizon(placeholder_lambda)
+        times_eval = times_for_horizon(eval_horizon)
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -694,7 +762,7 @@ def opt_lambda(
                 category=UserWarning,
             )
             cl_grid = consumption_loss_t(
-                t=times,
+                t=times_eval,
                 rec_rate=placeholder_lambda,
                 v=v,
                 k_str=k_str,
@@ -718,7 +786,7 @@ def opt_lambda(
                 )
                 return result
             ut_t = UtilityLoss(
-                times,
+                times_eval,
                 placeholder_lambda,
                 v,
                 k_str,
@@ -729,7 +797,7 @@ def opt_lambda(
                 liquidity,
                 extra_losses,
             )
-            loss_val = float(ut_t.total(rho=rho, method=method))
+            loss_val = float(ut_t.total(rho=rho, method=method, t2=eval_horizon))
         result.update(
             {
                 "status": OptLambdaStatus.NO_RECOVERY_NEEDED,
@@ -754,6 +822,8 @@ def opt_lambda(
         # values" UserWarning when that happens. Silence it within the
         # objective — callers that use methods.utility directly still see it.
         with warnings.catch_warnings():
+            eval_horizon = candidate_horizon(rec_rate)
+            times_eval = times_for_horizon(eval_horizon)
             warnings.filterwarnings(
                 "ignore",
                 message="Consumption contains zero or negative values",
@@ -764,7 +834,7 @@ def opt_lambda(
             # γ = Δc(t̂) (liquidity case); consumption_loss_t encodes both, so a
             # max over the time grid is exact.
             cl_grid = consumption_loss_t(
-                t=times,
+                t=times_eval,
                 rec_rate=rec_rate,
                 v=v,
                 k_str=k_str,
@@ -776,7 +846,7 @@ def opt_lambda(
             if c0 - cl_peak < cmin:
                 return np.inf
             ut_t = UtilityLoss(
-                times,
+                times_eval,
                 rec_rate,
                 v,
                 k_str,
@@ -787,7 +857,7 @@ def opt_lambda(
                 liquidity,
                 extra_losses,
             )
-            loss = ut_t.total(rho=rho, method=method)
+            loss = ut_t.total(rho=rho, method=method, t2=eval_horizon)
             return loss
 
     def fun(rec_rate):
@@ -923,12 +993,13 @@ def opt_lambda(
         # t_max diagnostic: at the slow-recovery end, check whether the
         # simulation horizon is the binding constraint rather than the
         # wellbeing shape.
-        fraction = 1.0 - float(np.exp(-l_opt * horizon))
+        diagnostic_horizon = candidate_horizon(l_opt)
+        fraction = 1.0 - float(np.exp(-l_opt * diagnostic_horizon))
         t_max_hint = ""
         if fraction < recovery_per / 100.0:
             t_max_hint = (
                 f" Recovery is only {fraction:.0%} complete by "
-                f"t_max={horizon:g}y, below recovery_per={recovery_per}%. "
+                f"t_max={diagnostic_horizon:g}y, below recovery_per={recovery_per}%. "
                 "The slow-λ preference may be an artefact of the "
                 "simulation horizon — consider increasing t_max."
             )

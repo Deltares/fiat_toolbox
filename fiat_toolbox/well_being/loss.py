@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from scipy.optimize import brentq
 
 from .methods import (
     ConsumptionLoss,
@@ -417,6 +418,20 @@ class CommunityUnit:
         dt_calc = t_max / (int(t_max / dt) + 1)
         return np.linspace(0, t_max, int(t_max / dt_calc) + 1)
 
+    def _resolve_loss_horizon(self, loss_horizon: Optional[float] = None) -> float:
+        if loss_horizon is None:
+            return float(self.t[-1])
+
+        horizon = float(loss_horizon)
+        t_max = float(self.t[-1])
+        if not np.isfinite(horizon) or horizon <= 0:
+            raise ValueError("loss_horizon must be a positive finite value.")
+        if horizon > t_max:
+            raise ValueError(
+                "loss_horizon must be less than or equal to SimulationConfig.t_max."
+            )
+        return horizon
+
     def __repr__(self):
         return (
             f"CommunityUnit(\n"
@@ -707,7 +722,7 @@ class CommunityUnit:
             return 0.0
         return (liq.internal or 0.0) + (liq.external or 0.0)
 
-    def _liquidity_depleted(self) -> float:
+    def _liquidity_depleted(self, horizon: Optional[float] = None) -> float:
         """
         Internal liquidity actually drawn down over the recovery period —
         the only portion that contributes to the Wellbeing-Loss Taylor term.
@@ -715,7 +730,8 @@ class CommunityUnit:
         External liquidity is spent first (insurance, aid; depleting it has
         no wellbeing loss). Whatever the household needs *beyond* the
         external buffer comes from internal savings.
-        Returns `max(0, total_drawn − external)`.
+        Returns `max(0, total_drawn − external)`. If `horizon` is supplied,
+        the drawdown is accumulated only up to that time.
         """
         liq = self.config.liquidity
         if not liq:
@@ -724,7 +740,7 @@ class CommunityUnit:
         if S <= 0:
             return 0.0
 
-        lifetime = 0.0
+        components = []
         if self._owner_has_physical_damage():
             rr = self._rec_rate()
             if rr is None or rr <= 0:
@@ -734,16 +750,56 @@ class CommunityUnit:
             owner_pi = self._stock_pi(self.config.owner_housing)
             v = self.config.owner_housing.v
             k = self.config.owner_housing.k
-            lifetime = ((owner_pi + rr) * v * k) / rr
+            components.append(((owner_pi + rr) * v * k, rr))
 
         for n0, lam in self._extra_losses() or []:
             if lam > 0:
-                lifetime += n0 / lam
+                components.append((n0, lam))
+
+        if not components:
+            return 0.0
+
+        def loss_rate(t: float) -> float:
+            return sum(n0 * np.exp(-lam * t) for n0, lam in components)
+
+        def integral_to(t: float) -> float:
+            return sum(n0 * (1 - np.exp(-lam * t)) / lam for n0, lam in components)
+
+        lifetime = sum(n0 / lam for n0, lam in components)
 
         if lifetime <= 0:
             return 0.0
 
-        total_drawn = min(S, lifetime)
+        if horizon is None:
+            total_drawn = min(S, lifetime)
+        else:
+            horizon = float(horizon)
+            if not np.isfinite(horizon) or horizon <= 0:
+                return 0.0
+
+            if S >= lifetime:
+                total_drawn = integral_to(horizon)
+            else:
+
+                def objective_t_hat(th: float) -> float:
+                    return loss_rate(th) * th + S - integral_to(th)
+
+                min_rate = min(lam for _, lam in components)
+                upper = max(10.0 / min_rate, 1.0)
+                f_upper = objective_t_hat(upper)
+                while f_upper > 0 and upper < 1e6:
+                    upper *= 2
+                    f_upper = objective_t_hat(upper)
+                if f_upper > 0:
+                    return 0.0
+
+                t_hat = brentq(objective_t_hat, 0.0, upper)
+                if horizon >= t_hat:
+                    total_drawn = S
+                else:
+                    total_drawn = integral_to(horizon) - loss_rate(t_hat) * horizon
+
+            total_drawn = min(S, max(0.0, total_drawn))
         external = liq.external or 0.0
         return float(max(0.0, total_drawn - external))
 
@@ -775,7 +831,9 @@ class CommunityUnit:
             return None
         return float(recovery_time(rr, rebuilt_per=self.config.simulation.recovery_per))
 
-    def composite_recovery_time(self) -> Optional[float]:
+    def composite_recovery_time(
+        self, components: Optional[Sequence[str]] = None
+    ) -> Optional[float]:
         """
         Aggregate recovery time across owner + rental + labour modes.
 
@@ -787,6 +845,14 @@ class CommunityUnit:
         aggregate horizon that reflects how slow non-household-owned assets
         constrain the effective recovery profile.
 
+        Parameters
+        ----------
+        components : sequence of str, optional
+            Subset of component names to include in the aggregate. Names match
+            those returned by `recovery_times_per_component` (e.g. "owner",
+            "rental", "labour/firm"). If None (default), all configured stocks
+            are used.
+
         Notes
         -----
         - This method is kept for
@@ -794,10 +860,16 @@ class CommunityUnit:
         - This definition ignores liquidity-induced piecewise effects.
         - Requires all involved rates λᵢ > 0 and coefficients Cᵢ ≥ 0.
         """
-        comps = self._exponential_loss_components()
-        if comps is None:
+        labelled = self._exponential_loss_components_labelled()
+        if labelled is None:
             return None
-        coeffs, rates = comps
+
+        if components is not None:
+            components_set = set(components)
+            labelled = [(n, c, r) for n, c, r in labelled if n in components_set]
+
+        coeffs = [c for _, c, _ in labelled]
+        rates = [r for _, _, r in labelled]
         if not coeffs:
             return 0.0
         C_sum = float(np.sum(coeffs))
@@ -1030,7 +1102,12 @@ class CommunityUnit:
             frac = 1.0
         return 100.0 * frac
 
-    def calc_loss(self, loss_type: LossType, method: str = "trapezoid") -> float:
+    def calc_loss(
+        self,
+        loss_type: LossType,
+        method: str = "trapezoid",
+        loss_horizon: Optional[float] = None,
+    ) -> float:
         """
         Calculate the loss based on the specified loss type and method.
 
@@ -1045,6 +1122,9 @@ class CommunityUnit:
         method : str, optional
             The numerical method to use for calculating the total loss.
             Can be either "trapezoid" (default) or "quad"
+        loss_horizon : float, optional
+            End time through which to integrate losses. If omitted, uses the
+            full configured simulation period.
 
         Returns
         -------
@@ -1058,6 +1138,7 @@ class CommunityUnit:
             on owner housing is requested while owner_housing has neither
             `recovery_rate` nor `recovery_time` set.
         """
+        effective_loss_horizon = self._resolve_loss_horizon(loss_horizon)
         owner_touched = loss_type in (
             LossType.RECOVERY_COST,
             LossType.OWNER_HOUSING_LOSS,
@@ -1126,7 +1207,9 @@ class CommunityUnit:
                     stock, self.t, self._stock_rec_rate(stock)
                 )
                 self.time_series[loss_type] = loss.losses_t
-                self.total_losses[loss_type] = loss.total(rho=0, method=method)
+                self.total_losses[loss_type] = loss.total(
+                    rho=0, method=method, t2=effective_loss_horizon
+                )
                 return self.total_losses[loss_type]
             else:
                 # Aggregate labour income losses over all provided labour assets
@@ -1146,7 +1229,9 @@ class CommunityUnit:
                     # Store per-asset component series and totals
                     asset_key = f"{LossType.LABOUR_INCOME_LOSS.value} ({name})"
                     self.time_series[asset_key] = il.losses_t
-                    self.total_losses[asset_key] = il.total(rho=0, method=method)
+                    self.total_losses[asset_key] = il.total(
+                        rho=0, method=method, t2=effective_loss_horizon
+                    )
                     # Accumulate into aggregate
                     losses_sum = losses_sum + il.losses_t
                     total_sum = total_sum + self.total_losses[asset_key]
@@ -1199,11 +1284,15 @@ class CommunityUnit:
             self.config.simulation.rho if loss_type == LossType.UTILITY_LOSS else 0.0
         )
         self.time_series[loss_type] = loss.losses_t
-        self.total_losses[loss_type] = loss.total(rho=loss_rho, method=method)
+        self.total_losses[loss_type] = loss.total(
+            rho=loss_rho, method=method, t2=effective_loss_horizon
+        )
 
         return self.total_losses[loss_type]
 
-    def get_losses(self, method: str = "trapezoid") -> pd.Series:
+    def get_losses(
+        self, method: str = "trapezoid", loss_horizon: Optional[float] = None
+    ) -> pd.Series:
         """
         Calculate and update various types of losses for the household.
 
@@ -1216,6 +1305,9 @@ class CommunityUnit:
         method : str, optional
             The numerical integration method to use for calculations.
             Can be either "trapezoid" (default) or "quad".
+        loss_horizon : float, optional
+            End time through which to integrate losses. If omitted, uses the
+            full configured simulation period.
 
         Returns
         -------
@@ -1235,12 +1327,13 @@ class CommunityUnit:
         - The `wellbeing_loss` and `equity_weight` functions are used to compute the respective metrics.
         - The results are stored in the `time_series` DataFrame and `total_losses` Series attributes.
         """
+        effective_loss_horizon = self._resolve_loss_horizon(loss_horizon)
         # Calculate losses for configured loss types only. calc_loss already
         # writes total_losses[UTILITY] at rho=config.simulation.rho, so reuse
         # that value rather than recomputing — avoids two "utility" numbers
         # disagreeing on which rho they used.
         for loss_type in self._loss_types_for_run():
-            self.calc_loss(loss_type, method=method)
+            self.calc_loss(loss_type, method=method, loss_horizon=loss_horizon)
 
         eta = self.config.simulation.eta
         c_avg = self._c_avg()
@@ -1250,7 +1343,9 @@ class CommunityUnit:
         # wellbeing cost of a depleted liquidity buffer, evaluated at pre-shock
         # marginal utility du/dc|_{c0} = c0^(-eta). Missing this understates
         # ΔW for every household that draws on S.
-        du_taylor = (self._c0() ** (-eta)) * self._liquidity_depleted()
+        du_taylor = (self._c0() ** (-eta)) * self._liquidity_depleted(
+            horizon=effective_loss_horizon
+        )
         wbl_integral = wellbeing_loss(du=du_dis, c_avg=c_avg, eta=eta)
         wbl_taylor = wellbeing_loss(du=du_taylor, c_avg=c_avg, eta=eta)
         well_being_loss = wbl_integral + wbl_taylor
@@ -1605,6 +1700,7 @@ class CommunityUnit:
         eps_flat: float = 1e-3,
         raise_on_fail: bool = True,
         rho: Optional[float] = None,
+        loss_horizon: Optional[Union[float, Literal["recovery_time"]]] = None,
     ) -> None:
         """
         Optimize the recovery rate (lambda) to minimize the total well-being loss.
@@ -1632,6 +1728,11 @@ class CommunityUnit:
             the optimized λ is consistent with the discounted well-being loss
             reported by `get_losses`. Pass `rho=0.0` to reproduce the
             pre-fix undiscounted optimum.
+        loss_horizon : float or {"recovery_time"}, optional
+            End time through which to integrate losses during optimization.
+            If omitted, uses the full configured simulation period. If
+            `"recovery_time"`, each candidate lambda is integrated through its
+            own implied recovery time.
 
         Returns
         -------
@@ -1639,6 +1740,16 @@ class CommunityUnit:
             The optimal reconstruction rate if found; otherwise None when raise_on_fail=False.
         """
         opt_rho = float(self.config.simulation.rho if rho is None else rho)
+        candidate_recovery_horizon = loss_horizon == "recovery_time"
+        if candidate_recovery_horizon:
+            effective_loss_horizon = None
+        elif isinstance(loss_horizon, str):
+            raise ValueError(
+                "loss_horizon must be None, a positive finite value, or "
+                "'recovery_time'."
+            )
+        else:
+            effective_loss_horizon = self._resolve_loss_horizon(loss_horizon)
         # Check if the maximum recovery time is provided, else use the maximum time
         if rec_time_max is None:
             rec_time_max = self.t[-1]
@@ -1672,6 +1783,11 @@ class CommunityUnit:
         # Create array of lambda values to check
         times = np.linspace(rec_time_min, rec_time_max, no_steps)
         lambdas = recovery_rate(times, rebuilt_per=self.config.simulation.recovery_per)
+        candidate_horizons = (
+            recovery_time(rate=lambdas, rebuilt_per=self.config.simulation.recovery_per)
+            if candidate_recovery_horizon
+            else np.full_like(lambdas, effective_loss_horizon, dtype=float)
+        )
 
         # Calculate losses for each lambda value
         # Initialize arrays to store losses for each lambda
@@ -1692,14 +1808,14 @@ class CommunityUnit:
                 message="Consumption contains zero or negative values",
                 category=UserWarning,
             )
-            for lmbd in lambdas:
+            for lmbd, candidate_horizon in zip(lambdas, candidate_horizons):
                 recovery_costs.append(
                     RecoveryCost(
                         t=self.t,
                         rec_rate=lmbd,
                         v=self.config.owner_housing.v,
                         k_str=self.config.owner_housing.k,
-                    ).total(rho=0, method=method)
+                    ).total(rho=0, method=method, t2=float(candidate_horizon))
                 )
                 income_losses.append(
                     IncomeLoss(
@@ -1708,7 +1824,7 @@ class CommunityUnit:
                         v=self.config.owner_housing.v,
                         k_str=self.config.owner_housing.k,
                         pi=self._stock_pi(self.config.owner_housing),
-                    ).total(rho=0, method=method)
+                    ).total(rho=0, method=method, t2=float(candidate_horizon))
                 )
                 consumption_losses.append(
                     ConsumptionLoss(
@@ -1719,7 +1835,7 @@ class CommunityUnit:
                         pi=self._stock_pi(self.config.owner_housing),
                         liquidity=self._liquidity(),
                         extra_losses=self._extra_losses(),
-                    ).total(rho=0, method=method)
+                    ).total(rho=0, method=method, t2=float(candidate_horizon))
                 )
                 utility_losses.append(
                     UtilityLoss(
@@ -1733,7 +1849,7 @@ class CommunityUnit:
                         cmin=self.config.simulation.c_min,
                         liquidity=self._liquidity(),
                         extra_losses=self._extra_losses(),
-                    ).total(rho=opt_rho, method=method)
+                    ).total(rho=opt_rho, method=method, t2=float(candidate_horizon))
                 )
 
         # Convert lists to numpy arrays for further processing
@@ -1752,6 +1868,11 @@ class CommunityUnit:
             l_max=lambdas.max(),
             t_max=self.config.simulation.t_max,
             times=self.t,
+            loss_horizon=(
+                "recovery_time"
+                if candidate_recovery_horizon
+                else effective_loss_horizon
+            ),
             method=method,
             cmin=self.config.simulation.c_min,
             eps_rel=eps_rel,

@@ -178,6 +178,85 @@ def test_opt_lambda_runs():
     assert "loss_opt" in result
 
 
+def test_opt_lambda_respects_loss_horizon():
+    kwargs = {
+        "v": 0.2,
+        "k_str": 100000,
+        "c0": 20000,
+        "pi": 0.1,
+        "eta": 1.5,
+        "l_min": 0.3,
+        "l_max": 1.0,
+        "times": np.linspace(0, 10, 100),
+        "method": "trapezoid",
+        "cmin": 0,
+        "liquidity": 0,
+        "rho": 0.0,
+    }
+    full = methods.opt_lambda(**kwargs)
+    short = methods.opt_lambda(**kwargs, loss_horizon=2.0)
+    assert full["success"]
+    assert short["success"]
+    assert short["loss_opt"] < full["loss_opt"]
+
+
+def test_opt_lambda_supports_candidate_recovery_time_horizon():
+    kwargs = {
+        "v": 0.2,
+        "k_str": 100000,
+        "c0": 20000,
+        "pi": 0.1,
+        "eta": 1.5,
+        "l_min": 0.3,
+        "l_max": 1.0,
+        "times": np.linspace(0, 10, 100),
+        "method": "trapezoid",
+        "cmin": 0,
+        "liquidity": 0,
+        "rho": 0.0,
+    }
+    full = methods.opt_lambda(**kwargs)
+    candidate = methods.opt_lambda(**kwargs, loss_horizon="recovery_time")
+
+    assert full["success"]
+    assert candidate["success"]
+    assert not np.isclose(candidate["loss_opt"], full["loss_opt"])
+
+
+def test_opt_lambda_rejects_invalid_loss_horizon():
+    res = methods.opt_lambda(
+        v=0.2,
+        k_str=100000,
+        c0=20000,
+        pi=0.1,
+        eta=1.5,
+        l_min=0.3,
+        l_max=1.0,
+        times=np.linspace(0, 10, 100),
+        method="trapezoid",
+        loss_horizon=11.0,
+    )
+    assert res["success"] is False
+    assert "loss_horizon" in (res["message"] or "")
+
+
+def test_opt_lambda_rejects_invalid_loss_horizon_mode():
+    res = methods.opt_lambda(
+        v=0.2,
+        k_str=100000,
+        c0=20000,
+        pi=0.1,
+        eta=1.5,
+        l_min=0.3,
+        l_max=1.0,
+        times=np.linspace(0, 10, 100),
+        method="trapezoid",
+        loss_horizon="bad-mode",
+    )
+    assert res["success"] is False
+    assert "loss_horizon" in (res["message"] or "")
+
+
 def test_utility_warns_on_nonpositive_consumption():
     # S1: the warning for c <= 0 was previously commented out. Subzero
     # consumption silently became NaN. Now it must warn so callers can see

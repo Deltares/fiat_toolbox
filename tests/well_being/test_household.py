@@ -79,6 +79,30 @@ def test_calc_loss_income():
     assert loss > 0
 
 
+def test_calc_loss_respects_loss_horizon():
+    rec_rate = 0.7
+    config = _make_config(
+        v=0.1,
+        k=50000,
+        rec_rate=rec_rate,
+        i0=15000,
+        iavg=14000,
+        t_max=5,
+        dt=0.1,
+    )
+    hh = CommunityUnit(config)
+    loss = hh.calc_loss(
+        LossType.OWNER_HOUSING_LOSS, method="trapezoid", loss_horizon=2.0
+    )
+    expected = _analytical_income_integral(
+        baseline=config.owner_housing.pi * config.owner_housing.k,
+        v=config.owner_housing.v,
+        lam=rec_rate,
+        t_max=2.0,
+    )
+    assert abs(loss - expected) / expected < 5e-3
+
+
 def test_calc_loss_utility():
     config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
     hh = CommunityUnit(config)
@@ -100,6 +124,34 @@ def test_get_losses():
     assert LossType.UTILITY_LOSS in losses
     assert LossType.RENTAL_HOUSING_LOSS not in losses
     assert LossType.LABOUR_INCOME_LOSS not in losses
+
+
+def test_get_losses_respects_loss_horizon_for_integrated_totals():
+    config = _make_config(
+        v=0.1,
+        k=50000,
+        rec_rate=0.7,
+        i0=15000,
+        iavg=14000,
+        internal=0,
+        external=0,
+    )
+    full = CommunityUnit(config).get_losses(method="trapezoid")
+    short = CommunityUnit(config).get_losses(method="trapezoid", loss_horizon=2.0)
+    assert short[LossType.UTILITY_LOSS] < full[LossType.UTILITY_LOSS]
+    assert short["Wellbeing Loss (Integral)"] < full["Wellbeing Loss (Integral)"]
+    assert short["Asset Loss"] == full["Asset Loss"]
+
+
+def test_loss_horizon_must_not_exceed_simulation_period():
+    import pytest
+
+    config = _make_config(v=0.1, k=50000, rec_rate=0.7, i0=15000, iavg=14000)
+    hh = CommunityUnit(config)
+    with pytest.raises(ValueError, match="SimulationConfig.t_max"):
+        hh.calc_loss(LossType.OWNER_HOUSING_LOSS, loss_horizon=10.0)
+    with pytest.raises(ValueError, match="positive finite"):
+        hh.get_losses(loss_horizon=0.0)
 
 
 def test_get_losses_with_rental_and_labour():
@@ -643,6 +695,44 @@ def test_liquidity_depleted_equals_min_S_and_lifetime():
     assert abs(hh2._liquidity_depleted() - 1000.0) < 1e-6
 
 
+def test_liquidity_depleted_respects_horizon():
+    config = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=0.5,
+        i0=20000,
+        iavg=20000,
+        internal=10**9,
+        external=0,
+        t_max=10,
+    )
+    hh = CommunityUnit(config)
+    expected = (0.1 + 0.5) * 0.2 * 100000 * (1 - math.exp(-0.5 * 2.0)) / 0.5
+    assert abs(hh._liquidity_depleted(horizon=2.0) - expected) < 1e-6
+    assert hh._liquidity_depleted(horizon=2.0) < hh._liquidity_depleted()
+
+
+def test_get_losses_uses_horizon_for_liquidity_taylor_term():
+    config = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=0.5,
+        i0=20000,
+        iavg=20000,
+        internal=10**9,
+        external=0,
+        t_max=10,
+    )
+    full = CommunityUnit(config).get_losses(method="trapezoid")
+    short = CommunityUnit(config).get_losses(method="trapezoid", loss_horizon=2.0)
+
+    assert (
+        short["Wellbeing Loss (Liquidity Term)"]
+        < full["Wellbeing Loss (Liquidity Term)"]
+    )
+    assert short["Wellbeing Loss"] < full["Wellbeing Loss"]
+
+
 def test_liquidity_depleted_extras_only_with_no_owner_damage():
     # Owner has no physical damage but a labour-asset damage stream exists.
     # Liquidity should still be drawn down to smooth the extras, and
@@ -848,6 +938,137 @@ def test_opt_lambda_rho_defaults_to_config_rho():
     assert not math.isclose(
         res_default["loss_opt"], res_zero["loss_opt"], rel_tol=1e-6
     ), "rho=config vs rho=0 produced identical loss_opt — rho not threaded through"
+
+
+def test_community_opt_lambda_respects_loss_horizon_in_diagnostics():
+    cfg_short = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=None,
+        i0=20000,
+        iavg=20000,
+        t_max=10,
+        internal=0,
+        external=0,
+        cmin=0,
+    )
+    hh_short = CommunityUnit(cfg_short)
+    res_short = hh_short.opt_lambda(no_steps=20, loss_horizon=2.0)
+    assert res_short["success"]
+
+    cfg_full = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=None,
+        i0=20000,
+        iavg=20000,
+        t_max=10,
+        internal=0,
+        external=0,
+        cmin=0,
+    )
+    hh_full = CommunityUnit(cfg_full)
+    res_full = hh_full.opt_lambda(no_steps=20)
+    assert res_full["success"]
+
+    short_utility = hh_short.l_opt[LossType.UTILITY_LOSS].dropna()
+    full_utility = hh_full.l_opt[LossType.UTILITY_LOSS].dropna()
+    idx = short_utility.index.intersection(full_utility.index)[0]
+    assert short_utility.loc[idx] < full_utility.loc[idx]
+
+
+def test_community_opt_lambda_supports_candidate_recovery_time_horizon():
+    cfg_candidate = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=None,
+        i0=20000,
+        iavg=20000,
+        t_max=10,
+        internal=0,
+        external=0,
+        cmin=0,
+    )
+    hh_candidate = CommunityUnit(cfg_candidate)
+    res_candidate = hh_candidate.opt_lambda(
+        rec_time_min=3.0,
+        rec_time_max=5.0,
+        no_steps=5,
+        loss_horizon="recovery_time",
+    )
+    assert res_candidate["success"]
+
+    cfg_fixed = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=None,
+        i0=20000,
+        iavg=20000,
+        t_max=10,
+        internal=0,
+        external=0,
+        cmin=0,
+    )
+    hh_fixed = CommunityUnit(cfg_fixed)
+    res_fixed = hh_fixed.opt_lambda(
+        rec_time_min=3.0,
+        rec_time_max=5.0,
+        no_steps=5,
+        loss_horizon=3.0,
+    )
+    assert res_fixed["success"]
+
+    candidate_grid = hh_candidate.l_opt
+    fixed_grid = hh_fixed.l_opt
+    assert math.isclose(candidate_grid["reconstruction_time"].iloc[0], 3.0)
+    assert math.isclose(candidate_grid["reconstruction_time"].iloc[-1], 5.0)
+    assert math.isclose(
+        candidate_grid[LossType.UTILITY_LOSS].iloc[0],
+        fixed_grid[LossType.UTILITY_LOSS].iloc[0],
+        rel_tol=1e-6,
+    )
+    assert (
+        candidate_grid[LossType.UTILITY_LOSS].iloc[-1]
+        > fixed_grid[LossType.UTILITY_LOSS].iloc[-1]
+    )
+
+
+def test_community_opt_lambda_rejects_invalid_loss_horizon():
+    import pytest
+
+    cfg = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=None,
+        i0=20000,
+        iavg=20000,
+        t_max=10,
+        internal=0,
+        external=0,
+        cmin=0,
+    )
+    hh = CommunityUnit(cfg)
+    with pytest.raises(ValueError, match="SimulationConfig.t_max"):
+        hh.opt_lambda(no_steps=20, loss_horizon=11.0)
+
+
+def test_community_opt_lambda_rejects_invalid_loss_horizon_mode():
+    import pytest
+
+    cfg = _make_config(
+        v=0.2,
+        k=100000,
+        rec_rate=None,
+        i0=20000,
+        iavg=20000,
+        t_max=10,
+        internal=0,
+        external=0,
+        cmin=0,
+    )
+    hh = CommunityUnit(cfg)
+    with pytest.raises(ValueError, match="loss_horizon"):
+        hh.opt_lambda(no_steps=20, loss_horizon="bad-mode")
 
 
 def test_c0_default_is_sum_of_stock_pi_k_plus_i_div():
