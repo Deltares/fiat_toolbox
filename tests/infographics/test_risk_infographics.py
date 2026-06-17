@@ -2,7 +2,7 @@ import base64
 import io
 import unittest
 from pathlib import Path
-from unittest.mock import mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pandas as pd
 from plotly.graph_objects import Figure
@@ -284,6 +284,102 @@ class TestRiskInfographicsParserChartsFigure(unittest.TestCase):
         self.assertEqual(mock_open.call_count, 3)  # 2 images and 1 html file
         self.assertEqual(mock_to_html.call_count, 1)
         self.assertEqual(mock_path_exists_infographics.call_count, 6)
+
+    @patch("fiat_toolbox.infographics.infographics.Path.exists")
+    @patch("fiat_toolbox.infographics.infographics.Image.open")
+    @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_figure_to_html_defaults_query_when_missing(
+        self,
+        mock_open,
+        mock_open_image,
+        mock_path_exists,
+        mock_path_exists_infographics,
+    ):
+        """When the [Other] config has no 'query' field (older databases), the
+        parser must fall back to the historical hardcoded metric names
+        ('ExpectedAnnualDamages' / 'FloodedHomes') instead of raising KeyError."""
+        # Arrange
+        figure_path = Path("parent/some_figure.html")
+        mock_open_image.return_value = "some_image"
+
+        def exists_side_effect(path):
+            # The .html output must not exist yet; everything else does.
+            return ".html" not in str(path)
+
+        mock_path_exists.side_effect = exists_side_effect
+        mock_path_exists_infographics.side_effect = exists_side_effect
+
+        def mock_open_side_effect(file_path, mode="r", encoding=None):
+            file = str(file_path)
+            if "r" in mode:
+                if "money.png" in file:
+                    return io.BytesIO(self.money_bin)
+                elif "house.png" in file:
+                    return io.BytesIO(self.house_bin)
+            else:
+                return mock_open.return_value
+
+        mock_open.side_effect = mock_open_side_effect
+        mock_file = mock_open.return_value.__enter__.return_value
+
+        # Use a mocked figure so the test does not depend on plotly internals.
+        rp_fig = MagicMock()
+        rp_fig.to_html.return_value = "<body>some_figure</body>"
+
+        metrics = {"ExpectedAnnualDamages": 1000000, "FloodedHomes": 1000}
+        # Note: Expected_Damages and Flooded intentionally have NO "query" key.
+        charts = {
+            "Other": {
+                "Expected_Damages": {
+                    "title": "Expected annual damages",
+                    "image": "money.png",
+                    "image_scale": 0.125,
+                    "title_font_size": 30,
+                    "numbers_font_size": 15,
+                    "height": 300,
+                },
+                "Flooded": {
+                    "title": "Number of homes with a high chance of being flooded in a 30-year period",
+                    "image": "house.png",
+                    "image_scale": 0.125,
+                    "title_font_size": 30,
+                    "numbers_font_size": 15,
+                    "height": 300,
+                },
+                "Return_Periods": {
+                    "title": "Building damages",
+                    "font_size": 30,
+                    "image_scale": 0.125,
+                    "numbers_font": 15,
+                    "subtitle_font": 25,
+                    "legend_font": 20,
+                    "plot_height": 300,
+                },
+                "Info": {
+                    "title": "Building damages",
+                    "image": "house.png",
+                    "scale": 0.125,
+                },
+            }
+        }
+
+        # Act
+        parser = RiskInfographicsParser(
+            scenario_name="test_scenario",
+            metrics_full_path="DontCare",
+            config_base_path="DontCare",
+            output_base_path="DontCare",
+        )
+
+        parser._figures_list_to_html(
+            rp_fig=rp_fig, metrics=metrics, charts=charts, file_path=figure_path
+        )
+
+        # Assert: the defaulted metric values are rendered (no KeyError).
+        written = mock_file.write.call_args[0][0]
+        self.assertIn("<p1>$1,000,000</p1>", written)
+        self.assertIn("<p2>1,000</p2>", written)
 
     @patch("fiat_toolbox.infographics.risk_infographics.Path.exists")
     @patch("fiat_toolbox.infographics.infographics.Image.open")
