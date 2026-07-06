@@ -125,6 +125,17 @@ class MetricsFileReader(IMetricsFileReader):
 
         # If the value is still not one of the columns, the metrics file is aggregated
         if "Value" not in df_metrics.columns:
+            # Drop unlabeled aggregation columns. Objects that fall outside all
+            # aggregation areas get an empty/NaN aggregation label, which is written
+            # as an empty-labeled group. It is not a real aggregation area and, after
+            # the transpose above, becomes a NaN/empty column that breaks the numeric
+            # conversion below, so remove it here.
+            valid_columns = [
+                not (pd.isna(col) or (isinstance(col, str) and col.strip() == ""))
+                for col in df_metrics.columns
+            ]
+            df_metrics = df_metrics.loc[:, valid_columns]
+
             aggregations = set(df_metrics.columns) - {
                 "Description",
                 "Long Name",
