@@ -329,7 +329,8 @@ class InfographicsParser(IInfographicsParser):
             if Path.exists(path):
                 if return_image:
                     with Image.open(path) as image:
-                        return image
+                        image.load()
+                    return image
                 else:
                     return str(path)
             else:
@@ -340,7 +341,8 @@ class InfographicsParser(IInfographicsParser):
             if Path.exists(path):
                 if return_image:
                     with Image.open(path) as image:
-                        return image
+                        image.load()
+                    return image
                 else:
                     return str(path)
             else:
