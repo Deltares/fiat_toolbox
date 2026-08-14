@@ -81,9 +81,11 @@ class MetricsFileWriter(IMetricsFileWriter):
         # Read the metrics file
         _, extension = os.path.splitext(self.config_file)
         if extension == ".json":
-            metrics = json.load(open(self.config_file, "r"))
+            with open(self.config_file, "r") as f:
+                metrics = json.load(f)
         elif extension == ".toml":
-            metrics = tomli.load(open(self.config_file, "rb"))
+            with open(self.config_file, "rb") as f:
+                metrics = tomli.load(f)
         else:
             raise ValueError(
                 f"Config file '{self.config_file}' has an invalid extension. Only .json and .toml are supported."

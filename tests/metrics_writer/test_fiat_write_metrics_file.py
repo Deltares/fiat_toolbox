@@ -1114,7 +1114,7 @@ class TestMetricsFileWriter(unittest.TestCase):
         }
 
         temporary_file_name = Path("temptestfile.txt")
-        open(temporary_file_name, "a").close()
+        temporary_file_name.write_text("tmp")
 
         # Act & Assert
         with self.assertLogs(level="WARNING") as cm:
