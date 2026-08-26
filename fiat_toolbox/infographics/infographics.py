@@ -490,21 +490,37 @@ class InfographicsParser(IInfographicsParser):
 
         # Add the pie chart to the figure
         for idx, (key, value) in enumerate(data.items()):
-            # Create single pie chart
-            trace = Pie(
-                values=value["Values"],
-                labels=value["Labels"],
-                hole=0.6,
-                hoverinfo="label+percent+name+value",
-                textinfo="none",
-                name=value["Name"],
-                direction="clockwise",
-                sort=False,
-                marker={
-                    "line": {"color": "#000000", "width": 2},
-                    "colors": value["Colors"],
-                },
-            )
+            # When all values are zero, show a single grey slice instead of
+            # misleading equal-sized colored slices.
+            if sum(value["Values"]) == 0:
+                trace = Pie(
+                    values=[1],
+                    labels=["No impact"],
+                    hole=0.6,
+                    hoverinfo="name",
+                    textinfo="none",
+                    name=value["Name"],
+                    showlegend=False,
+                    marker={
+                        "line": {"color": "#000000", "width": 2},
+                        "colors": ["#c2c2c2"],
+                    },
+                )
+            else:
+                trace = Pie(
+                    values=value["Values"],
+                    labels=value["Labels"],
+                    hole=0.6,
+                    hoverinfo="label+percent+name+value",
+                    textinfo="none",
+                    name=value["Name"],
+                    direction="clockwise",
+                    sort=False,
+                    marker={
+                        "line": {"color": "#000000", "width": 2},
+                        "colors": value["Colors"],
+                    },
+                )
 
             # Add the pie chart to the figure
             fig.add_trace(trace, row=1, col=idx + 1)

@@ -618,3 +618,73 @@ class TestInfographicsParserChartsFigure(unittest.TestCase):
             "File path must be a .html file, not some_figure.txt"
             in str(context.exception)
         )
+
+
+class TestInfographicsParserPieChartFigure(unittest.TestCase):
+    @patch("fiat_toolbox.infographics.infographics.InfographicsParser._add_info_button")
+    @patch(
+        "fiat_toolbox.infographics.infographics.InfographicsParser._check_image_source"
+    )
+    def test_get_pie_chart_figure_zero_values_shows_no_impact_slice(
+        self, mock_check_image_source, mock_add_info_button
+    ):
+        # Arrange
+        mock_check_image_source.return_value = None
+        mock_add_info_button.side_effect = lambda fig, *args, **kwargs: fig
+
+        data = {
+            "testpie": {
+                "Name": "Emergency Facilities",
+                "Image": "test.png",
+                "Values": [0, 0, 0],
+                "Colors": ["red", "orange", "darkred"],
+                "Labels": ["Minor", "Major", "Severe"],
+            }
+        }
+
+        # Act
+        fig = InfographicsParser._get_pie_chart_figure(data)
+
+        # Assert: a single grey "No impact" slice, not three equal misleading ones
+        self.assertEqual(len(fig.data), 1)
+        trace = fig.data[0]
+        self.assertEqual(trace.values, (1,))
+        self.assertEqual(trace.labels, ("No impact",))
+        self.assertEqual(trace.marker.colors, ("#c2c2c2",))
+        self.assertFalse(trace.showlegend)
+        self.assertEqual(trace.hoverinfo, "name")
+        self.assertEqual(trace.textinfo, "none")
+        self.assertEqual(trace.name, "Emergency Facilities")
+
+    @patch("fiat_toolbox.infographics.infographics.InfographicsParser._add_info_button")
+    @patch(
+        "fiat_toolbox.infographics.infographics.InfographicsParser._check_image_source"
+    )
+    def test_get_pie_chart_figure_nonzero_values_shows_normal_slices(
+        self, mock_check_image_source, mock_add_info_button
+    ):
+        # Arrange
+        mock_check_image_source.return_value = None
+        mock_add_info_button.side_effect = lambda fig, *args, **kwargs: fig
+
+        data = {
+            "testpie": {
+                "Name": "Residential",
+                "Image": "test.png",
+                "Values": [1, 2, 3],
+                "Colors": ["red", "orange", "darkred"],
+                "Labels": ["Minor", "Major", "Severe"],
+            }
+        }
+
+        # Act
+        fig = InfographicsParser._get_pie_chart_figure(data)
+
+        # Assert: regular pie with the real values/labels/colors, not the grey fallback
+        self.assertEqual(len(fig.data), 1)
+        trace = fig.data[0]
+        self.assertEqual(trace.values, (1, 2, 3))
+        self.assertEqual(trace.labels, ("Minor", "Major", "Severe"))
+        self.assertEqual(trace.marker.colors, ("red", "orange", "darkred"))
+        self.assertEqual(trace.hoverinfo, "label+percent+name+value")
+        self.assertEqual(trace.textinfo, "none")
